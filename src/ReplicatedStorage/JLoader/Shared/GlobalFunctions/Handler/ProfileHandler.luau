@@ -143,4 +143,5 @@ function CharacterProfile:Destroy()
 	CharacterProfile.ProfileCache[self._Character] = nil
 end
 
+
 return CharacterProfile
