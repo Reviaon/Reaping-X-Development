@@ -1,0 +1,69 @@
+{
+  "name": "Reaping-X",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$path": "src/ReplicatedFirst"
+    },
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Modules": {
+        "$path": "src/ReplicatedStorage/Modules"
+      },
+      "Libraries": {
+        "$path": "src/ReplicatedStorage/Libraries"
+      },
+      "JLoader": {
+        "$path": "src/ReplicatedStorage/JLoader"
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Core": {
+        "$path": "src/ServerScriptService/Core"
+      },
+      "Server": {
+        "$path": "src/ServerScriptService/Server"
+      }
+    },
+
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "ModelBrush": {
+        "$path": "src/ServerStorage/ModelBrush"
+      },
+      "TrianglePoints": {
+        "$path": "src/ServerStorage/TrianglePoints"
+      }
+    },
+
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$path": "src/StarterGui"
+    },
+
+    "StarterPack": {
+      "$className": "StarterPack",
+      "$path": "src/StarterPack"
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterCharacterScripts": {
+        "$path": "src/StarterPlayer/StarterCharacterScripts"
+      },
+      "StarterPlayerScripts": {
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
+      }
+    },
+
+    "Teams": {
+      "$className": "Teams",
+      "$path": "src/Teams"
+    }
+  }
+}
