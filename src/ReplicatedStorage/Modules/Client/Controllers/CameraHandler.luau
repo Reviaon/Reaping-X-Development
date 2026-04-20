@@ -69,7 +69,7 @@ local inputActions = {
 			action = function(Character : Model)	
 			end,
 		},
-		[Enum.KeyCode.LeftControl] = {
+		[Enum.KeyCode.LeftShift] = {
 			canHold = false,
 			action = function(Character : Model)
 				CameraHandler:ToggleShiftLock(not shiftLockEnabled)
@@ -91,8 +91,8 @@ function CameraHandler:Init()
 		self:OnCharacterAdded(LocalPlayer.Character)
 	end
 
-	LocalPlayer.CharacterAdded:Connect(function()
-		self:OnCharacterAdded(LocalPlayer.Character)
+	LocalPlayer.CharacterAdded:Connect(function(char)
+		self:OnCharacterAdded(char)
 	end)
 
 
@@ -121,7 +121,7 @@ function CameraHandler:OnCharacterAdded(char)
 		self:ToggleShiftLock(false);
 	end)
 	
-	self:ToggleShiftLock(true);
+	self:ToggleShiftLock(shiftLockEnabled)
 	
 	self.Mouse = MouseModule.new()
 	self.Mouse.filterDescendants = {self.Character, workspace.World.Visuals, workspace.World.Live}
@@ -195,7 +195,7 @@ function CameraHandler:ToggleShiftLock(state)
 		RunService:UnbindFromRenderStep("ShiftLockRotation")
 
 		if self.Humanoid then
-			self.Humanoid.AutoRotate = false
+			self.Humanoid.AutoRotate = true
 		end
 	end
 end
@@ -211,18 +211,7 @@ function CameraHandler:UpdateCamera(DeltaTime : number)
 	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset)
 
 	if not shiftLockEnabled then		
-		local mousePos = self.Mouse and self.Mouse:GetHit()
-
-		self.Humanoid.AutoRotate = false
-
-		if mousePos and not StatusService:CheckStatuses(self.Character, {NoRotate = true}) then
-
-			local rootPos = self.HumanoidRootPart.Position
-			local lookAt = Vector3.new(mousePos.X, rootPos.Y, mousePos.Z)
-			local targetCFrame = CFrame.new(rootPos, lookAt)
-
-			self.HumanoidRootPart.CFrame = self.HumanoidRootPart.CFrame:Lerp(targetCFrame,math.min(1, DeltaTime * FACE_MOUSE_SPEED * 2))
-		end
+		
 	end
 end
 

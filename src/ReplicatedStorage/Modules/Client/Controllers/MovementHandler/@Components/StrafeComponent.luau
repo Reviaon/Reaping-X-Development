@@ -16,12 +16,10 @@ local AnimatorService = GlobalFunctions.AnimatorService
 local DirectionalSettings = {
 	DefaultLerpAlpha = 0.145,
 	dotThreshold = 0.9,
-	
-	lastMoveDirection = Vector3.new(),
-	
+
 	CurrentAnimation = nil,
 	CurrentAnimationName = nil,
-	
+
 	Trove = GlobalFunctions.Trove.new(),
 }
 
@@ -67,6 +65,11 @@ end
 function DirectionalMovement:Update()
 	local MoveDirection = self.Humanoid.MoveDirection
 
+	if not CameraHandler:IsShiftLockEnabled() then
+		self:StopAnimation()
+		return
+	end
+
 	if MoveDirection.Magnitude <= 0 then
 		self:StopAnimation()
 		return
@@ -93,17 +96,6 @@ function DirectionalMovement:Update()
 	end
 end
 
-function DirectionalMovement:OnMoveDirectionChanged()
-	local currentMoveDirection = self.Humanoid.MoveDirection
-	
-	if currentMoveDirection ~= DirectionalSettings.lastMoveDirection then
-		
-		DirectionalSettings.lastMoveDirection = currentMoveDirection
-		self:Update()
-		
-	end
-end
-
 function DirectionalMovement:Init(Character)
 	if not Character then return end
 		
@@ -113,7 +105,7 @@ function DirectionalMovement:Init(Character)
 	self.HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 	DirectionalSettings.Trove:Add(RunService.RenderStepped:Connect(function()
-		self:OnMoveDirectionChanged()
+		self:Update()
 	end))
 	
 	DirectionalSettings.Trove:Add(self.Humanoid.Died:Connect(function()
@@ -121,7 +113,7 @@ function DirectionalMovement:Init(Character)
 		DirectionalSettings.Trove:Clean()
 	end))
 
-	self:OnMoveDirectionChanged()
+	self:Update()
 end
 
 function DirectionalMovement.Reset()
