@@ -23,6 +23,19 @@ local CharacterProfile = {}
 CharacterProfile.__index = CharacterProfile
 CharacterProfile.ProfileCache = {}
 
+--@ Default humanoid properties applied to every character on spawn
+CharacterProfile.DefaultSettings = {
+	WalkSpeed = 10,
+	JumpPower = 50,
+	JumpHeight = 7.2,
+	MaxHealth = 100,
+	Health = 100,
+	AutoRotate = false,
+	UseJumpPower = true,
+	HipHeight = 0,
+	MaxSlopeAngle = 89,
+}
+
 function CharacterProfile.new(Character)
 	local Player = Players:GetPlayerFromCharacter(Character)
 	local Humanoid = Character:WaitForChild("Humanoid")
@@ -39,20 +52,7 @@ function CharacterProfile.new(Character)
 	local self = {
 		_Character = Character,
 		_Trove = Trove.new(),
-		_WeaponOriginPoint = nil,
 
-		ApplyPhysicsDragToPos = function(Victim, Config)
-			ProfileFunctions.DragToPosition(Victim, Config)
-		end,
-		
-		AddKnockback = function(Attacker, Victim, Settings)
-			ProfileFunctions.AddKnockback(Attacker, Victim,Settings)
-		end,
-		
-		ApplyPhysics = function(Character, Config)
-			ProfileFunctions.ApplyPhysics(Character, Config)
-		end,
-		
 		ClientProperties = {
 			["CFrame"] = CFrame.new(),
 			["Velocity"] = Vector3.zero,
@@ -76,6 +76,20 @@ end
 function CharacterProfile:LoadCharacterAppearance(Character)
 	if not Character then return end    
 	
+	local Humanoid = Character:WaitForChild("Humanoid")
+
+	--@ Apply default humanoid settings
+	local Settings = CharacterProfile.DefaultSettings
+	Humanoid.WalkSpeed  = Settings.WalkSpeed
+	Humanoid.JumpPower = Settings.JumpPower
+	Humanoid.JumpHeight = Settings.JumpHeight
+	Humanoid.MaxHealth = Settings.MaxHealth
+	Humanoid.Health = Settings.Health
+	Humanoid.AutoRotate = Settings.AutoRotate
+	Humanoid.UseJumpPower = Settings.UseJumpPower
+	Humanoid.HipHeight = Settings.HipHeight
+	Humanoid.MaxSlopeAngle = Settings.MaxSlopeAngle
+
 	GlobalFunctions.AnimatorService:CreateProfile(Character)
 	GlobalFunctions.CooldownService:CreateProfile(Character)
 	GlobalFunctions.AnimatorService:LoadPackage(Character, Storage.Animations)

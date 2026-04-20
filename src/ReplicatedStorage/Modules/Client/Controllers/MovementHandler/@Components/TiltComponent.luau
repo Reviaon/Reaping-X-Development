@@ -75,8 +75,8 @@ function TiltController:Init(Character: Model)
 		workspace.World.Map
 	}
 	
-	self.MaxArmTilt = 3 -- How far up the arms can tilt (positive)
-	self.MinArmTilt = -3 -- How far down the arms can tilt (negative)
+	self.MaxArmTilt = 8 -- How far up the arms can tilt (positive)
+	self.MinArmTilt = -8 -- How far down the arms can tilt (negative)
 end
 
 return TiltController
