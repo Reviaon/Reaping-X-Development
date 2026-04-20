@@ -96,6 +96,7 @@ function DirectionalMovement:Update()
 	end
 end
 
+
 function DirectionalMovement:Init(Character)
 	if not Character then return end
 		
