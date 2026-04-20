@@ -137,6 +137,7 @@ function CharacterProfile:AddFor(Time, Callback)
 	end)
 end
 
+
 function CharacterProfile:Destroy()
 	self._Trove:Destroy()
 	
