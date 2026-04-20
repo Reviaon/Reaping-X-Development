@@ -108,7 +108,6 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	end
 end
 
-
 function CharacterProfile:RigCharacter(Character : Model)
 	local Handle = RigParts:FindFirstChild("Handle")
 	local RightArm = Character:FindFirstChild("Right Arm")
