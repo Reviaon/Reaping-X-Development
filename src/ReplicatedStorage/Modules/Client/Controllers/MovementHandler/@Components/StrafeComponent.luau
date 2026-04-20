@@ -118,6 +118,7 @@ function DirectionalMovement:Init(Character)
 	self:Update()
 end
 
+
 function DirectionalMovement.Reset()
 	DirectionalSettings.Trove:Clean()
 end
