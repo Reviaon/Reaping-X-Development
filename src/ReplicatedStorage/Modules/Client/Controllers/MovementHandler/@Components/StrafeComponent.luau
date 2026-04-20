@@ -104,6 +104,7 @@ function DirectionalMovement:Init(Character)
 	self.Animator = self.Humanoid:WaitForChild("Animator")
 	self.HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
+	
 	DirectionalSettings.Trove:Add(RunService.RenderStepped:Connect(function()
 		self:Update()
 	end))
