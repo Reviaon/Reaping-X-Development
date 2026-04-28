@@ -1,9 +1,11 @@
 return{
+	--@ Combat
 	["ComboCount"] = 0,
 	["BlockCount"] = 0,
 	["MaxBlockCount"] = 4,
-	["EquippedWeapon"] = "Melee",
 	
+	--@ Movement
 	["Stamina"] = 100,
 	["MaxStamina"] = 100,
+
 }
