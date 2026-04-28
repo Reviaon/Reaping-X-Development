@@ -59,16 +59,6 @@ local inputConnections = {};
 
 local inputActions = {
 	Began = {
-		[Enum.UserInputType.MouseButton1] = {
-			canHold = false,
-			action = function(Character : Model)
-			end,
-		},
-		[Enum.UserInputType.MouseButton2] = {
-			canHold = true,
-			action = function(Character : Model)	
-			end,
-		},
 		[Enum.KeyCode.LeftControl] = {
 			canHold = false,
 			action = function(Character : Model)
@@ -77,11 +67,7 @@ local inputActions = {
 		} 
 	},
 	Ended = {
-		[Enum.UserInputType.MouseButton2] = {
-			canHold = false;
-			action = function(Character : Model)
-			end;
-		}
+
 	}
 }
 
