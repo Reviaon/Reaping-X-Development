@@ -15,7 +15,7 @@ end
 
 
 function CrouchComponent:Activate(controller)
-	local Character = controller:Get("Character")
+	local Character = controller.Character
 	if not Character then return end
 
 	--@ Guard: already crouching
@@ -32,7 +32,7 @@ function CrouchComponent:Activate(controller)
 end
 
 function CrouchComponent:Deactivate(controller)
-	local Character = controller:Get("Character")
+	local Character = controller.Character
 	if not Character then return end
 
 	if StatusService:CheckStatuses(Character, { Crouching = true }) then

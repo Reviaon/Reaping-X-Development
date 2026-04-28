@@ -103,4 +103,13 @@ function ClientController:ClearCharacter()
 	})
 end
 
-return ClientController
+--@ Proxy so that `controller.Character` reads/writes State transparently,
+--  while method calls like `controller:Set(...)` still resolve on ClientController.
+return setmetatable(ClientController, {
+	__index = function(_, key)
+		return ClientController.State[key]
+	end,
+	__newindex = function(_, key, value)
+		ClientController.State[key] = value
+	end,
+})
