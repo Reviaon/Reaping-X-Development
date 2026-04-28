@@ -20,6 +20,7 @@ local RaycastService = GlobalFunctions.RaycastService
 
 local InputHandler = GlobalFunctions.InputHandler
 local GarbageCollection = GlobalFunctions.Trove
+local ClientController = GlobalFunctions.ClientController
 
 --@ Movement Controller Constants:
 MovementHandler.components = {};
@@ -36,39 +37,18 @@ local inputConnections = {};
 
 local inputActions = {
 	Began = {
-		[Enum.KeyCode.Space] = {
+		[Enum.KeyCode.C] = {
 			canHold = false,
-			action = function(Character : Model)				
+			action = function()
+				MovementHandler.components["CrouchComponent"]:Activate(ClientController)
 			end,
-		},
-		[Enum.KeyCode.Q] = {
-			canHold = false;
-			action = function(Character : Model)				
-			end;
-		},
-		[Enum.KeyCode.W] = {
-			canHold = false;
-			action = function(Character : Model)
-			end;
-		},
-		
-		[Enum.KeyCode.LeftShift] = {
-			canHold = false;
-			action = function(Character : Model)
-			end;
 		},
 	},
 	Ended = {
-		[Enum.KeyCode.Space] = {
+		[Enum.KeyCode.C] = {
 			canHold = false;
-			action = function(Character : Model)
-				
-			end;
-		},
-		[Enum.KeyCode.W] = {
-			canHold = false;
-			action = function(Character : Model)
-				
+			action = function()
+				MovementHandler.components["CrouchComponent"]:Deactivate(ClientController)
 			end;
 		},
 	}
@@ -81,18 +61,34 @@ function MovementHandler:Init()
 end
 
 function MovementHandler:InitCharacter()
-	local Player = Players.LocalPlayer;
-	
-	local Character = Player.Character or Player.CharacterAdded:Wait();
-	local HumanoidRootPart = Character.HumanoidRootPart
-	local Humanoid = Character:WaitForChild("Humanoid")
-		
-	MovementHandler.components["TiltComponent"]:Init(Character);
-	MovementHandler.components["StrafeComponent"]:Init(Character);
+	local Player = Players.LocalPlayer
 
-	MovementHandler.Trove:Connect(RunService.RenderStepped, function(DeltaTime)
-		MovementHandler.components["TiltComponent"]:Update(DeltaTime);		
-	end)
+	local function onCharacter(Character: Model)
+		--@ Populate the shared ClientController with the new character
+		ClientController:SetCharacter(Character)
+
+		MovementHandler.Trove:Destroy()
+		MovementHandler.Trove = GarbageCollection.new()
+
+		MovementHandler.components["TiltComponent"]:Init(ClientController)
+		MovementHandler.components["StrafeComponent"]:Init(ClientController)
+
+		MovementHandler.Trove:Connect(RunService.RenderStepped, function(DeltaTime)
+			MovementHandler.components["TiltComponent"]:Update(DeltaTime)
+		end)
+
+		MovementHandler.Trove:Connect(Character.AncestryChanged, function()
+			if not Character:IsDescendantOf(game) then
+				ClientController:ClearCharacter()
+			end
+		end)
+	end
+
+	local Character = Player.Character or Player.CharacterAdded:Wait()
+	onCharacter(Character)
+
+	--@ Re-populate on every subsequent respawn
+	Player.CharacterAdded:Connect(onCharacter)
 end
 
 function MovementHandler:Clean() 
