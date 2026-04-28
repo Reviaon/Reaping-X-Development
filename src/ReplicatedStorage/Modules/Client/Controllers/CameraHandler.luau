@@ -69,7 +69,7 @@ local inputActions = {
 			action = function(Character : Model)	
 			end,
 		},
-		[Enum.KeyCode.LeftShift] = {
+		[Enum.KeyCode.LeftControl] = {
 			canHold = false,
 			action = function(Character : Model)
 				CameraHandler:ToggleShiftLock(not shiftLockEnabled)
