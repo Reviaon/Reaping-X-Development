@@ -19,13 +19,13 @@ function CrouchComponent:Activate(controller)
 	if not Character then return end
 
 	--@ Guard: already crouching
-	if StatusService:CheckStatuses(Character, { Crouching = true }) then return end
+	if StatusService:CheckStatuses(Character, { IsCrouching = true }) then return end
 
-	StatusService:SetStatus(Character, "Crouching", true)
+	StatusService:SetStatus(Character, "IsCrouching", true)
 
 	local crouch_track = AnimatorService:PlayTrack(Character, "CrouchIdle", {
 		Speed = 1,
-		Priority = Enum.AnimationPriority.Movement,
+		Priority = Enum.AnimationPriority.Idle,
 		FadeTime = 0.3,
 	})
 
@@ -36,8 +36,8 @@ function CrouchComponent:Deactivate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if StatusService:CheckStatuses(Character, { Crouching = true }) then
-		StatusService:RemoveStatus(Character, "Crouching")
+	if StatusService:CheckStatuses(Character, { IsCrouching = true }) then
+		StatusService:RemoveStatus(Character, "IsCrouching")
 	end
 
 	local crouch_track = controller.CrouchIdle

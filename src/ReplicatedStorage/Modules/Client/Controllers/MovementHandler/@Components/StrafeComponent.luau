@@ -10,11 +10,14 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CameraHandler = Jloader.GetHandler("CameraHandler")
 local AnimatorService = GlobalFunctions.AnimatorService
+local StatusService = GlobalFunctions.StatusService
+
 local Trove = GlobalFunctions.Trove
 
 local DOT_THRESHOLD = 0.9
 
 --@ Animation sets keyed by controller state flag.
+--@ We'll use this to determine strafe animation sets for Weapons   
 local STATE_ANIMATIONS = {
 	{ state = "IsCrouching", anims = {
 		Forward = "CrouchForwardWalk",
@@ -22,6 +25,7 @@ local STATE_ANIMATIONS = {
 		Left = "CrouchLeftWalk",
 		Right = "CrouchRightWalk",
 	}},
+
 	{ state = "Default", anims = {
 		Forward = "WalkForward",
 		Backward = "WalkBackward",
@@ -31,12 +35,11 @@ local STATE_ANIMATIONS = {
 }
 
 local function resolveAnimSet(controller)
-	for _, entry in ipairs(STATE_ANIMATIONS) do
-		if entry.state == "Default" then
-			return entry.anims
-		end
-		if controller[entry.state] == true then
-			return entry.anims
+	local Character = controller.Character
+
+	for _, set in ipairs(STATE_ANIMATIONS) do
+		if set.state == "Default" and not Character:GetAttribute(set.state) or StatusService:CheckStatuses(Character, { [set.state] = true }) then
+			return set.anims
 		end
 	end
 end
@@ -49,7 +52,7 @@ local function playAnimation(controller, animName: string)
 	if _currentAnim == animName then return end
 
 	if _currentTrack then
-		_currentTrack:Stop(0.3)
+		_currentTrack:Stop(0.3)	
 	end
 
 	_currentTrack = AnimatorService:PlayTrack(controller.Character, animName, {
@@ -87,10 +90,11 @@ local function update(controller)
 	end
 
 	local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)	
-
 	local anims = resolveAnimSet(controller)
 
-	if     MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+	warn("Current Set State:", anims == STATE_ANIMATIONS[1].anims and "Crouching" or "Default")
+
+	if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
 	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)

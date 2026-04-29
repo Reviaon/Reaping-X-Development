@@ -16,6 +16,13 @@ return{
 			IsStun = false;
 		};
 
+		IsCrouching = {
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 1;
+			IsStun = false;
+		};
+
 		SlowerMovement = {
 			WalkSpeed = 5,
 			JumpPower = 50,
