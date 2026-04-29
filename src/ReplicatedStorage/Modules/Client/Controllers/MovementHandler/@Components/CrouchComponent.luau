@@ -28,7 +28,8 @@ function CrouchComponent:Activate(controller)
 		Priority = Enum.AnimationPriority.Movement,
 		FadeTime = 0.3,
 	})
-	controller:Set("CrouchIdle", track)
+
+    controller.CrouchIdle = track
 end
 
 function CrouchComponent:Deactivate(controller)
@@ -40,11 +41,13 @@ function CrouchComponent:Deactivate(controller)
 	end
 
 
-	local track = controller:Get("CrouchIdle")
+	local track = controller.CrouchIdle
 
 	if track then
 		track:Stop(0.2)
-		controller:Remove("CrouchIdle")
+		controller.CrouchIdle = nil
+
+        warn("Stopped crouch track")
 	end
 end
 

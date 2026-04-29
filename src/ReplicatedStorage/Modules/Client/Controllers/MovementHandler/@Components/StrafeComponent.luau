@@ -1,10 +1,8 @@
 --@ Strafing
-local DirectionalMovement = {}
+local StrafeComponent = {}
 
 local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserinputService = game:GetService("UserInputService")
 
 --@ Imports
 local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
@@ -12,113 +10,106 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CameraHandler = Jloader.GetHandler("CameraHandler")
 local AnimatorService = GlobalFunctions.AnimatorService
+local Trove = GlobalFunctions.Trove
 
-local DirectionalSettings = {
-	DefaultLerpAlpha = 0.145,
-	dotThreshold = 0.9,
+local DOT_THRESHOLD = 0.9
 
-	CurrentAnimation = nil,
-	CurrentAnimationName = nil,
+local _trove  = nil
+local _currentTrack = nil
+local _currentAnim = nil
 
-	Trove = GlobalFunctions.Trove.new(),
-}
+local function playAnimation(controller, animName: string)
+	if _currentAnim == animName then return end
 
-function DirectionalMovement:PlayAnimation(animationName)
-	if DirectionalSettings.CurrentAnimationName == animationName then
-		return
+	if _currentTrack then
+		_currentTrack:Stop(0.3)
 	end
 
-	if DirectionalSettings.CurrentAnimation then
-		DirectionalSettings.CurrentAnimation:Stop()
-	end
-
-	DirectionalSettings.CurrentAnimation = GlobalFunctions.AnimatorService:PlayTrack(self.Character, animationName, {
-		Speed = 1,
+	_currentTrack = AnimatorService:PlayTrack(controller.Character, animName, {
+		Speed    = 1,
 		Priority = Enum.AnimationPriority.Movement,
-		FadeTime = 0.3
+		FadeTime = 0.3,
 	})
-
-	DirectionalSettings.CurrentAnimationName = animationName
+	_currentAnim = animName
 end
 
-function DirectionalMovement:StopAnimation()
-	if DirectionalSettings.CurrentAnimation then
-		DirectionalSettings.CurrentAnimation:Stop(0.3)
-		
-		DirectionalSettings.CurrentAnimation = nil
-		DirectionalSettings.CurrentAnimationName = nil
+local function stopAnimation()
+	if _currentTrack then
+		_currentTrack:Stop(0.3)
+		_currentTrack = nil
+		_currentAnim  = nil
 	end
 end
 
-function DirectionalMovement:CancelWalkAnim()
-	local Animator = self.Animator
-	
-	if Animator then
-		for _, Track: AnimationTrack in Animator:GetPlayingAnimationTracks() do
-			if Track.Name == "WalkAnim" then
-				Track:Stop()
-			end
+local function cancelWalkAnim(controller)
+	local Humanoid = controller.Humanoid
+	if not Humanoid then return end
+
+	local Animator = Humanoid:FindFirstChildOfClass("Animator")
+	if not Animator then return end
+
+	for _, track: AnimationTrack in Animator:GetPlayingAnimationTracks() do
+		if track.Name == "WalkAnim" then
+			track:Stop()
 		end
 	end
 end
 
-function DirectionalMovement:Update()
-	local MoveDirection = self.Humanoid.MoveDirection
+local function update(controller)
+	local Humanoid         = controller.Humanoid
+	local HumanoidRootPart = controller.HumanoidRootPart
+	if not Humanoid or not HumanoidRootPart then return end
+
+	local MoveDirection = Humanoid.MoveDirection
 
 	if not CameraHandler:IsShiftLockEnabled() then
-		self:StopAnimation()
+		stopAnimation()
 		return
 	end
 
 	if MoveDirection.Magnitude <= 0 then
-		self:StopAnimation()
+		stopAnimation()
 		return
 	end
 
-	local MoveDirectionLocal = self.HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
+	local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
 
-	if MoveDirectionLocal:Dot(Vector3.new(1, 0, -1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(1, 0, 1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, 1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(0, 0, -1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(1, 0, 0).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkRight")
-	elseif MoveDirectionLocal:Dot(Vector3.new(0, 0, 1).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, 0).Unit) > DirectionalSettings.dotThreshold then
-		self:PlayAnimation("WalkLeft")
+	if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
+	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
+	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
+	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkRight")
+	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkLeft")
 	end
 end
 
-function DirectionalMovement:Init(Character)
-	if not Character then return end
-		
-	self.Character = Character
-	self.Humanoid = Character:WaitForChild("Humanoid")
-	self.Animator = self.Humanoid:WaitForChild("Animator")
-	self.HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+function StrafeComponent:Init(controller)
+	if not controller.Character then return end
 
+	StrafeComponent.Reset()
 
-	DirectionalSettings.Trove:Add(RunService.RenderStepped:Connect(function()
-		self:Update()
-	end))
-	
-	DirectionalSettings.Trove:Add(self.Humanoid.Died:Connect(function()
-		self:StopAnimation()
-		DirectionalSettings.Trove:Clean()
+	_trove = Trove.new()
+
+	_trove:Add(RunService.RenderStepped:Connect(function()
+		update(controller)
 	end))
 
-	self:Update()
+	_trove:Add(controller.Humanoid.Died:Connect(function()
+		StrafeComponent.Reset()
+	end))
+
+	update(controller)
 end
 
-function DirectionalMovement.Reset()
-	DirectionalSettings.Trove:Clean()
+function StrafeComponent.Reset()
+	stopAnimation()
+
+	if _trove then
+		_trove:Clean()
+		_trove = nil
+	end
 end
 
-return DirectionalMovement
+return StrafeComponent
