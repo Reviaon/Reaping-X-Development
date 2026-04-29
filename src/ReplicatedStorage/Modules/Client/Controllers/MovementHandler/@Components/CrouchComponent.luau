@@ -23,13 +23,13 @@ function CrouchComponent:Activate(controller)
 
 	StatusService:SetStatus(Character, "Crouching", true)
 
-	local track = AnimatorService:PlayTrack(Character, "CrouchIdle", {
-		Speed    = 1,
+	local crouch_track = AnimatorService:PlayTrack(Character, "CrouchIdle", {
+		Speed = 1,
 		Priority = Enum.AnimationPriority.Movement,
 		FadeTime = 0.3,
 	})
 
-    controller.CrouchIdle = track
+    controller.CrouchIdle = crouch_track
 end
 
 function CrouchComponent:Deactivate(controller)
@@ -40,14 +40,12 @@ function CrouchComponent:Deactivate(controller)
 		StatusService:RemoveStatus(Character, "Crouching")
 	end
 
+	local crouch_track = controller.CrouchIdle
 
-	local track = controller.CrouchIdle
+	if crouch_track then
+		crouch_track:Stop(0.2)
 
-	if track then
-		track:Stop(0.2)
 		controller.CrouchIdle = nil
-
-        warn("Stopped crouch track")
 	end
 end
 

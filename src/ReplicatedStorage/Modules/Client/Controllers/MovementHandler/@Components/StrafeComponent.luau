@@ -14,7 +14,34 @@ local Trove = GlobalFunctions.Trove
 
 local DOT_THRESHOLD = 0.9
 
-local _trove  = nil
+--@ Animation sets keyed by controller state flag.
+local STATE_ANIMATIONS = {
+	{ state = "IsCrouching", anims = {
+		Forward = "CrouchForwardWalk",
+		Backward = "CrouchBackwardWalk",
+		Left = "CrouchLeftWalk",
+		Right = "CrouchRightWalk",
+	}},
+	{ state = "Default", anims = {
+		Forward = "WalkForward",
+		Backward = "WalkBackward",
+		Left = "WalkLeft",
+		Right  = "WalkRight",
+	}},
+}
+
+local function resolveAnimSet(controller)
+	for _, entry in ipairs(STATE_ANIMATIONS) do
+		if entry.state == "Default" then
+			return entry.anims
+		end
+		if controller[entry.state] == true then
+			return entry.anims
+		end
+	end
+end
+
+local _trove = nil
 local _currentTrack = nil
 local _currentAnim = nil
 
@@ -26,10 +53,11 @@ local function playAnimation(controller, animName: string)
 	end
 
 	_currentTrack = AnimatorService:PlayTrack(controller.Character, animName, {
-		Speed    = 1,
+		Speed = 1,
 		Priority = Enum.AnimationPriority.Movement,
 		FadeTime = 0.3,
 	})
+
 	_currentAnim = animName
 end
 
@@ -37,21 +65,7 @@ local function stopAnimation()
 	if _currentTrack then
 		_currentTrack:Stop(0.3)
 		_currentTrack = nil
-		_currentAnim  = nil
-	end
-end
-
-local function cancelWalkAnim(controller)
-	local Humanoid = controller.Humanoid
-	if not Humanoid then return end
-
-	local Animator = Humanoid:FindFirstChildOfClass("Animator")
-	if not Animator then return end
-
-	for _, track: AnimationTrack in Animator:GetPlayingAnimationTracks() do
-		if track.Name == "WalkAnim" then
-			track:Stop()
-		end
+		_currentAnim = nil
 	end
 end
 
@@ -72,16 +86,18 @@ local function update(controller)
 		return
 	end
 
-	local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
+	local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)	
 
-	if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkForward")
-	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkRight")
-	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkBackward")
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, "WalkLeft")
+	local anims = resolveAnimSet(controller)
+
+	if     MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Right)
+	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
 	end
 end
 
