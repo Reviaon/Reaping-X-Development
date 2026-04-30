@@ -36,10 +36,12 @@ local STATE_ANIMATIONS = {
 
 local function resolveAnimSet(controller)
 	local Character = controller.Character
-
-	for _, set in ipairs(STATE_ANIMATIONS) do
-		if set.state == "Default" and not Character:GetAttribute(set.state) or StatusService:CheckStatuses(Character, { [set.state] = true }) then
-			return set.anims
+	for _, entry in ipairs(STATE_ANIMATIONS) do
+		if entry.state == "Default" then
+			return entry.anims
+		end
+		if Character and StatusService:CheckStatuses(Character, { [entry.state] = true }) then
+			return entry.anims
 		end
 	end
 end
@@ -73,35 +75,34 @@ local function stopAnimation()
 end
 
 local function update(controller)
-	local Humanoid         = controller.Humanoid
+	local Humanoid   = controller.Humanoid
 	local HumanoidRootPart = controller.HumanoidRootPart
 	if not Humanoid or not HumanoidRootPart then return end
 
 	local MoveDirection = Humanoid.MoveDirection
-
-	if not CameraHandler:IsShiftLockEnabled() then
-		stopAnimation()
-		return
-	end
 
 	if MoveDirection.Magnitude <= 0 then
 		stopAnimation()
 		return
 	end
 
-	local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)	
 	local anims = resolveAnimSet(controller)
 
-	warn("Current Set State:", anims == STATE_ANIMATIONS[1].anims and "Crouching" or "Default")
+	if CameraHandler:IsShiftLockEnabled() then
+		local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
 
-	if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
-	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
-	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
-	elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Right)
-	elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
-	elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
+		if     MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Right)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
+		end
+	else
+		
+		playAnimation(controller, anims.Forward)
 	end
 end
 
