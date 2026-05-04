@@ -91,7 +91,7 @@ local function update(controller)
 	if CameraHandler:IsShiftLockEnabled() then
 		local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
 
-		if     MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
 		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
@@ -101,7 +101,7 @@ local function update(controller)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
 		end
 	else
-		
+
 		playAnimation(controller, anims.Forward)
 	end
 end
@@ -110,7 +110,6 @@ function StrafeComponent:Init(controller)
 	if not controller.Character then return end
 
 	StrafeComponent.Reset()
-
 	_trove = Trove.new()
 
 	_trove:Add(RunService.RenderStepped:Connect(function()

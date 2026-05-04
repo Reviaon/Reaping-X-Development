@@ -22,10 +22,11 @@ function CrouchComponent:Activate(controller)
 	StatusService:SetStatus(Character, "IsCrouching", true)
 
 	local track = AnimatorService:PlayTrack(Character, "CrouchIdle", {
-		Speed    = 1,
+		Speed = 1,
 		Priority = Enum.AnimationPriority.Idle,
 		FadeTime = 0.3,
 	})
+	
 	controller.CrouchIdle = track
 end
 

@@ -37,6 +37,12 @@ local inputConnections = {};
 
 local inputActions = {
 	Began = {
+		[Enum.KeyCode.LeftShift] = {
+			canHold = true,
+			action = function()
+				MovementHandler.components["SprintComponent"]:Activate(ClientController)
+			end,
+		},
 		[Enum.KeyCode.C] = {
 			canHold = false,
 			action = function()
@@ -51,6 +57,12 @@ local inputActions = {
 				MovementHandler.components["CrouchComponent"]:Deactivate(ClientController)
 			end;
 		},
+		[Enum.KeyCode.LeftShift] = {
+			canHold = true,
+			action = function()
+				MovementHandler.components["SprintComponent"]:Deactivate(ClientController)
+			end,
+		},
 	}
 }
 
@@ -64,7 +76,6 @@ function MovementHandler:InitCharacter()
 	local Player = Players.LocalPlayer
 
 	local function onCharacter(Character: Model)
-		--@ Populate the shared ClientController with the new character
 		ClientController:SetCharacter(Character)
 
 		MovementHandler.Trove:Destroy()
@@ -87,7 +98,6 @@ function MovementHandler:InitCharacter()
 	local Character = Player.Character or Player.CharacterAdded:Wait()
 	onCharacter(Character)
 
-	--@ Re-populate on every subsequent respawn
 	Player.CharacterAdded:Connect(onCharacter)
 end
 

@@ -33,14 +33,13 @@ function SprintComponent:Activate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if StatusService:CheckStatuses(Character, { Sprinting = true }) then return end
+	if StatusService:CheckStatuses(Character, { IsSprinting = true }) then return end
 
-	StatusService:SetStatus(Character, "Sprinting", true)
+	StatusService:SetStatus(Character, "IsSprinting", true)
 
-	_sprintTrack = AnimatorService:PlayTrack(Character, "SprintAnim", {
-		Speed    = 1,
-		Priority = Enum.AnimationPriority.Movement,
-		FadeTime = 0.2,
+	_sprintTrack = AnimatorService:PlayTrack(Character, "UniversalSprintAnim", {
+		Speed = 1,
+		Priority = Enum.AnimationPriority.Action,
     })
 
 	controller.SprintTrack = _sprintTrack
@@ -50,8 +49,8 @@ function SprintComponent:Deactivate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if StatusService:CheckStatuses(Character, { Sprinting = true }) then
-		StatusService:RemoveStatus(Character, "Sprinting")
+	if StatusService:CheckStatuses(Character, { IsSprinting = true }) then
+		StatusService:RemoveStatus(Character, "IsSprinting")
 	end
 
 	stopSprint(controller)

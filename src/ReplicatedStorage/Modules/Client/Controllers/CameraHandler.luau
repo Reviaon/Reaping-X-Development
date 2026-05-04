@@ -157,7 +157,7 @@ function CameraHandler:ToggleShiftLock(state)
 	if state then
 		RunService:BindToRenderStep("ShiftLockRotation", Enum.RenderPriority.Camera.Value + 1, function(dt)
 			if not (self.Character and self.HumanoidRootPart and Camera) then return end
-			if not StatusService:CheckStatuses(self.Character, {NoRotate = true}) and not StatusService:CheckStatuses(self.Character, {IsRunning = true}) then
+			if not StatusService:CheckStatuses(self.Character, {NoRotate = true}) and not StatusService:CheckStatuses(self.Character, {IsSprinting = true}) then
 				self.Humanoid.AutoRotate = false
 				
 				local rootPos = self.HumanoidRootPart.Position
