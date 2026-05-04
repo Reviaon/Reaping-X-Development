@@ -4,7 +4,6 @@ local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
 local MovementHandler = Jloader.CreateHandler({Name = script.Name})
 
 --@ Services
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -72,33 +71,23 @@ function MovementHandler:Init()
 	InputHandler.BindInput(inputActions, inputConnections);
 end
 
-function MovementHandler:InitCharacter()
-	local Player = Players.LocalPlayer
+function MovementHandler:InitCharacter(controller)
+	MovementHandler.Trove:Destroy()
+	MovementHandler.Trove = GarbageCollection.new()
 
-	local function onCharacter(Character: Model)
-		ClientController:SetCharacter(Character)
+	MovementHandler.components["TiltComponent"]:Init(controller)
+	MovementHandler.components["StrafeComponent"]:Init(controller)
 
-		MovementHandler.Trove:Destroy()
-		MovementHandler.Trove = GarbageCollection.new()
+	MovementHandler.Trove:Connect(RunService.RenderStepped, function(DeltaTime)
+		MovementHandler.components["TiltComponent"]:Update(DeltaTime)
+	end)
 
-		MovementHandler.components["TiltComponent"]:Init(ClientController)
-		MovementHandler.components["StrafeComponent"]:Init(ClientController)
-
-		MovementHandler.Trove:Connect(RunService.RenderStepped, function(DeltaTime)
-			MovementHandler.components["TiltComponent"]:Update(DeltaTime)
-		end)
-
-		MovementHandler.Trove:Connect(Character.AncestryChanged, function()
-			if not Character:IsDescendantOf(game) then
-				ClientController:ClearCharacter()
-			end
-		end)
-	end
-
-	local Character = Player.Character or Player.CharacterAdded:Wait()
-	onCharacter(Character)
-
-	Player.CharacterAdded:Connect(onCharacter)
+	local Character = controller.Character
+	MovementHandler.Trove:Connect(Character.AncestryChanged, function()
+		if not Character:IsDescendantOf(game) then
+			controller:ClearCharacter()
+		end
+	end)
 end
 
 function MovementHandler:Clean() 

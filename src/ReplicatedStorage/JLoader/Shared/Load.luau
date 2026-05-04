@@ -27,8 +27,7 @@ Load.AddRunners = function(List, Raws, Init)
 	end
 end
 
---@ Load runners and initialize players and characters
-Load.LoadRunners = function(List)
+Load.LoadRunners = function(List, controllerFactory)
 	local Clock = os.clock()
 
 	local Sorted = {}
@@ -54,9 +53,12 @@ Load.LoadRunners = function(List)
 
 	local function InitCharacter(Character)
 		if not Character then return end
+		
+		local controller = controllerFactory and controllerFactory(Character) or Character
+
 		for _, Runner in ipairs(EventInits.Characters) do
 			local IsLocal = Players.LocalPlayer and Character == Players.LocalPlayer.Character
-			task.spawn(Runner.InitCharacter, Runner, Character, IsLocal)
+			task.spawn(Runner.InitCharacter, Runner, controller, IsLocal)
 		end
 	end
 

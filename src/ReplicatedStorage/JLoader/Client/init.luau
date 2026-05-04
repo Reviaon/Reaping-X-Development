@@ -93,7 +93,14 @@ end
 
 --@ Start all handlers and fire the OnStart signal
 Client.Load = function()
-	Load.LoadRunners(Handlers)
+	local ClientController = Client.GlobalFunctions.ClientController
+
+	local function controllerFactory(character)
+		ClientController:SetCharacter(character)
+		return ClientController
+	end
+
+	Load.LoadRunners(Handlers, controllerFactory)
 	Client.Started = true
 	Client.OnStart:Fire()
 end
