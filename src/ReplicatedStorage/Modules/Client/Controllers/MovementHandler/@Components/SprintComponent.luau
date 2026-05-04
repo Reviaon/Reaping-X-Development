@@ -63,7 +63,9 @@ function SprintComponent:Activate(controller)
 				_sprintTrack:Stop(0.3)
 			end
 		else 
-			if _sprintTrack and not _sprintTrack.IsPlaying then
+			if _sprintTrack and not _sprintTrack.IsPlaying 
+				and not (Humanoid.FloorMaterial == Enum.Material.Air 
+				or Humanoid:GetState() == Enum.HumanoidStateType.Jumping) then
 				_sprintTrack:Play()
 			end
 		end

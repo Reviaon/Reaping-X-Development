@@ -36,9 +36,15 @@ local animNames = {
 	jump = 	{
 				{ id = "http://www.roblox.com/asset/?id=125750702", weight = 10 } 
 			}, 
+	sprintjump = {
+				{ id = "http://www.roblox.com/asset/?id=111683728542195", weight = 12 } 
+			},
 	fall = 	{
 				{ id = "http://www.roblox.com/asset/?id=180436148", weight = 10 } 
 			}, 
+	sprintfall = {
+				{ id = "http://www.roblox.com/asset/?id=106678491438059", weight = 12 } 
+			},
 	climb = {
 				{ id = "http://www.roblox.com/asset/?id=180436334", weight = 10 } 
 			}, 
@@ -252,6 +258,12 @@ function playAnimation(animName, transitionTime, humanoid)
 		-- load it to the humanoid; get AnimationTrack
 		currentAnimTrack = humanoid:LoadAnimation(anim)
 		currentAnimTrack.Priority = Enum.AnimationPriority.Core
+
+		if animName == "sprintjump" or animName == "sprintfall" then
+			currentAnimTrack.Priority = Enum.AnimationPriority.Action2
+		elseif animName == "jump" or animName == "fall" then
+			currentAnimTrack.Priority = Enum.AnimationPriority.Action
+		end
 		 
 		-- play the animation
 		currentAnimTrack:Play(transitionTime)
@@ -364,7 +376,8 @@ function onDied()
 end
 
 function onJumping()
-	playAnimation("jump", 0.1, Humanoid)
+	local jumpAnim = Figure:GetAttribute("IsSprinting") and "sprintjump" or "jump"
+	playAnimation(jumpAnim, 0.1, Humanoid)
 	jumpAnimTime = jumpAnimDuration
 	pose = "Jumping"
 end
@@ -383,7 +396,8 @@ end
 
 function onFreeFall()
 	if (jumpAnimTime <= 0) then
-		playAnimation("fall", fallTransitionTime, Humanoid)
+		local fallAnim = Figure:GetAttribute("IsSprinting") and "sprintfall" or "fall"
+		playAnimation(fallAnim, fallTransitionTime, Humanoid)
 	end
 	pose = "FreeFall"
 end
@@ -467,7 +481,8 @@ function move(time)
   	end
 
 	if (pose == "FreeFall" and jumpAnimTime <= 0) then
-		playAnimation("fall", fallTransitionTime, Humanoid)
+		local fallAnim = Figure:GetAttribute("IsSprinting") and "sprintfall" or "fall"
+		playAnimation(fallAnim, fallTransitionTime, Humanoid)
 	elseif (pose == "Seated") then
 		playAnimation("sit", 0.5, Humanoid)
 		return

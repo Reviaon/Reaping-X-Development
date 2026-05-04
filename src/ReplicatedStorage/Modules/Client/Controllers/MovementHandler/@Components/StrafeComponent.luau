@@ -75,7 +75,7 @@ local function stopAnimation()
 end
 
 local function update(controller)
-	local Humanoid   = controller.Humanoid
+	local Humanoid = controller.Humanoid
 	local HumanoidRootPart = controller.HumanoidRootPart
 	if not Humanoid or not HumanoidRootPart then return end
 
@@ -90,7 +90,7 @@ local function update(controller)
 
 	if CameraHandler:IsShiftLockEnabled() then
 		local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
-
+		
 		if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
 		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
@@ -100,8 +100,9 @@ local function update(controller)
 		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
 		end
+	elseif StatusService:CheckStatuses(controller.Character, { IsSprinting = true }) then
+		stopAnimation()
 	else
-
 		playAnimation(controller, anims.Forward)
 	end
 end
