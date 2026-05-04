@@ -5,11 +5,6 @@ local MovementHandler = Jloader.CreateHandler({Name = script.Name})
 
 --@ Services
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
---@ Libraries
-local Libraries = ReplicatedStorage:WaitForChild("Libraries")
-local KeybindList = require(Libraries:WaitForChild("KeybindsLibrary"))
 
 --@ Imports
 local GlobalFunctions = Jloader.GlobalFunctions
@@ -38,28 +33,28 @@ local inputActions = {
 	Began = {
 		[Enum.KeyCode.LeftShift] = {
 			canHold = true,
-			action = function()
-				MovementHandler.components["SprintComponent"]:Activate(ClientController)
+			action = function(controller)
+				MovementHandler.components["SprintComponent"]:Activate(controller)
 			end,
 		},
 		[Enum.KeyCode.C] = {
 			canHold = false,
-			action = function()
-				MovementHandler.components["CrouchComponent"]:Activate(ClientController)
+			action = function(controller)
+				MovementHandler.components["CrouchComponent"]:Activate(controller)
 			end,
 		},
 	},
 	Ended = {
 		[Enum.KeyCode.C] = {
 			canHold = false;
-			action = function()
-				MovementHandler.components["CrouchComponent"]:Deactivate(ClientController)
+			action = function(controller)
+				MovementHandler.components["CrouchComponent"]:Deactivate(controller)
 			end;
 		},
 		[Enum.KeyCode.LeftShift] = {
 			canHold = true,
-			action = function()
-				MovementHandler.components["SprintComponent"]:Deactivate(ClientController)
+			action = function(controller)
+				MovementHandler.components["SprintComponent"]:Deactivate(controller)
 			end,
 		},
 	}
@@ -68,7 +63,7 @@ local inputActions = {
 --@ Bind Input
 function MovementHandler:Init()
 	InputHandler.Init();
-	InputHandler.BindInput(inputActions, inputConnections);
+	InputHandler.BindInput(inputActions, inputConnections, ClientController);
 end
 
 function MovementHandler:InitCharacter(controller)
@@ -83,6 +78,7 @@ function MovementHandler:InitCharacter(controller)
 	end)
 
 	local Character = controller.Character
+
 	MovementHandler.Trove:Connect(Character.AncestryChanged, function()
 		if not Character:IsDescendantOf(game) then
 			controller:ClearCharacter()

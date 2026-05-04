@@ -19,13 +19,14 @@ local KeybindList = require(Libraries:WaitForChild("KeybindsLibrary"))
 --@ Imports
 function InputHandler.Init()
 	InputDump = {}
+	table.clear(heldInputs)
 end
 
 function InputHandler.Clear(connections)
 	for _, connection in ipairs(connections) do
 		connection:Disconnect()
 	end
-	connections = {}
+	table.clear(connections)
 end
 
 function InputHandler:CheckKeys(...)
@@ -45,11 +46,13 @@ function InputHandler:IsMouseButtonDown(MouseButton)
 	return UserInputService:IsMouseButtonPressed(MouseButton)
 end
 
-function InputHandler.HandleInput(Input, GPE, Began, actionTable)
+function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 	local Character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
 
 	if not Character or UserInputService:GetFocusedTextBox() or GPE then return end
 	if Character.Humanoid.Health <= 0 then heldInputs = {} return end
+
+	local payload = controller or Character
 
 	local Key = Input.KeyCode
 	local InputType = Input.UserInputType
@@ -68,7 +71,7 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable)
 						while next(heldInputs) do
 							for input, action in pairs(heldInputs) do
 								if action then
-									action(Character)
+									action(payload)
 								end
 							end
 							RunService.Stepped:Wait()
@@ -76,44 +79,39 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable)
 					end)
 				end
 				if not actionInfo.canHold then
-					actionInfo.action(Character)
+					actionInfo.action(payload)
 				end
 			else
 				heldInputs[Input] = nil
-				actionInfo.action(Character)
+				actionInfo.action(payload)
 			end
 		end
 	end
 end
 
-function InputHandler.BindInput(actionTable : {any}, connections : {any})
+function InputHandler.BindInput(actionTable : {any}, connections : {any}, controller: any?)
 	table.insert(connections, UserInputService.InputBegan:Connect(function(Input, GPE)
-		InputHandler.HandleInput(Input, GPE, true, actionTable)
+		InputHandler.HandleInput(Input, GPE, true, actionTable, controller)
 	end))
 
 	table.insert(connections, UserInputService.InputEnded:Connect(function(Input, GPE)
-		InputHandler.HandleInput(Input, GPE, false, actionTable)
+		InputHandler.HandleInput(Input, GPE, false, actionTable, controller)
 	end))
 end
 
 --@ Additional functions
-
---@ Binds an action to a specific input
 function InputHandler:BindAction(actionName, inputTypes, actionFunction)
 	ContextActionService:BindAction(actionName, actionFunction, false, table.unpack(inputTypes))
 end
 
---@ Unbinds an action from a specific input
 function InputHandler:UnbindAction(actionName)
 	ContextActionService:UnbindAction(actionName)
 end
 
---@ Checks if a key is being pressed and held
 function InputHandler:IsKeyHeld(Key)
 	return UserInputService:IsKeyDown(Key)
 end
 
---@ Checks if any key from a list is being pressed
 function InputHandler:AreKeysDown(keys)
 	for _, key in ipairs(keys) do
 		if UserInputService:IsKeyDown(key) then
@@ -123,7 +121,6 @@ function InputHandler:AreKeysDown(keys)
 	return false
 end
 
---@ Listens for a specific input type and executes a callback function
 function InputHandler:ListenForInput(inputType, callback)
 	table.insert(InputDump, UserInputService.InputBegan:Connect(function(input)
 		if input.UserInputType == inputType then
@@ -132,7 +129,6 @@ function InputHandler:ListenForInput(inputType, callback)
 	end))
 end
 
---@ Gets the current position of the mouse
 function InputHandler:GetMousePosition()
 	return UserInputService:GetMouseLocation()
 end

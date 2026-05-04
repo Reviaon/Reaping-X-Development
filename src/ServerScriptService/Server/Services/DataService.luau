@@ -142,6 +142,7 @@ function DataService.InitPlr(plr, scope)
 					newVal.Parent = parent
 					
 					if newVal.ClassName ~= "Folder" then
+						
 						newVal.Value = val
 						
 						newVal.Changed:Connect(function(newVal)
@@ -152,8 +153,9 @@ function DataService.InitPlr(plr, scope)
 								
 							end
 						end)
+
 					else
-						-- Handle child added event for folders
+
 						newVal.ChildAdded:Connect(function(child)
 							if making == true then return end
 							if not plr or (plr and not plr:IsDescendantOf(Players)) then return end
@@ -199,8 +201,6 @@ function DataService.InitPlr(plr, scope)
 			
 			recursiveCreate(publicDataFolder,profile.Data)
 			
-			--// Handle leveling for data values
-		
 		else
 			profile:Release()
 		end

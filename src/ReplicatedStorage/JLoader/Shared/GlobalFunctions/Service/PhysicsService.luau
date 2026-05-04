@@ -19,9 +19,7 @@ local GlobalFunctions = Jloader.GlobalFunctions;
 local CharacterService = GlobalFunctions.CharacterService;
 local WorldConstants = GlobalFunctions.WorldConstants;
 local DestructionConstants = GlobalFunctions.DestructionConstants;
-
 -- @ Variables
-
 
 function PhysicsService.ProcessPhysics(character: Model, child: Instance)
 	local root: BasePart = character:FindFirstChild("HumanoidRootPart")

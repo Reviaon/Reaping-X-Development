@@ -93,9 +93,13 @@ end
 
 --@ Start all handlers and fire the OnStart signal
 Client.Load = function()
+	local Players = game:GetService("Players")
 	local ClientController = Client.GlobalFunctions.ClientController
 
 	local function controllerFactory(character)
+		if character ~= Players.LocalPlayer.Character then
+			return character
+		end
 		ClientController:SetCharacter(character)
 		return ClientController
 	end

@@ -30,6 +30,7 @@ local ClientController = {}
 ClientController.__index = ClientController
 
 --@ Internal state table - this is the shared mutable array
+
 ClientController.State = {
 	--@ Player / Character references (populated by MovementHandler:InitCharacter)
 	Player          = nil,
@@ -44,9 +45,6 @@ ClientController.State = {
 	-- Components may freely read and write additional keys here.
 }
 
--- ─────────────────────────────────────────────
---  Core API
--- ─────────────────────────────────────────────
 
 --@ Set a single key on State
 function ClientController:Set(key: string, value: any)
@@ -77,9 +75,6 @@ function ClientController:Reset()
 	end
 end
 
--- ─────────────────────────────────────────────
---  Character helpers
--- ─────────────────────────────────────────────
 
 --@ Called once the local character is ready; populates core references
 function ClientController:SetCharacter(character: Model)
@@ -103,8 +98,8 @@ function ClientController:ClearCharacter()
 	})
 end
 
---@ Proxy so that `controller.Character` reads/writes State transparently,
---  while method calls like `controller:Set(...)` still resolve on ClientController.
+--@ Proxy so that `controller.Character` reads/writes State transparently.
+
 return setmetatable(ClientController, {
 	__index = function(_, key)
 		return ClientController.State[key]

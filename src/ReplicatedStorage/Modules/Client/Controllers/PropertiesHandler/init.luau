@@ -11,7 +11,7 @@ local Trove = GlobalFunctions.Trove
 local StatusStates = StatusService:GetStatesTable()
 
 --@ Default base stats when no status overrides are active
-local BASE_WALK_SPEED = 14
+local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
 local SPEED_LERP_ALPHA = 8 
 
@@ -25,6 +25,7 @@ local function applyHumanoidProperties(controller)
 	if not Character or not Humanoid then return end
 
 	local walkSpeed, jumpPower, highestPriority = BASE_WALK_SPEED, BASE_JUMP_POWER, -math.huge
+	local noAutoRotate = false
 
 	for attrName in Character:GetAttributes() do
 		local statusData = StatusStates[attrName]
@@ -34,7 +35,7 @@ local function applyHumanoidProperties(controller)
 				highestPriority = priority
 
 				if attrName == "NoAutoRotate" then
-					Humanoid.AutoRotate = false
+					noAutoRotate = true
 				end
 
 				walkSpeed = statusData.WalkSpeed or walkSpeed
@@ -42,6 +43,8 @@ local function applyHumanoidProperties(controller)
 			end
 		end
 	end
+
+	Humanoid.AutoRotate = not noAutoRotate
 
 	controller:Set("GoalSpeed", walkSpeed)
 	Humanoid.JumpPower = math.max(jumpPower, 0)

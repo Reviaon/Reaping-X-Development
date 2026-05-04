@@ -9,7 +9,7 @@ return{
 			WalkSpeed = 12,
 		},
 
-		IsRunning = {
+		IsSprinting = {
 			WalkSpeed = 30,
 			JumpPower = 50,
 			Priority = 3;
