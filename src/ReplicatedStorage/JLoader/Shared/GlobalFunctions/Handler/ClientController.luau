@@ -92,7 +92,13 @@ end
 
 return setmetatable(ClientController, {
 	__index = function(_, key)
-		return ClientController.State[key]
+		local stateValue = ClientController.State[key]
+		if stateValue ~= nil then
+			return stateValue
+		end
+		-- Fall back to GlobalFunctions utilities
+		local GlobalFunctions = require(script.Parent.Parent)
+		return GlobalFunctions[key]
 	end,
 	__newindex = function(_, key, value)
 		ClientController.State[key] = value

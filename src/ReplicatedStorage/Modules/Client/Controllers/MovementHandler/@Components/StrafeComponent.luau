@@ -2,22 +2,13 @@
 local StrafeComponent = {}
 
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
---@ Imports
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
-local GlobalFunctions = Jloader.GlobalFunctions
-
-local CameraHandler = Jloader.GetHandler("CameraHandler")
-local AnimatorService = GlobalFunctions.AnimatorService
-local StatusService = GlobalFunctions.StatusService
-
-local Trove = GlobalFunctions.Trove
+local CameraHandler = require(game:GetService("ReplicatedStorage"):WaitForChild("JLoader")).GetHandler("CameraHandler")
 
 local DOT_THRESHOLD = 0.9
 
 --@ Animation sets keyed by controller state flag.
---@ We'll use this to determine strafe animation sets for Weapons 
+--@ We'll use this to determine strafe animation sets for Weapons
 
 --@ TODO: Work on Blending between sets.
 local STATE_ANIMATIONS = {
@@ -42,7 +33,7 @@ local function resolveAnimSet(controller)
 		if entry.state == "Default" then
 			return entry.anims
 		end
-		if Character and StatusService:CheckStatuses(Character, { [entry.state] = true }) then
+		if Character and controller.StatusService:CheckStatuses(Character, { [entry.state] = true }) then
 			return entry.anims
 		end
 	end
@@ -56,10 +47,10 @@ local function playAnimation(controller, animName: string)
 	if _currentAnim == animName then return end
 
 	if _currentTrack then
-		_currentTrack:Stop(0.3)	
+		_currentTrack:Stop(0.3)
 	end
 
-	_currentTrack = AnimatorService:PlayTrack(controller.Character, animName, {
+	_currentTrack = controller.AnimatorService:PlayTrack(controller.Character, animName, {
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Movement,
 		FadeTime = 0.3,
@@ -101,7 +92,7 @@ local function update(controller)
 		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
 		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
 		end
-	elseif StatusService:CheckStatuses(controller.Character, { IsSprinting = true }) then
+	elseif controller.StatusService:CheckStatuses(controller.Character, { IsSprinting = true }) then
 		stopAnimation()
 	else
 		playAnimation(controller, anims.Forward)
@@ -112,7 +103,7 @@ function StrafeComponent:Init(controller)
 	if not controller.Character then return end
 
 	StrafeComponent.Reset()
-	_trove = Trove.new()
+	_trove = controller.Trove.new()
 
 	_trove:Add(RunService.RenderStepped:Connect(function()
 		update(controller)

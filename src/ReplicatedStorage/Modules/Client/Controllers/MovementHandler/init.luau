@@ -8,10 +8,6 @@ local RunService = game:GetService("RunService")
 
 --@ Imports
 local GlobalFunctions = Jloader.GlobalFunctions
-local CooldownService = GlobalFunctions.CooldownService
-local StatusService = GlobalFunctions.StatusService
-local RaycastService = GlobalFunctions.RaycastService
-
 local InputHandler = GlobalFunctions.InputHandler
 local GarbageCollection = GlobalFunctions.Trove
 local ClientController = GlobalFunctions.ClientController
@@ -31,6 +27,12 @@ local inputConnections = {};
 
 local inputActions = {
 	Began = {
+		[Enum.KeyCode.Q] = {
+			canHold = false,
+			action = function(controller)
+				MovementHandler.components["DiveComponent"]:Activate(controller)
+			end,
+		},
 		[Enum.KeyCode.LeftShift] = {
 			canHold = true,
 			action = function(controller)
