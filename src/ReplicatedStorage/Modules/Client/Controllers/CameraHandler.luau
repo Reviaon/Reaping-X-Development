@@ -139,10 +139,11 @@ function CameraHandler:ToggleShiftLock(state, controller)
 				
 				if USE_SMOOTH_ROTATION then
 					_, camY = Camera.CFrame:ToOrientation()
-					targetCFrame = CFrame.new(HumanoidRootPart.Position) * CFrame.Angles(0, camY, 0)				
-				end
-	
-				HumanoidRootPart.CFrame = HumanoidRootPart.CFrame:Lerp(targetCFrame, math.min(1, dt * ROTATION_SPEED * 2))
+					targetCFrame = CFrame.new(HumanoidRootPart.Position) * CFrame.Angles(0, camY, 0)	
+					HumanoidRootPart.CFrame = HumanoidRootPart.CFrame:Lerp(targetCFrame, math.min(1, dt * ROTATION_SPEED * 2))		
+				else
+					HumanoidRootPart.CFrame = targetCFrame	
+				end	
 			else
 				Humanoid.AutoRotate = true
 			end
