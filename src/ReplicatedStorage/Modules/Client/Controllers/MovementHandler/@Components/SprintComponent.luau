@@ -3,7 +3,6 @@ local SprintComponent = {}
 
 local RunService = game:GetService("RunService")
 
---@ Module-local state
 local _trove = nil
 local _sprintTrack  = nil
 

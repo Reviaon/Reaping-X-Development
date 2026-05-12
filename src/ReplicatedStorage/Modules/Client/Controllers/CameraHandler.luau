@@ -3,34 +3,27 @@ local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
 local CameraHandler = Jloader.CreateHandler({Name = script.Name})
 
 --@ Services
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 
 --@ Modules
 local GlobalFunctions = Jloader.GlobalFunctions
 local Spring = GlobalFunctions.Spring
-local StatusService = GlobalFunctions.StatusService
 local InputHandler = GlobalFunctions.InputHandler
-local RaycastService = GlobalFunctions.RaycastService
 local MouseModule = GlobalFunctions.MouseModule
+local ClientController = GlobalFunctions.ClientController
 
 --@ Constants
-local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
-local SHIFT_LOCK_KEYS = {Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift}
 local SHIFT_LOCK_OFFSET = Vector3.new(2, 0, 0)
-local LOCK_ICON = ""
+local MOUSE_OBJECT = nil
 
-local TRANSITION_DAMPER = 1.5
 local TRANSITION_IN_SPEED = 60
 local TRANSITION_OUT_SPEED = 30
 
 local ROTATION_SPEED = 20
-local FACE_MOUSE_SPEED = 15
 local USE_SMOOTH_ROTATION = false
 
 --@ Springs
@@ -44,7 +37,6 @@ shakeSpring.Speed = 40
 --@ Components
 CameraHandler.components = {};
 
-
 for _, controller: ModuleScript in script:GetDescendants() do
 	if controller:IsA("ModuleScript") and controller:GetAttribute("AutoRequire") then
 		CameraHandler.components[controller.Name] = require(controller)
@@ -53,16 +45,14 @@ end
 
 --@ State
 local shiftLockEnabled = false
-
-local heldInputs = {}
 local inputConnections = {};
 
 local inputActions = {
 	Began = {
 		[Enum.KeyCode.LeftControl] = {
 			canHold = false,
-			action = function(Character : Model)
-				CameraHandler:ToggleShiftLock(not shiftLockEnabled)
+			action = function(controller)
+				CameraHandler:ToggleShiftLock(not shiftLockEnabled, controller)
 			end,
 		} 
 	},
@@ -72,72 +62,41 @@ local inputActions = {
 }
 
 function CameraHandler:Init()
-
-	if LocalPlayer.Character then
-		self:OnCharacterAdded(LocalPlayer.Character)
-	end
-
-	LocalPlayer.CharacterAdded:Connect(function(char)
-		self:OnCharacterAdded(char)
-	end)
-
-
-	LocalPlayer.CharacterRemoving:Connect(function()
-		self:OnCharacterRemoved()
-	end)
-
-	RunService.RenderStepped:Connect(function(DeltaTime : number)
-		self:UpdateCamera(DeltaTime)
-	end)
-
 	InputHandler.Init();
-	InputHandler.BindInput(inputActions, inputConnections);
+	InputHandler.BindInput(inputActions, inputConnections, ClientController);
 end
 
-function CameraHandler:OnCharacterAdded(char)
-	
-	self.Character = char
-	self.Player = Players:GetPlayerFromCharacter(self.Character)
-	
-	self.Humanoid = char:WaitForChild("Humanoid")
-	self.HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-	self.Head = char:WaitForChild("Head")
-	
-	self.Humanoid.Died:Connect(function()
-		self:ToggleShiftLock(false);
-	end)
-	
-	self:ToggleShiftLock(shiftLockEnabled)
-	
-	self.Mouse = MouseModule.new()
-	self.Mouse.filterDescendants = {self.Character, workspace.World.Visuals, workspace.World.Live}
-	--self.MouseIcon = CameraHandler.components["MouseIcon"]:Init(self.Player)
-	
-	self.Debug = false
-	self.DebugMode = function(DEBUG_POS : Vector3)
-		local DEBUG_PART = Instance.new("Part")
-		DEBUG_PART.Shape = Enum.PartType.Ball
-		DEBUG_PART.CanCollide = false
-		DEBUG_PART.Anchored = true
-		DEBUG_PART.Parent = workspace.World.Visuals
-		DEBUG_PART.Material = Enum.Material.Neon
-		DEBUG_PART.Color = Color3.new(1, 0, 0)
-		DEBUG_PART.Transparency = 0.5
-		DEBUG_PART.Position = DEBUG_POS
+function CameraHandler:InitCharacter(controller)
+	local Character = controller.Character	
 
-		task.delay(1, function()
-			if DEBUG_PART then
-				DEBUG_PART:Destroy()
-			end
-		end)
-	end
-		
+	if not Character then return warn("@CHARACTER FAILED TO LOAD") end
+
+	local _humanoid = Character:WaitForChild("Humanoid")
+	local _trove = controller.Trove.new()
+	local _mouse = MouseModule.new()
+
+	MOUSE_OBJECT = _mouse
+	MOUSE_OBJECT.filterDescendants = {Character, workspace.World.Visuals, workspace.World.Live}
+
+	CameraHandler:ToggleShiftLock(shiftLockEnabled, controller)
+	
+	_trove:Add(_humanoid.Died:Connect(function()
+		CameraHandler:OnCharacterRemoved(controller)
+	end))
+
+	_trove:Add(RunService.RenderStepped:Connect(function(DeltaTime : number)
+		CameraHandler:UpdateCamera(DeltaTime, controller)
+	end))
+
+	warn("CAMERA HANDLER INITIALIZED", controller.Character)
 end
 
-function CameraHandler:OnCharacterRemoved()
-	self:ToggleShiftLock(false)
+
+function CameraHandler:OnCharacterRemoved(controller)
+	CameraHandler:ToggleShiftLock(false, controller)
 end
 
+--@ TODO: Refractor this for screen shake capabilities, utilize camera shaker.
 function CameraHandler:ShakeCamera(power, decay, amplifier)
 	shakeSpring.Position += Vector3.new(
 		math.random(-power, power) * amplifier,
@@ -148,20 +107,31 @@ function CameraHandler:ShakeCamera(power, decay, amplifier)
 	shakeSpring.Damper = decay or 0.8
 end
 
-function CameraHandler:ToggleShiftLock(state)
+function CameraHandler:ToggleShiftLock(state, controller)
 	shiftLockEnabled = state
 	UserInputService.MouseBehavior = state and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
 	CameraHandler.cameraOffsetSpring.Speed = state and TRANSITION_IN_SPEED or TRANSITION_OUT_SPEED
 	CameraHandler.cameraOffsetSpring.Target = state and SHIFT_LOCK_OFFSET or Vector3.zero
 
-	if state then
-		RunService:BindToRenderStep("ShiftLockRotation", Enum.RenderPriority.Camera.Value + 1, function(dt)
-			if not (self.Character and self.HumanoidRootPart and Camera) then return end
-			if not StatusService:CheckStatuses(self.Character, {NoRotate = true}) and not StatusService:CheckStatuses(self.Character, {IsSprinting = true}) then
-				self.Humanoid.AutoRotate = false
-				
-				local rootPos = self.HumanoidRootPart.Position
+	local Character = controller.Character
+	local Humanoid = Character:WaitForChild("Humanoid")
+	local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
+	if state then
+		controller.StatusService:SetStatus(Character, 
+			"ShiftLock", 
+			state
+		)
+
+		RunService:BindToRenderStep("ShiftLockRotation", Enum.RenderPriority.Camera.Value + 1, function(dt)
+			if not (Character) then return end
+
+			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true}) 
+				and not controller.StatusService:CheckStatuses(Character, {IsSprinting = true}) then
+
+				Humanoid.AutoRotate = false
+				
+				local rootPos = HumanoidRootPart.Position
 				local targetCFrame
 	
 				local _, camY = Camera.CFrame:ToOrientation()
@@ -169,19 +139,24 @@ function CameraHandler:ToggleShiftLock(state)
 				
 				if USE_SMOOTH_ROTATION then
 					local _, camY = Camera.CFrame:ToOrientation()
-					targetCFrame = CFrame.new(self.HumanoidRootPart.Position) * CFrame.Angles(0, camY, 0)				
+					targetCFrame = CFrame.new(HumanoidRootPart.Position) * CFrame.Angles(0, camY, 0)				
 				end
 	
-				self.HumanoidRootPart.CFrame = self.HumanoidRootPart.CFrame:Lerp(targetCFrame, math.min(1, dt * ROTATION_SPEED * 2))
+				HumanoidRootPart.CFrame = HumanoidRootPart.CFrame:Lerp(targetCFrame, math.min(1, dt * ROTATION_SPEED * 2))
 			else
-				self.Humanoid.AutoRotate = true
+				Humanoid.AutoRotate = true
 			end
 		end)
 	else
 		RunService:UnbindFromRenderStep("ShiftLockRotation")
 
-		if self.Humanoid then
-			self.Humanoid.AutoRotate = true
+		controller.StatusService:SetStatus(Character, 
+			"ShiftLock", 
+			nil
+		)
+
+		if Humanoid then
+			Humanoid.AutoRotate = true
 		end
 	end
 end
@@ -190,15 +165,13 @@ function CameraHandler:IsShiftLockEnabled()
 	return shiftLockEnabled
 end
 
-function CameraHandler:UpdateCamera(DeltaTime : number)
-	if not (Camera and self.Character and self.Head and self.HumanoidRootPart) then return end
+function CameraHandler:UpdateCamera(DeltaTime, controller)
+	if not (Camera and controller.Character) then 
+		return 
+	end
 
 	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position
 	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset)
-
-	if not shiftLockEnabled then		
-		
-	end
 end
 
 return CameraHandler

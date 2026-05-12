@@ -34,7 +34,7 @@ local animNames = {
 				{ id = "http://www.roblox.com/asset/?id=110000813899534", weight = 10 } 
 			}, 
 	jump = 	{
-				{ id = "http://www.roblox.com/asset/?id=125750702", weight = 10 } 
+				{ id = "http://www.roblox.com/asset/?id=106823849006077", weight = 10 } 
 			}, 
 	sprintjump = {
 				{ id = "http://www.roblox.com/asset/?id=111683728542195", weight = 12 } 
