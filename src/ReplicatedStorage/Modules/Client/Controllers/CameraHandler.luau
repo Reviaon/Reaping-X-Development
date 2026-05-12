@@ -138,7 +138,7 @@ function CameraHandler:ToggleShiftLock(state, controller)
 				targetCFrame = CFrame.new(rootPos) * CFrame.Angles(0, camY, 0)
 				
 				if USE_SMOOTH_ROTATION then
-					local _, camY = Camera.CFrame:ToOrientation()
+					_, camY = Camera.CFrame:ToOrientation()
 					targetCFrame = CFrame.new(HumanoidRootPart.Position) * CFrame.Angles(0, camY, 0)				
 				end
 	
@@ -169,6 +169,8 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 	if not (Camera and controller.Character) then 
 		return 
 	end
+
+	DeltaTime = DeltaTime or RunService.RenderStepped:Wait() 
 
 	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position
 	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset)
