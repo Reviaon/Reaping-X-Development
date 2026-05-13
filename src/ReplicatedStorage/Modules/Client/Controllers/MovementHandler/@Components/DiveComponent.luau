@@ -4,6 +4,9 @@ local DiveComponent = {}
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+--@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
+local DIVE_COOLDOWN = 1.5 --@ Temporary
+
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
 
@@ -12,6 +15,10 @@ function DiveComponent:Activate(controller)
 	end
 
 	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
+		return
+	end
+
+	if controller.CooldownService:CheckCooldown(_character, "Dive") then
 		return
 	end
 
@@ -44,7 +51,7 @@ function DiveComponent:Activate(controller)
 		_divetracks[_heldbind]:Play()
 	end
 
-
+	--@ TODO: Refactor Dive Settings To be more dynamic and less hardcoded.
 	local _dive_speed = 60
 	local _dive_duration = 1
 	local _diveDirection = _heldbind
@@ -60,27 +67,32 @@ function DiveComponent:Activate(controller)
 	local _offset = _directionOffsets[_diveDirection]
 	local _diveVelocity = (_directionOffsets[_diveDirection] * _dive_speed)
   
-	warn("Dive Direction:", _diveDirection, "Offset:", _offset)
-
 	local _camera = workspace.CurrentCamera
-	local _baseCFrame = _humanoidRootPart.CFrame
+	local _startCFrame = _humanoidRootPart.CFrame
+
+	local function _updateOrientation()
+		local _, camY = _camera.CFrame:ToOrientation()
+		local targetCFrame = CFrame.new(_humanoidRootPart.Position) * CFrame.Angles(0, camY, 0)
+		_humanoidRootPart.CFrame = targetCFrame
+		return targetCFrame
+	end
+
+	local _lockedDiveCFrame = _updateOrientation()
+
+	local _lockedDirectionOffsets = {
+		["W"] = _lockedDiveCFrame.LookVector,
+		["S"] = -_lockedDiveCFrame.LookVector,
+		["A"] = -_lockedDiveCFrame.RightVector,
+		["D"] = _lockedDiveCFrame.RightVector,
+	}
+
+	local _lockedDirection = Vector3.new(
+		_lockedDirectionOffsets[_diveDirection].X,
+		0,
+		_lockedDirectionOffsets[_diveDirection].Z
+	).Unit
+
 	local _start = os.clock()
-
-	local _velocity = Instance.new("BodyVelocity")
-	_velocity.Name = "@impulse_velocity"
-	
-	_velocity.MaxForce = Vector3.new(_humanoidRootPart.AssemblyMass,
-	 _humanoidRootPart.AssemblyMass, 
-	 _humanoidRootPart.AssemblyMass) * Vector3.new(1, 0, 1) * 4e4
-
-	_velocity.Velocity = _diveVelocity
-	_velocity.Parent = _humanoidRootPart
-
-	task.delay(_dive_duration, function()
-		if _velocity and _velocity.Parent then
-			_velocity:Destroy()
-		end
-	end)
 
 	local speedMultiplier = Instance.new("NumberValue")
 	speedMultiplier.Value = _dive_speed
@@ -88,6 +100,24 @@ function DiveComponent:Activate(controller)
 	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
 	local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
 	tween:Play()
+
+	local _velocity = Instance.new("BodyVelocity")
+	_velocity.Name = "@impulse_velocity"
+
+	_velocity.MaxForce = Vector3.new(
+		_humanoidRootPart.AssemblyMass,
+		_humanoidRootPart.AssemblyMass,
+		_humanoidRootPart.AssemblyMass
+	) * Vector3.new(1, 0, 1) * 4e4
+
+	_velocity.Velocity = _lockedDirection * speedMultiplier.Value
+	_velocity.Parent = _humanoidRootPart
+
+	task.delay(_dive_duration, function()
+		if _velocity and _velocity.Parent then
+			_velocity:Destroy()
+		end
+	end)
 
 	_trove:Add(tween)
 	_trove:Add(RunService.RenderStepped:Connect(function()
@@ -97,31 +127,38 @@ function DiveComponent:Activate(controller)
 			return
 		end
 
-		if speedMultiplier.Value <= 10 then 
+		if speedMultiplier.Value <= 10 then
 			if _velocity and _velocity.Parent then
 				_velocity:Destroy()
 			end
-			return 
+			return
 		end
 
-		_directionOffsets = {
-			["W"] = _humanoidRootPart.CFrame.LookVector,
-			["S"] = -_humanoidRootPart.CFrame.LookVector,
-			["A"] = -_humanoidRootPart.CFrame.RightVector,
-			["D"] = _humanoidRootPart.CFrame.RightVector,
-		}
+		if not _isShiftLock then
+			_updateOrientation()
+		end
 
-		_offset = _directionOffsets[_diveDirection]
-		_diveVelocity = (_directionOffsets[_diveDirection] * speedMultiplier.Value)
+		if _velocity and _velocity.Parent then
 
-		local _, camY = _camera.CFrame:ToOrientation()
-		local targetCFrame = CFrame.new(_humanoidRootPart.Position) * CFrame.Angles(0, camY, 0)
+			local currentOffsets = {
+				["W"] = _humanoidRootPart.CFrame.LookVector,
+				["S"] = -_humanoidRootPart.CFrame.LookVector,
+				["A"] = -_humanoidRootPart.CFrame.RightVector,
+				["D"] = _humanoidRootPart.CFrame.RightVector,
+			}
 
-		_humanoidRootPart.CFrame = targetCFrame
-		_velocity.Velocity = _diveVelocity
+			local currentDirection = Vector3.new(
+				currentOffsets[_diveDirection].X,
+				0,
+				currentOffsets[_diveDirection].Z
+			).Unit
+
+			_velocity.Velocity = currentDirection * speedMultiplier.Value
+		end
 	end))
 
 	controller.StatusService:SetStatus(_character, "IsDiving", true, _dive_duration)
+	controller.CooldownService:ApplyCooldown(_character, "Dive", DIVE_COOLDOWN)
 
 	DiveComponent:Deactivate(controller)
 end
