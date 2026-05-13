@@ -14,20 +14,17 @@ function HeavyAttackComponent:Activate(controller, _combatState)
 	local Character = controller.Character
 	if not Character then return end
 
-	--@ Stop previous track if still playing
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
 		_currentTrack = nil
 	end
 
-	--@ Play heavy attack animation
 	_currentTrack = controller.AnimatorService:PlayTrack(Character, "Heavy", {
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Action,
 		FadeTime = 0.1,
 	})
 
-	--@ Longer wind-up lock for heavy attacks
 	controller.StatusService:SetStatus(Character, "IsAttacking", true, 0.45)
 end
 
