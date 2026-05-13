@@ -22,7 +22,7 @@ return{
 		};
 
 		ShiftLock = {
-			WalkSpeed = 16,
+			WalkSpeed = 10,
 			JumpPower = 50,
 			Priority = 1,
 			IsStun = false
