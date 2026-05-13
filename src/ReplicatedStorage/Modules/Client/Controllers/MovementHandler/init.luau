@@ -22,7 +22,6 @@ for _, controller: ModuleScript in script:GetDescendants() do
 	end
 end
 
-local heldInputs = {}
 local inputConnections = {};
 
 local inputActions = {
