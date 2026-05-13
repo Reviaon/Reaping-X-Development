@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Libraries = ReplicatedStorage.Libraries
 
+local debug = false
 local StatusService = {
 	Registry = {} :: {Model: {[string]: thread}},
 }
@@ -66,6 +67,14 @@ function StatusService:SetStatus(Entity: Model, Status: string, Value: any, Dura
 		Profile[Status] = nil
 	end
 	
+	if debug then
+		warn("Setting status: ", Status,
+		" to value: ", Value, 
+		" for entity: ", Entity.Name, 
+		" with duration: ", Duration
+		)
+	end
+
 	Entity:SetAttribute(Status, Value)
 	
 	if Duration then

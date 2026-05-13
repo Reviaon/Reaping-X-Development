@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 --@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
 local DIVE_COOLDOWN = 1.5 --@ Temporary
+local _trove 
 
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
@@ -48,6 +49,7 @@ function DiveComponent:Activate(controller)
 			_heldbind = "W"
 		 end
 
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action4
 		_divetracks[_heldbind]:Play()
 	end
 
@@ -55,7 +57,7 @@ function DiveComponent:Activate(controller)
 	local _dive_speed = 60
 	local _dive_duration = 1
 	local _diveDirection = _heldbind
-	local _trove = controller.Trove.new()
+	 _trove = controller.Trove.new()
 
 	local _directionOffsets = {
 		["W"] = _humanoidRootPart.CFrame.LookVector,
@@ -119,6 +121,7 @@ function DiveComponent:Activate(controller)
 		end
 	end)
 
+
 	_trove:Add(tween)
 	_trove:Add(RunService.RenderStepped:Connect(function()
 		if os.clock() - _start > (_dive_duration + 0.5) then
@@ -131,10 +134,9 @@ function DiveComponent:Activate(controller)
 			if _velocity and _velocity.Parent then
 				_velocity:Destroy()
 			end
-			return
 		end
 
-		if not _isShiftLock then
+		if not _isShiftLock or controller.StatusService:CheckStatuses(_character, { IsSprinting = true }) then
 			_updateOrientation()
 		end
 
@@ -157,10 +159,8 @@ function DiveComponent:Activate(controller)
 		end
 	end))
 
-	controller.StatusService:SetStatus(_character, "IsDiving", true, _dive_duration)
+	controller.StatusService:SetStatus(_character, "IsDiving", true, _dive_duration / 2 )
 	controller.CooldownService:ApplyCooldown(_character, "Dive", DIVE_COOLDOWN)
-
-	DiveComponent:Deactivate(controller)
 end
 
 function DiveComponent:Deactivate(controller)

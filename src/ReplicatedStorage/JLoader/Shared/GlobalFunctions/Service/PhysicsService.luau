@@ -61,7 +61,7 @@ function PhysicsService.ProcessPhysics(character: Model, child: Instance)
 		local velocity_fadeoff = child:GetAttribute("velocity_fadeoff") or false
 		local fadeoff_duration = child:GetAttribute("fadeoff_duration") or 0.3
 		local fadeoff_delay = child:GetAttribute("fadeoff_delay") or 0
-		local fadeoff_easing_style = child:GetAttribute("fadeoff_easing_style") or Enum.EasingStyle.Linear
+		local fadeoff_easing_style = child:GetAttribute("fadeoff_easing_style") 
 		local fadeoff_easing_direction = child:GetAttribute("fadeoff_easing_direction") or Enum.EasingDirection.Out
 
 		local velocity_speed = velocity.Magnitude
