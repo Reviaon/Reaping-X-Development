@@ -27,13 +27,11 @@ function BlockComponent:Activate(controller, combatState)
 	local Character = controller.Character
 	if not Character then return end
 
-	--@ Stop any previous block animation
 	if _blockTrack then
 		_blockTrack:Stop(0.1)
 		_blockTrack = nil
 	end
 
-	--@ Play universal block animation on hold
 	_blockTrack = controller.AnimatorService:PlayTrack(Character, "UniversalBlock", {
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Action,
@@ -47,7 +45,6 @@ function BlockComponent:Deactivate(controller, _combatState)
 	local Character = controller.Character
 	if not Character then return end
 
-	--@ Stop block animation and fade out
 	if _blockTrack then
 		_blockTrack:Stop(0.15)
 		_blockTrack = nil
