@@ -186,7 +186,7 @@ function CombatHandler:SetCurrentBranch(branchName: string)
 		local maxCombo = CombatHandler:GetMaxCombo()
 		CombatHandler.State.ComboIndex += 1
 
-		if CombatHandler.State.ComboIndex >= maxCombo then
+		if CombatHandler.State.ComboIndex > maxCombo then
 			CombatHandler.State.ComboIndex = 0
 		end
 	else
