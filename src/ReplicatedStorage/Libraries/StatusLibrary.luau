@@ -5,6 +5,13 @@ return{
 			JumpPower = 50,
 			Priority = 3;
 			IsStun = false;
+		};	
+
+		IsAttacking = {
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 3;
+			IsStun = false;
 		};
 
 		IsDiving = {

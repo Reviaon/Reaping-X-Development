@@ -13,19 +13,22 @@ end
 function LightAttackComponent:Activate(controller, combatState)
 	local Character = controller.Character
 	if not Character then return end
+	 
+	local weaponId = combatState.ActiveWeapon or 
+		controller.CombatConfig:ResolveWeaponId(controller)
+
+	if weaponId == "Unarmed" then
+		return
+	end
 
 	local comboIndex = (combatState.ComboIndex % 10)
 
 	if comboIndex == 0 then
 		comboIndex = 1
 	end
-    
-	local weaponId = combatState.ActiveWeapon or 
-		controller.CombatConfig:ResolveWeaponId(controller)
+   
 
 	local animationName = string.format("%s%d", weaponId, comboIndex)
-
-	warn("Attacking Animation:", animationName)
 
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
