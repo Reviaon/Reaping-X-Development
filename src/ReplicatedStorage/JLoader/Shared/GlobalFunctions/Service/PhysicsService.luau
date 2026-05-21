@@ -6,156 +6,150 @@ local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-function PhysicsService.ApplyImpulse(controller : {}, settings : {})
+-- @ Modules
+local Trove = require(script.Parent.Parent:WaitForChild("Trove"))
+
+--[[
+	PhysicsService.ApplyImpulse(controller, settings) -> Trove | nil
+
+	Applies a configurable BodyVelocity-based impulse to the controller's character.
+	Returns a Trove instance; call :Destroy() on it to cancel the impulse early.
+	Returns nil if a blockcast detects an obstacle and the impulse is suppressed.
+
+	Settings:
+		speed            number        Initial speed.                             Default: 40
+		direction        Vector3       World-space direction. Normalized on use.  Default: root.LookVector
+		duration         number        Total impulse lifetime in seconds.         Default: 0.8
+		falloff          number        Tween duration for speed → 0.             Default: duration
+		falloffStyle     EasingStyle   Easing style for falloff tween.           Default: Linear
+		falloffDirection EasingDirection                                          Default: Out
+		updateDirection  bool          Re-derive direction each RenderStep.      Default: false
+		directionResolver (root)->Vector3  Custom per-frame direction function.  Default: root.LookVector
+		lockToHorizontal bool          Zero Y component of velocity.             Default: true
+		stopThreshold    number        Early destroy BodyVelocity below this speed. Default: 5
+		maxForce         Vector3       Override MaxForce.                        Default: mass-based
+		blockCast        bool          Enable per-frame obstacle check.          Default: false
+		blockCastDistance number       Cast distance ahead in studs.             Default: 2.5
+]]
+function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local character = controller.Character
 	if not character then return end
 
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	local impulseChild = Instance.new("Folder")
-	impulseChild.Name = "@apply_impulse"
-	impulseChild:SetAttribute("velocity", settings.velocity)
-	impulseChild:SetAttribute("duration", settings.duration or 0.5)
-	impulseChild:SetAttribute("force_scale", settings.force_scale or Vector3.new(1, 0, 1))
-	impulseChild:SetAttribute("angular_scale", settings.angular_scale or 0)
-	impulseChild:SetAttribute("stop_on_obstacle", settings.stop_on_obstacle ~= false)
-	impulseChild:SetAttribute("obstacle_check_duration", settings.obstacle_check_duration or 1)
-	impulseChild:SetAttribute("obstacle_speed_quota", settings.obstacle_speed_quota or 10)
-	impulseChild:SetAttribute("force_update_velocity", settings.force_update_velocity or false)
-	impulseChild:SetAttribute("velocity_fadeoff", settings.velocity_fadeoff or false)
-	impulseChild:SetAttribute("fadeoff_duration", settings.fadeoff_duration or 0.3)
-	impulseChild:SetAttribute("fadeoff_delay", settings.fadeoff_delay or 0)
-	impulseChild:SetAttribute("fadeoff_easing_style", settings.fadeoff_easing_style or Enum.EasingStyle.Linear)
-	impulseChild:SetAttribute("fadeoff_easing_direction", settings.fadeoff_easing_direction or Enum.EasingDirection.Out)
-	impulseChild:SetAttribute("velocity_direction", settings.velocity_direction or settings.velocity.Unit)
-	impulseChild.Parent = root
+	local speed = settings.speed or 40
+	local duration = settings.duration or 0.8
+	local falloff = settings.falloff or duration
+	local falloffStyle = settings.falloffStyle or Enum.EasingStyle.Linear
+	local falloffDir = settings.falloffDirection or Enum.EasingDirection.Out
+	local lockHorizontal = settings.lockToHorizontal ~= false -- default true
+	local stopThreshold = settings.stopThreshold or 5
+	local updateDirection = settings.updateDirection == true
+	local directionResolver = settings.directionResolver
 
-	PhysicsService.ProcessPhysics(character, impulseChild)
-end
+	local function resolveDirection(vec: Vector3): Vector3
+		if lockHorizontal then
+			vec = Vector3.new(vec.X, 0, vec.Z)
+		end
+		return vec.Magnitude > 0 and vec.Unit or Vector3.zero
+	end
 
-function PhysicsService.ProcessPhysics(character: Model, child: Instance)
-	local root: BasePart = character:FindFirstChild("HumanoidRootPart")
-	local humanoid: Humanoid = character:FindFirstChild("Humanoid")
+	local direction = resolveDirection(settings.direction or root.CFrame.LookVector)
 
-	if child.Name == "@apply_impulse" then
-		local exist_mover = root:FindFirstChild("@impulse_velocity")
+	local doBlockCast = settings.blockCast == true -- default false
+	local castDistance = settings.blockCastDistance or 2.5
 
-		if exist_mover then
-			exist_mover:Destroy()
+	local _blockCastParams
+	if doBlockCast then
+		_blockCastParams = RaycastParams.new()
+		_blockCastParams.FilterType = Enum.RaycastFilterType.Include
+		local filterList = {}
+		local worldFolder = workspace:FindFirstChild("World")
+		if worldFolder then
+			local mapFolder  = worldFolder:FindFirstChild("Map")
+			local liveFolder = worldFolder:FindFirstChild("Live")
+			if mapFolder  then table.insert(filterList, mapFolder)  end
+			if liveFolder then table.insert(filterList, liveFolder) end
+		end
+		if #filterList > 0 then
+			_blockCastParams.FilterDescendantsInstances = filterList
+		else
+			_blockCastParams = nil
+		end
+	end
+
+	local speedValue = Instance.new("NumberValue")
+	speedValue.Value = speed
+
+	local tweenInfo = TweenInfo.new(falloff, falloffStyle, falloffDir)
+	local tween = TweenService:Create(speedValue, tweenInfo, { Value = 0 })
+	tween:Play()
+
+	local mass = root.AssemblyMass
+	local maxForce = settings.maxForce
+		or (lockHorizontal
+			and Vector3.new(mass, 0, mass) * 4e4
+			or  Vector3.new(mass, mass, mass) * 4e4)
+
+	local velocity = Instance.new("BodyVelocity")
+	velocity.Name = "@impulse_velocity"
+	velocity.MaxForce = maxForce
+	velocity.Velocity = direction * speed
+	velocity.Parent = root
+
+	local trove = Trove.new()
+
+	trove:Add(tween)
+	trove:Add(velocity)
+
+	local start = os.clock()
+
+	trove:Add(RunService.RenderStepped:Connect(function()
+		if os.clock() - start > duration + 0.1 then
+			trove:Destroy()
+			return
 		end
 
-		warn("Processing Impulse for", character.Name, "with velocity", child:GetAttribute("velocity"))
+		if speedValue.Value <= stopThreshold then
+			if velocity and velocity.Parent then
+				velocity:Destroy()
+			end
+			return
+		end
 
-		local velocity = child:GetAttribute("velocity")
-		local duration = child:GetAttribute("duration") or 0.5
-		local force_scale = child:GetAttribute("force_scale") or Vector3.new(1, 1, 1)
-		local angular_scale = child:GetAttribute("angular_scale") or 0
-		local stop_on_obstacle = child:GetAttribute("stop_on_obstacle")
-		local obstacle_speed_quota = child:GetAttribute("obstacle_speed_quota") or 10
-		local obstacle_check_duration = child:GetAttribute("obstacle_check_duration") or 2
+		if not (velocity and velocity.Parent) then return end
 
-		local force_update_velocity = child:GetAttribute("force_update_velocity") or false
-		local velocity_direction = child:GetAttribute("velocity_direction") or velocity.Unit
-
-		local velocity_fadeoff = child:GetAttribute("velocity_fadeoff") or false
-		local fadeoff_duration = child:GetAttribute("fadeoff_duration") or 0.3
-		local fadeoff_delay = child:GetAttribute("fadeoff_delay") or 0
-		local fadeoff_easing_style = child:GetAttribute("fadeoff_easing_style") 
-		local fadeoff_easing_direction = child:GetAttribute("fadeoff_easing_direction") or Enum.EasingDirection.Out
-
-		local velocity_speed = velocity.Magnitude
-
-		for _, part: BasePart in ipairs(character:GetChildren()) do
-			if not part:IsA("BasePart") then continue end
-			part.AssemblyLinearVelocity = Vector3.zero
-			if angular_scale > 0 then
-				part.AssemblyAngularVelocity = Vector3.zero
+		-- @ Obstacle check: stop velocity if something is in the way
+		if _blockCastParams then
+			local castDir = direction * castDistance
+			local hit = workspace:Blockcast(root.CFrame, Vector3.new(1, 2, 1), castDir, _blockCastParams)
+			if hit then
+				velocity:Destroy()
+				return
 			end
 		end
 
-		local linear_velocity = Instance.new("BodyVelocity")
-		linear_velocity:SetAttribute("knockback_mover", true)
-		linear_velocity.Name = "@impulse_velocity"
-		linear_velocity.MaxForce = Vector3.new(root.AssemblyMass, root.AssemblyMass, root.AssemblyMass) * force_scale * 4e4
-		linear_velocity.Velocity = velocity
-		linear_velocity.Parent = root
+		local currentDir = direction
 
-		local impulse_end_time = tick() + duration
-
-		if force_update_velocity then
-			task.spawn(function()
-				while linear_velocity and linear_velocity.Parent and tick() < impulse_end_time do
-					linear_velocity.Velocity = velocity_direction * velocity_speed
-					RunService.Heartbeat:Wait()
-				end
-			end)
+		if updateDirection then
+			if directionResolver then
+				currentDir = resolveDirection(directionResolver(root))
+			else
+				currentDir = resolveDirection(root.CFrame.LookVector)
+			end
 		end
 
-		if velocity_fadeoff then
-			task.spawn(function()
-				task.wait(fadeoff_delay)
+		velocity.Velocity = currentDir * speedValue.Value
+	end))
 
-				local speedMultiplier = Instance.new("NumberValue")
-				speedMultiplier.Value = 1
-
-				local tweenInfo = TweenInfo.new(fadeoff_duration, fadeoff_easing_style, fadeoff_easing_direction)
-				local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
-
-				speedMultiplier.Changed:Connect(function()
-					if linear_velocity and linear_velocity.Parent then
-						linear_velocity.Velocity = velocity * speedMultiplier.Value
-					end
-				end)
-
-				tween:Play()
-				tween.Completed:Connect(function()
-					if linear_velocity and linear_velocity.Parent then
-						linear_velocity:Destroy()
-					end
-				end)
-
-
-			end)
-		else
-			task.spawn(function()
-				task.wait(duration)
-				if linear_velocity and linear_velocity.Parent then
-					linear_velocity:Destroy()
-				end
-			end)
+	task.delay(duration, function()
+		if velocity and velocity.Parent then
+			velocity:Destroy()
 		end
+	end)
 
-		if stop_on_obstacle then
-			local end_time = os.clock() + obstacle_check_duration
-
-			task.spawn(function()
-				while os.clock() <= end_time do
-					RunService.Heartbeat:Wait()
-
-					local current_velocity = root.AssemblyLinearVelocity
-					if current_velocity.Magnitude < obstacle_speed_quota then continue end
-
-					local Params = RaycastParams.new()
-					Params.FilterType = Enum.RaycastFilterType.Exclude
-					Params.FilterDescendantsInstances = {character}
-					Params.IgnoreWater = true
-					Params.RespectCanCollide = true
-
-					local wall = workspace:Blockcast(root.CFrame - current_velocity.Unit, root.Size, current_velocity, Params)
-
-					if wall and wall.Distance <= 15 then
-						if linear_velocity and linear_velocity.Parent then
-							linear_velocity:Destroy()
-						end
-						break
-					end
-				end
-			end)
-		end
-
-		Debris:AddItem(child, duration + fadeoff_delay + fadeoff_duration + 0.1)
-	end
+	return trove
 end
 
 return PhysicsService

@@ -6,13 +6,22 @@ local CombatConfig = {
 	DefaultWeapon = "Unarmed", --@ Default weapon id to resolve to when no weapon is equipped or specified.
 
 	--@ Configure max combo per weapon id/name.
+
+	--@ This Configuration WILL not handle data the server will need to know, such as damage values, hitbox sizes, etc. 
+	--@ This is purely for client visual and combo handling purposes.
 	WeaponConfig = {
 		Unarmed = {
 			MaxCombo = 3,
+
+
 		},
 
 		WoodenSword = {
-			MaxCombo = 4
+			MaxCombo = 4,
+
+			attack_cooldown = .5,
+			attack_cooldown_final = 1,
+			attack_duration = 0.35
 		}
 	},
 }
@@ -81,6 +90,12 @@ function CombatConfig:ResolveWeaponId(controller): string
 	end
 
 	return self.DefaultWeapon
+end
+
+function CombatConfig:ResolveWeaponConfig(controller)
+	local weaponId = self:ResolveWeaponId(controller)
+
+	return self.WeaponConfig[weaponId] or {}
 end
 
 return CombatConfig

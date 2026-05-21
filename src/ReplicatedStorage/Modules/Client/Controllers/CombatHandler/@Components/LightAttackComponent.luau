@@ -6,7 +6,22 @@ local _currentTrack = nil
 function LightAttackComponent:Init(_controller)
 end
 
-function LightAttackComponent:CanActivate(_controller, _combatState): boolean
+function LightAttackComponent:CanActivate(controller, _combatState): boolean
+	local Character = controller.Character
+	if not Character then return false end
+
+	if controller.CooldownService:CheckCooldown(Character, "IsAttacking") then
+		return false
+	end
+
+	if controller.StatusService:CheckStatuses(Character, { 
+		IsStunned = true, 
+		IsBlocking = true, 
+		IsDiving = true 
+	}) then
+		return false
+	end
+
 	return true
 end
 
@@ -14,8 +29,8 @@ function LightAttackComponent:Activate(controller, combatState)
 	local Character = controller.Character
 	if not Character then return end
 	 
-	local weaponId = combatState.ActiveWeapon or 
-		controller.CombatConfig:ResolveWeaponId(controller)
+	local weaponId = combatState.ActiveWeapon or  controller.CombatConfig:ResolveWeaponId(controller)
+	local weaponConfig = controller.CombatConfig:ResolveWeaponConfig(controller)
 
 	if weaponId == "Unarmed" then
 		return
@@ -26,7 +41,6 @@ function LightAttackComponent:Activate(controller, combatState)
 	if comboIndex == 0 then
 		comboIndex = 1
 	end
-   
 
 	local animationName = string.format("%s%d", weaponId, comboIndex)
 
@@ -41,7 +55,19 @@ function LightAttackComponent:Activate(controller, combatState)
 		FadeTime = 0.1,
 	})
 
-	controller.StatusService:SetStatus(Character, "IsAttacking", true, 0.2)
+	controller.StatusService:SetStatus(
+		Character, 
+		"IsAttacking", 
+		true, 
+		weaponConfig.attack_duration or .2
+	)
+
+	controller.CooldownService:ApplyCooldown(
+		Character,
+		"IsAttacking",
+		comboIndex >= weaponConfig.MaxCombo and weaponConfig.attack_cooldown_final 
+			or weaponConfig.attack_cooldown or 0.3
+	)
 end
 
 function LightAttackComponent:Deactivate(_controller, _combatState)
