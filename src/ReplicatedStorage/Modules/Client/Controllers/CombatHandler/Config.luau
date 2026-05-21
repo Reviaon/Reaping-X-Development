@@ -1,14 +1,16 @@
 --@ Combat Config
 local CombatConfig = {
-	ComboTimeout = 1.5,
-	DefaultMaxCombo = 3,
-	DefaultWeapon = "Unarmed",
+
+	ComboTimeout = 1.5, --@ Default Combo Time Out
+	DefaultMaxCombo = 3, --@ Default Max Combo
+	DefaultWeapon = "Unarmed", --@ Default weapon id to resolve to when no weapon is equipped or specified.
 
 	--@ Configure max combo per weapon id/name.
 	WeaponConfig = {
 		Unarmed = {
 			MaxCombo = 3,
 		},
+
 		WoodenSword = {
 			MaxCombo = 4
 		}
