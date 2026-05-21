@@ -123,6 +123,8 @@ function DiveComponent:Activate(controller)
 
 
 	_trove:Add(tween)
+	_trove:Add(_velocity)
+	
 	_trove:Add(RunService.RenderStepped:Connect(function()
 		if os.clock() - _start > (_dive_duration + 0.5) then
 			_trove:Clean()

@@ -15,6 +15,9 @@ local CombatConfig = {
 		DualDaggers = {
 			MaxCombo = 5,
 		},
+		WoodenSword = {
+			
+		}
 	},
 }
 
