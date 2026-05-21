@@ -86,6 +86,8 @@ function CombatHandler:InitCharacter(controller)
 	local Character = controller.Character
 	if not Character then return end
 
+	controller.CombatConfig = CombatConfig
+
 	CombatHandler.Trove:Connect(RunService.Heartbeat, function()
 		CombatHandler:UpdateComboTimeout()
 		CombatHandler:ConsumeQueuedBranch(controller)

@@ -20,7 +20,12 @@ function LightAttackComponent:Activate(controller, combatState)
 		comboIndex = 1
 	end
     
-	local animationName = "Light" .. comboIndex
+	local weaponId = combatState.ActiveWeapon or 
+		controller.CombatConfig:ResolveWeaponId(controller)
+
+	local animationName = string.format("%s%d", weaponId, comboIndex)
+
+	warn("Attacking Animation:", animationName)
 
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
