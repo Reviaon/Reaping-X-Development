@@ -36,12 +36,7 @@ function LightAttackComponent:Activate(controller, combatState)
 		return
 	end
 
-	local comboIndex = (combatState.ComboIndex % 10)
-
-	if comboIndex == 0 then
-		comboIndex = 1
-	end
-
+	local comboIndex = combatState.ComboIndex
 	local animationName = string.format("%s%d", weaponId, comboIndex)
 
 	if _currentTrack then
@@ -54,6 +49,21 @@ function LightAttackComponent:Activate(controller, combatState)
 		Priority = Enum.AnimationPriority.Action,
 		FadeTime = 0.1,
 	})
+
+	warn("Playing animation:", animationName)
+
+	if weaponConfig.light_impulse then
+		local root = Character:FindFirstChild("HumanoidRootPart")
+
+		if root then
+			controller.PhysicsService.ApplyImpulse(controller, {
+				direction = root.CFrame.LookVector,
+				speed = weaponConfig.light_impulse.speed or 30,
+				duration = weaponConfig.light_impulse.duration or 0.2,
+				falloff = weaponConfig.light_impulse.falloff or 0.2,
+			})
+		end
+	end
 
 	controller.StatusService:SetStatus(
 		Character, 

@@ -184,11 +184,7 @@ function CombatHandler:SetCurrentBranch(branchName: string)
 
 	if branchName == "Light" then
 		local maxCombo = CombatHandler:GetMaxCombo()
-		CombatHandler.State.ComboIndex += 1
-
-		if CombatHandler.State.ComboIndex > maxCombo then
-			CombatHandler.State.ComboIndex = 0
-		end
+		CombatHandler.State.ComboIndex = (CombatHandler.State.ComboIndex % maxCombo) + 1
 	else
 		CombatHandler.State.ComboIndex = 0
 	end
@@ -209,6 +205,8 @@ function CombatHandler:UpdateComboTimeout()
 	end
 
 	if os.clock() - CombatHandler.State.LastAttackAt >= CombatConfig.ComboTimeout then
+		warn("Combo timeout reached, resetting combo index.")
+
 		CombatHandler.State.ComboIndex = 0
 		CombatHandler.State.CurrentBranch = "Neutral"
 	end

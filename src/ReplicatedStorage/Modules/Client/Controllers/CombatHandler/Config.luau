@@ -21,7 +21,13 @@ local CombatConfig = {
 
 			attack_cooldown = .5,
 			attack_cooldown_final = 1,
-			attack_duration = 0.35
+			attack_duration = 0.35,
+
+			light_impulse = {
+				speed = 30,
+				duration = 1,
+				falloff = 0.5,
+			}
 		}
 	},
 }
