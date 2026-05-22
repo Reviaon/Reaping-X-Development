@@ -53,16 +53,22 @@ function LightAttackComponent:Activate(controller, combatState)
 	warn("Playing animation:", animationName)
 
 	if weaponConfig.light_impulse then
-		local root = Character:FindFirstChild("HumanoidRootPart")
+		local impulse_delay = weaponConfig.light_impulse.impulse_delay 
+			and weaponConfig.light_impulse.impulse_delay[comboIndex] or 0.2
 
-		if root then
-			controller.PhysicsService.ApplyImpulse(controller, {
-				direction = root.CFrame.LookVector,
-				speed = weaponConfig.light_impulse.speed or 30,
-				duration = weaponConfig.light_impulse.duration or 0.2,
-				falloff = weaponConfig.light_impulse.falloff or 0.2,
-			})
-		end
+		task.delay(impulse_delay, function()
+			if not Character or not Character.Parent then return end
+			local root = Character:FindFirstChild("HumanoidRootPart")
+
+			if root then
+				controller.PhysicsService.ApplyImpulse(controller, {
+					direction = root.CFrame.LookVector,
+					speed = weaponConfig.light_impulse.speed or 30,
+					duration = weaponConfig.light_impulse.duration or 0.2,
+					falloff = weaponConfig.light_impulse.falloff or 0.2,
+				})
+			end
+		end)
 	end
 
 	controller.StatusService:SetStatus(

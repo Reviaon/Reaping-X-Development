@@ -38,6 +38,10 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
+	if root:FindFirstChild("@impulse_velocity") then
+		root:FindFirstChild("@impulse_velocity"):Destroy()
+	end
+
 	local speed = settings.speed or 40
 	local duration = settings.duration or 0.8
 	local falloff = settings.falloff or duration
