@@ -17,6 +17,20 @@ local CombatConfig = {
 			attack_cooldown_final = 1,
 			attack_duration = 0.35,
 
+			light_impulse = {
+				speed = 10,
+				duration = 0.8,
+				falloff = 0.5,
+
+				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
+					0.35,
+					0.217,
+					0.35,
+					0.267,
+					0.25,
+					0.533
+				}
+			}
 		},
 		WoodenSword = {
 			MaxCombo = 4,
@@ -26,9 +40,9 @@ local CombatConfig = {
 			attack_duration = 0.35,
 
 			light_impulse = {
-				speed = 30,
-				duration = 1,
-				falloff = 0.25,
+				speed = 10,
+				duration = 0.8,
+				falloff = 0.5,
 
 				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
 					0.45,
