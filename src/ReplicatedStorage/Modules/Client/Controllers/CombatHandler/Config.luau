@@ -3,19 +3,21 @@ local CombatConfig = {
 
 	ComboTimeout = 1.5, --@ Default Combo Time Out
 	DefaultMaxCombo = 3, --@ Default Max Combo
-	DefaultWeapon = "Unarmed", --@ Default weapon id to resolve to when no weapon is equipped or specified.
+	DefaultWeapon = "Melee", --@ Default weapon id to resolve to when no weapon is equipped or specified.
 
 	--@ Configure max combo per weapon id/name.
 
 	--@ This Configuration WILL not handle data the server will need to know, such as damage values, hitbox sizes, etc. 
 	--@ This is purely for client visual and combo handling purposes.
 	WeaponConfig = {
-		Unarmed = {
-			MaxCombo = 3,
+		Melee = {
+			MaxCombo = 6,
 
+			attack_cooldown = 0.5,
+			attack_cooldown_final = 1,
+			attack_duration = 0.35,
 
 		},
-
 		WoodenSword = {
 			MaxCombo = 4,
 
