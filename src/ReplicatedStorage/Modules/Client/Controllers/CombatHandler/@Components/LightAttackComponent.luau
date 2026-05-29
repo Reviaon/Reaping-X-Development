@@ -2,6 +2,7 @@
 local LightAttackComponent = {}
 
 local _currentTrack = nil
+local _impulseThread = nil
 
 function LightAttackComponent:Init(_controller)
 end
@@ -37,7 +38,7 @@ function LightAttackComponent:Activate(controller, combatState)
 	end
 
 	local comboIndex = combatState.ComboIndex
-	local animationName = string.format("%s%d", weaponId, comboIndex)
+	local animationName = string.format("%s%s%d", weaponId, "Attack", comboIndex)
 
 	local attack_duration = typeof(weaponConfig.attack_duration) == "table" 
 		and weaponConfig.attack_duration[comboIndex] 
@@ -65,19 +66,35 @@ function LightAttackComponent:Activate(controller, combatState)
 		local impulse_delay = weaponConfig.light_impulse.impulse_delay 
 			and weaponConfig.light_impulse.impulse_delay[comboIndex] or 0.2
 
-		task.delay(impulse_delay, function()
+		local impulseData = (weaponConfig.light_impulse.impulse and weaponConfig.light_impulse.impulse[comboIndex])
+			or weaponConfig.light_impulse
+
+		--@ Cancel any pending impulse before scheduling a new one
+		if _impulseThread then
+			task.cancel(_impulseThread)
+			_impulseThread = nil
+		end
+
+		_impulseThread = task.delay(impulse_delay, function()
+			_impulseThread = nil
 			if not Character or not Character.Parent then return end
 			local root = Character:FindFirstChild("HumanoidRootPart")
 
 			if root then
-				controller.PhysicsService.ApplyImpulse(controller, {
+				local trove = controller.PhysicsService.ApplyImpulse(controller, {
 					direction = root.CFrame.LookVector,
-					speed = weaponConfig.light_impulse.speed or 30,
-					duration = weaponConfig.light_impulse.duration or 0.2,
-					falloff = weaponConfig.light_impulse.falloff or 0.2,
+					speed = impulseData.speed or 30,
+					duration = impulseData.duration or 0.2,
+					falloff = impulseData.falloff or 0.2,
 				})
+
+				if trove then
+					controller:Set("_activeImpulseTrove", trove)
+				end
 			end
 		end)
+
+		controller:Set("_impulseThread", _impulseThread)
 	end
 
 	controller.StatusService:SetStatus(Character, "IsAttacking", true, attack_duration)

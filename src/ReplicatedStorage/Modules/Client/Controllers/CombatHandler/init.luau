@@ -35,7 +35,7 @@ local inputConnections = {}
 local inputActions = {
 	Began = {
 		[Enum.UserInputType.MouseButton1] = {
-			canHold = true,
+			canHold = false,
 			action = function(controller)
 				CombatHandler:TryLightAttack(controller)
 			end,
@@ -105,7 +105,15 @@ function CombatHandler:InitCharacter(controller)
 	end)
 
 	CombatConfig:WeaponListener(controller, CombatHandler.Trove, function(weaponId)
+		CombatConfig:ClearImpulse(controller)
+
+		controller.AnimatorService:StopAllWithReference(
+			Character, 
+			"Attack"
+		)
+
 		CombatHandler.State.ActiveWeapon = weaponId
+
 		warn("Active weapon changed to:", weaponId)
 	end)
 end

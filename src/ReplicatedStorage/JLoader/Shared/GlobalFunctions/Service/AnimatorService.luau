@@ -164,7 +164,7 @@ function AnimatorService:StopAllAnimations(Entity: Model, FadeTime: number?)
 	local FadeTime = FadeTime or 0.1
 
 	for _, Track: AnimationTrack in Tracks do
-		if not string.find(Track.Name,"Run") and not string.find(Track.Name,"Idle") then --@ Ignore Important Animations
+		if not string.find(Track.Name,"Sprint") and not string.find(Track.Name,"Idle") then --@ Ignore Important Animations
 			Track:Stop(FadeTime) 
 		end
 	end

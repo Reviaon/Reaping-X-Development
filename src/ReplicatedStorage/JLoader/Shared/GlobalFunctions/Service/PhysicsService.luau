@@ -156,4 +156,19 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	return trove
 end
 
+function PhysicsService.ClearExistingImpulse(controller: {})
+	if not controller then return end
+	local character = controller.Character
+	
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local existing = root:FindFirstChild("@impulse_velocity")
+
+	if existing then
+		existing:Destroy()
+	end
+end
+
 return PhysicsService

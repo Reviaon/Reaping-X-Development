@@ -44,14 +44,22 @@ local CombatConfig = {
 			MaxCombo = 4,
 
 			attack_cooldown = .5,
-			attack_cooldown_final = 1,
-			attack_duration = 0.35,
+			attack_cooldown_final = 2,
+
+			attack_duration = {
+				0.733,
+				0.850,
+				0.750,
+				2
+			},
 
 			light_impulse = {
-				speed = 10,
-				duration = 0.8,
-				falloff = 0.5,
-
+				impulse = {
+					{ speed = 10, duration = 0.8, falloff = 0.5 },
+					{ speed = 10, duration = 0.8, falloff = 0.5 },
+					{ speed = 10, duration = 0.8, falloff = 0.5 },
+					{ speed = 10, duration = 2, falloff = 1.5 },
+				},
 				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
 					0.45,
 					0.550,
@@ -88,6 +96,7 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 			warn("[CombatConfig] Tool '" .. child.Name .. "' has no WeaponConfig entry, ignoring.")
 			return
 		end
+
 		controller:Set("EquippedWeapon", child.Name)
 		if onChanged then onChanged(child.Name) end
 	end)
@@ -99,6 +108,38 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 			if onChanged then onChanged(self.DefaultWeapon) end
 		end
 	end)
+end
+
+function CombatConfig:ClearImpulse(controller)
+	--@ Cancel a pending impulse delay thread before it fires
+	local thread = controller:Get("_impulseThread")
+	if thread then
+		task.cancel(thread)
+		controller:Remove("_impulseThread")
+	end
+
+	--@ Destroy the active impulse trove (cleans up BodyVelocity, RenderStepped connection, and tween)
+	local trove = controller:Get("_activeImpulseTrove")
+	if trove then
+		trove:Destroy()
+		controller:Remove("_activeImpulseTrove")
+	end
+
+	--@ Fallback: remove the BodyVelocity directly if it somehow outlived the trove
+	controller.PhysicsService.ClearExistingImpulse(controller)
+end
+
+function CombatConfig:UpdateWeaponConfig(controller)
+	local Character = controller.Character
+	if not Character then return end
+
+	self:ClearImpulse(controller)
+
+	local weaponId = self:ResolveWeaponId(controller)
+	local weaponConfig = self.WeaponConfig[weaponId]
+
+	--@ Play weapon idle animation (add per-weapon idle names below as needed)
+	
 end
 
 function CombatConfig:ResolveWeaponId(controller): string
