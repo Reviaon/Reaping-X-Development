@@ -15,7 +15,7 @@ function DiveComponent:Activate(controller)
 		return
 	end
 
-	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
+	if controller.StatusService:CheckStatuses(_character, { IsDiving = true, IsAttacking = true }) then
 		return
 	end
 
@@ -49,7 +49,7 @@ function DiveComponent:Activate(controller)
 			_heldbind = "W"
 		 end
 
-		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action4
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action2
 		_divetracks[_heldbind]:Play()
 	end
 

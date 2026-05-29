@@ -142,21 +142,18 @@ end
 function StatusService:CheckStatuses(Entity: Model, Statuses: {string: any}) : boolean
 	assert(Entity:IsA("Model"), "Entity has to be a model.")
 	assert(typeof(Statuses) == "table", "Statuses has to be a table.")
-	
-	local IsFlagged = true
-	
+
 	for State, Value in Statuses do
-		if State == "Default" and DefaultCheck(Entity, Statuses) then
-			IsFlagged = true
-			break
-		elseif Entity:GetAttribute(State) ~= (Value or true) then
-			IsFlagged = false
-			break
+		if State == "Default" then
+			if DefaultCheck(Entity, Statuses) then
+				return true
+			end
+		elseif Entity:GetAttribute(State) == (Value or true) then
+			return true
 		end
 	end
-	
 
-	return IsFlagged
+	return false
 end
 
 function StatusService:IsAlive(Entity: Model) : boolean

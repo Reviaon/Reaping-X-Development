@@ -86,6 +86,7 @@ function LightAttackComponent:Activate(controller, combatState)
 					speed = impulseData.speed or 30,
 					duration = impulseData.duration or 0.2,
 					falloff = impulseData.falloff or 0.2,
+					updateDirection = true,
 				})
 
 				if trove then

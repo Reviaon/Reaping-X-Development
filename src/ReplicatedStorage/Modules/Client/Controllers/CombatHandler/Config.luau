@@ -98,6 +98,8 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 		end
 
 		controller:Set("EquippedWeapon", child.Name)
+		self:UpdateWeaponConfig(controller)
+
 		if onChanged then onChanged(child.Name) end
 	end)
 
@@ -105,6 +107,9 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 		if not child:IsA("Tool") then return end
 		if controller:Get("EquippedWeapon") == child.Name then
 			controller:Remove("EquippedWeapon")
+
+			self:UpdateWeaponConfig(controller)
+
 			if onChanged then onChanged(self.DefaultWeapon) end
 		end
 	end)
@@ -118,8 +123,8 @@ function CombatConfig:ClearImpulse(controller)
 		controller:Remove("_impulseThread")
 	end
 
-	--@ Destroy the active impulse trove (cleans up BodyVelocity, RenderStepped connection, and tween)
 	local trove = controller:Get("_activeImpulseTrove")
+	
 	if trove then
 		trove:Destroy()
 		controller:Remove("_activeImpulseTrove")
@@ -133,13 +138,22 @@ function CombatConfig:UpdateWeaponConfig(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	self:ClearImpulse(controller)
-
 	local weaponId = self:ResolveWeaponId(controller)
 	local weaponConfig = self.WeaponConfig[weaponId]
 
 	--@ Play weapon idle animation (add per-weapon idle names below as needed)
-	
+	if not controller._idle_animation then
+		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
+
+	else
+
+		controller.AnimatorService:StopAllWithReference(
+			Character, 
+			controller._idle_animation
+		)
+
+		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
+	end
 end
 
 function CombatConfig:ResolveWeaponId(controller): string
