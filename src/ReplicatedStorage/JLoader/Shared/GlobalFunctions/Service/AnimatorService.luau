@@ -120,9 +120,10 @@ function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[st
 	local Weight = Properties.Weight or 1
 	local Priority = Properties.Priority or Track.Priority
 	local TimePosition = Properties.TimePosition or nil
-
+	local Loop = Properties.Loop or false
 
 	Track.Priority = Priority
+	Track.Looped = Loop
 
 	if TimePosition then
 		Track.TimePosition = TimePosition;

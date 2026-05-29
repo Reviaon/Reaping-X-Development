@@ -48,6 +48,7 @@ function LightAttackComponent:Activate(controller, combatState)
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Action,
 		FadeTime = 0.1,
+		Loop = false,
 	})
 
 	warn("Playing animation:", animationName)

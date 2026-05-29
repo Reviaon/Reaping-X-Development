@@ -35,7 +35,7 @@ local inputConnections = {}
 local inputActions = {
 	Began = {
 		[Enum.UserInputType.MouseButton1] = {
-			canHold = false,
+			canHold = true,
 			action = function(controller)
 				CombatHandler:TryLightAttack(controller)
 			end,
@@ -54,6 +54,11 @@ local inputActions = {
 		},
 	},
 	Ended = {
+		[Enum.UserInputType.MouseButton1] = {
+			canHold = false,
+			action = function(controller)
+			end,
+		},
 		[Enum.UserInputType.MouseButton2] = {
 			canHold = false,
 			action = function(controller)
