@@ -127,7 +127,8 @@ function CameraHandler:ToggleShiftLock(state, controller)
 			if not (Character) then return end
 
 			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true})  
-				and not controller.StatusService:CheckStatuses(Character, {IsSprinting = true})  then
+				and not (controller.StatusService:CheckStatuses(Character, {IsSprinting = true}) 
+				and not controller.StatusService:CheckStatuses(Character, {IsAttacking = true})) then
 
 				Humanoid.AutoRotate = false
 				

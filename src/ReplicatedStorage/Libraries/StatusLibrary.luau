@@ -10,7 +10,7 @@ return{
 		IsAttacking = {
 			WalkSpeed = 8,
 			JumpPower = 0,
-			Priority = 3;
+			Priority = 4;
 			IsStun = false;
 		};
 

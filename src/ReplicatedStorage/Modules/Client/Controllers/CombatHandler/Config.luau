@@ -1,6 +1,5 @@
 --@ Combat Config
 local CombatConfig = {
-
 	ComboTimeout = 1.5, --@ Default Combo Time Out
 	DefaultMaxCombo = 3, --@ Default Max Combo
 	DefaultWeapon = "Melee", --@ Default weapon id to resolve to when no weapon is equipped or specified.
@@ -15,7 +14,15 @@ local CombatConfig = {
 
 			attack_cooldown = 0.5,
 			attack_cooldown_final = 1,
-			attack_duration = 0.35,
+
+			attack_duration = {
+				0.63,
+				0.56,
+				0.76,
+				0.583,
+				0.583,
+				0.833
+			},
 
 			light_impulse = {
 				speed = 10,
@@ -32,6 +39,7 @@ local CombatConfig = {
 				}
 			}
 		},
+
 		WoodenSword = {
 			MaxCombo = 4,
 

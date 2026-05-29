@@ -39,6 +39,14 @@ function LightAttackComponent:Activate(controller, combatState)
 	local comboIndex = combatState.ComboIndex
 	local animationName = string.format("%s%d", weaponId, comboIndex)
 
+	local attack_duration = typeof(weaponConfig.attack_duration) == "table" 
+		and weaponConfig.attack_duration[comboIndex] 
+		or weaponConfig.attack_duration or 0.2
+
+	local cooldown_duration = comboIndex >= weaponConfig.MaxCombo 
+			and weaponConfig.attack_cooldown_final 
+			or weaponConfig.attack_cooldown or 0.3
+
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
 		_currentTrack = nil
@@ -46,7 +54,7 @@ function LightAttackComponent:Activate(controller, combatState)
 
 	_currentTrack = controller.AnimatorService:PlayTrack(Character, animationName, {
 		Speed = 1,
-		Priority = Enum.AnimationPriority.Action,
+		Priority = Enum.AnimationPriority.Action4,
 		FadeTime = 0.1,
 		Loop = false,
 	})
@@ -72,19 +80,8 @@ function LightAttackComponent:Activate(controller, combatState)
 		end)
 	end
 
-	controller.StatusService:SetStatus(
-		Character, 
-		"IsAttacking", 
-		true, 
-		weaponConfig.attack_duration or .2
-	)
-
-	controller.CooldownService:ApplyCooldown(
-		Character,
-		"IsAttacking",
-		comboIndex >= weaponConfig.MaxCombo and weaponConfig.attack_cooldown_final 
-			or weaponConfig.attack_cooldown or 0.3
-	)
+	controller.StatusService:SetStatus(Character, "IsAttacking", true, attack_duration)
+	controller.CooldownService:ApplyCooldown(Character, "IsAttacking", cooldown_duration)
 end
 
 function LightAttackComponent:Deactivate(_controller, _combatState)
