@@ -155,7 +155,7 @@ function PhysicsService.ProcessPhysics(character: Model, child: Instance)
 					if wall.Distance > 15 then continue end
 
 					if RunService:IsServer() then
-						local CharacterController = GlobalFunctions.ProfileHandler:GetProfile(character)
+						local CharacterController = GlobalFunctions.ServerController:GetProfile(character)
 						if not CharacterController then continue end
 
 						--GlobalFunctions.EffectService:Fire({
@@ -319,7 +319,7 @@ function PhysicsService.ProcessPhysics(character: Model, child: Instance)
 
 					if stop_on_obstacle then
 						if RunService:IsServer() then
-							local CharacterController = GlobalFunctions.ProfileHandler:GetProfile(character)
+							local CharacterController = GlobalFunctions.ServerController:GetProfile(character)
 							if not CharacterController then continue end
 
 							--if not live_controller.physics_callback then continue end

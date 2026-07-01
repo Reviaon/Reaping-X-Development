@@ -49,7 +49,7 @@ function CharacterHandler:InitializeCharacter()
 	task.spawn(function()
 		RunService.Stepped:Wait()
 
-		GlobalFunctions.ProfileHandler.new(self.Character)
+		GlobalFunctions.ServerController:SetCharacter(self.Character)
 
 		self.EffectService.CreateVisual:FireAll({
 			Set = "SpawnVisuals",
@@ -111,7 +111,7 @@ function GameService:Initialize()
 
 	for _, live in Live:GetChildren() do
 		if live:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(live) then
-			GlobalFunctions.ProfileHandler.new(live)
+			GlobalFunctions.ServerController:SetCharacter(live)
 		end
 	end
 

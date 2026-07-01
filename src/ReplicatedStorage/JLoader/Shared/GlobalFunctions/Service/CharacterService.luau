@@ -28,7 +28,7 @@ function Utils.GetCFrame(character: Model, client_check: boolean)
 	local final_cframe = root.CFrame
 
 	if RunService:IsServer() and client_check then
-		local Controller = GlobalFunctions.ProfileHandler:GetProfile(character);
+		local Controller = GlobalFunctions.ServerController:GetProfile(character);
 
 		if Controller and Controller._IsPlayer then
 			final_cframe = Controller.ClientProperties.CFrame
