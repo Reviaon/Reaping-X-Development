@@ -24,11 +24,8 @@ return function(Data) : ()
 	Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 	Highlight.OutlineTransparency = 0.5
 	Highlight.Parent = Entity
-	
-	GlobalFunctions.SetCollision(Entity, "Ghosts")
-	
+		
 	local function Remove()
-		GlobalFunctions.SetCollision(Entity, "Entities")
 		local ClientTween = TweenService:Create(Highlight, HIGHLIGHT_FADE, {
 			FillTransparency = 1, OutlineTransparency = 1
 		})

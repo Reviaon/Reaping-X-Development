@@ -20,6 +20,11 @@ for _, module in ipairs(Controllers:GetChildren()) do
 	end
 end
 
+--@ Include the ReplicatedFirst effect handler so its firing gets initialized
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local EffectsHandler = ReplicatedFirst:WaitForChild("Modules"):WaitForChild("ClientEffects")
+table.insert(ControllerList, EffectsHandler)
+
 --@ Load and start all controllers
 JLoader.LoadHandlers(ControllerList)
 JLoader.Load()

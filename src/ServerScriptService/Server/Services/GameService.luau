@@ -51,8 +51,8 @@ function CharacterHandler:InitializeCharacter()
 
 		GlobalFunctions.ServerController:SetCharacter(self.Character)
 
+		--@ Spawn protection: ForceField visual for every client (Effects.ForceField)
 		self.EffectService.CreateVisual:FireAll({
-			Set = "SpawnVisuals",
 			Effect = "ForceField",
 			Info = {
 				Char = self.Character,
