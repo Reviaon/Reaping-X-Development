@@ -38,7 +38,6 @@ local JLoader = require(ReplicatedStorage:WaitForChild("JLoader"))
 local GlobalFunctions = JLoader.GlobalFunctions
 
 local Trove = GlobalFunctions.Trove
-local PhysicsService = GlobalFunctions.PhysicsService
 
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
@@ -131,11 +130,6 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	GlobalFunctions.AnimatorService:LoadPackage(Character, Storage.Animations)
 
 	CharacterProfile:RigCharacter(Character)
-
-	Character.ChildAdded:Connect(function(child)
-		if not child:GetAttribute("knockback_attribute") then return end
-		PhysicsService.ProcessPhysics(Character, child)
-	end)
 
 	for Attribute, Value in AttributesLibrary do
 		if not Character:GetAttribute(Attribute) then

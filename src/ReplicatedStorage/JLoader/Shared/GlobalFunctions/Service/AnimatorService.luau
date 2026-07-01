@@ -120,9 +120,10 @@ function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[st
 	local Weight = Properties.Weight or 1
 	local Priority = Properties.Priority or Track.Priority
 	local TimePosition = Properties.TimePosition or nil
-
+	local Loop = Properties.Loop or false
 
 	Track.Priority = Priority
+	Track.Looped = Loop
 
 	if TimePosition then
 		Track.TimePosition = TimePosition;
@@ -163,7 +164,7 @@ function AnimatorService:StopAllAnimations(Entity: Model, FadeTime: number?)
 	local FadeTime = FadeTime or 0.1
 
 	for _, Track: AnimationTrack in Tracks do
-		if not string.find(Track.Name,"Run") and not string.find(Track.Name,"Idle") then --@ Ignore Important Animations
+		if not string.find(Track.Name,"Sprint") and not string.find(Track.Name,"Idle") then --@ Ignore Important Animations
 			Track:Stop(FadeTime) 
 		end
 	end

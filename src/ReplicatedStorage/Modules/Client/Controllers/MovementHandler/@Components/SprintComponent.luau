@@ -2,17 +2,7 @@
 local SprintComponent = {}
 
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
---@ Imports
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
-local GlobalFunctions = Jloader.GlobalFunctions
-
-local AnimatorService = GlobalFunctions.AnimatorService
-local StatusService = GlobalFunctions.StatusService
-local Trove = GlobalFunctions.Trove
-
---@ Module-local state
 local _trove = nil
 local _sprintTrack  = nil
 
@@ -38,19 +28,19 @@ function SprintComponent:Activate(controller)
 
 	if Humanoid.MoveDirection.Magnitude <= 0 then return end
 
-	if StatusService:CheckStatuses(Character, { IsSprinting = true }) then return end
+	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true }) then return end
 
-	StatusService:SetStatus(Character, "IsSprinting", true)
+	controller.StatusService:SetStatus(Character, "IsSprinting", true)
 
-	_sprintTrack = AnimatorService:PlayTrack(Character, "UniversalSprintAnim", {
+	_sprintTrack = controller.AnimatorService:PlayTrack(Character, "UniversalSprintAnim", {
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Action,
-    })
+	})
 
-	_trove = Trove.new()
+	_trove = controller.Trove.new()
 
 	_trove:Add(RunService.Heartbeat:Connect(function()
-		if not StatusService:CheckStatuses(Character, { IsSprinting = true }) then
+		if not controller.StatusService:CheckStatuses(Character, { IsSprinting = true }) then
 			if _trove then
 				_trove:Clean()
 				_trove = nil
@@ -59,12 +49,12 @@ function SprintComponent:Activate(controller)
 		end
 
 		if Humanoid.MoveDirection.Magnitude <= 0 then
-			if _sprintTrack and _sprintTrack.IsPlaying then 
+			if _sprintTrack and _sprintTrack.IsPlaying then
 				_sprintTrack:Stop(0.3)
 			end
-		else 
-			if _sprintTrack and not _sprintTrack.IsPlaying 
-				and not (Humanoid.FloorMaterial == Enum.Material.Air 
+		else
+			if _sprintTrack and not _sprintTrack.IsPlaying
+				and not (Humanoid.FloorMaterial == Enum.Material.Air
 				or Humanoid:GetState() == Enum.HumanoidStateType.Jumping) then
 				_sprintTrack:Play()
 			end
@@ -78,8 +68,8 @@ function SprintComponent:Deactivate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if StatusService:CheckStatuses(Character, { IsSprinting = true }) then
-		StatusService:RemoveStatus(Character, "IsSprinting")
+	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true }) then
+		controller.StatusService:RemoveStatus(Character, "IsSprinting")
 	end
 
 	stopSprint(controller)

@@ -4,12 +4,6 @@ local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local RunService = game:GetService("RunService")
 
-local GlobalFunctions = Jloader.GlobalFunctions
-local StatusService = GlobalFunctions.StatusService
-local Trove = GlobalFunctions.Trove
-
-local StatusStates = StatusService:GetStatesTable()
-
 --@ Default base stats when no status overrides are active
 local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
@@ -26,6 +20,8 @@ local function applyHumanoidProperties(controller)
 
 	local walkSpeed, jumpPower, highestPriority = BASE_WALK_SPEED, BASE_JUMP_POWER, -math.huge
 	local noAutoRotate = false
+
+	local StatusStates = controller.StatusService:GetStatesTable()
 
 	for attrName in Character:GetAttributes() do
 		local statusData = StatusStates[attrName]
@@ -71,7 +67,7 @@ function PropertyHandler:InitCharacter(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	local trove = Trove.new()
+	local trove = controller.Trove.new()
 
 	applyHumanoidProperties(controller)
 

@@ -5,6 +5,27 @@ return{
 			JumpPower = 50,
 			Priority = 3;
 			IsStun = false;
+		};	
+
+		IsAttacking = {
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 4;
+			IsStun = false;
+		};
+
+		IsDiving = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			Priority = 4;
+			IsStun = false;
+		};
+
+		IsBlocking = {
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 3;
+			IsStun = false;
 		};
 
 		IsCrouching = {
@@ -13,6 +34,13 @@ return{
 			Priority = 1;
 			IsStun = false;
 		};
+
+		ShiftLock = {
+			WalkSpeed = 10,
+			JumpPower = 50,
+			Priority = 1,
+			IsStun = false
+		},
 
 		Emote = {
 			WalkSpeed = 8,

@@ -121,6 +121,18 @@ function InputHandler:AreKeysDown(keys)
 	return false
 end
 
+function InputHandler:GetKeysDown(keys)
+	local _keyheld = nil
+
+	for _, key in ipairs(keys) do
+		if UserInputService:IsKeyDown(key) then
+			_keyheld = key
+			return _keyheld
+		end
+	end
+	return _keyheld 
+end
+
 function InputHandler:ListenForInput(inputType, callback)
 	table.insert(InputDump, UserInputService.InputBegan:Connect(function(input)
 		if input.UserInputType == inputType then

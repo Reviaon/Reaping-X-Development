@@ -32,13 +32,7 @@
     },
 
     "ServerStorage": {
-      "$className": "ServerStorage",
-      "ModelBrush": {
-        "$path": "src/ServerStorage/ModelBrush"
-      },
-      "TrianglePoints": {
-        "$path": "src/ServerStorage/TrianglePoints"
-      }
+      "$className": "ServerStorage"
     },
 
     "StarterGui": {

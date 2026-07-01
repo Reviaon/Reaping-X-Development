@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Libraries = ReplicatedStorage.Libraries
 
+local debug = false
 local StatusService = {
 	Registry = {} :: {Model: {[string]: thread}},
 }
@@ -66,6 +67,14 @@ function StatusService:SetStatus(Entity: Model, Status: string, Value: any, Dura
 		Profile[Status] = nil
 	end
 	
+	if debug then
+		warn("Setting status: ", Status,
+		" to value: ", Value, 
+		" for entity: ", Entity.Name, 
+		" with duration: ", Duration
+		)
+	end
+
 	Entity:SetAttribute(Status, Value)
 	
 	if Duration then
@@ -133,21 +142,18 @@ end
 function StatusService:CheckStatuses(Entity: Model, Statuses: {string: any}) : boolean
 	assert(Entity:IsA("Model"), "Entity has to be a model.")
 	assert(typeof(Statuses) == "table", "Statuses has to be a table.")
-	
-	local IsFlagged = true
-	
+
 	for State, Value in Statuses do
-		if State == "Default" and DefaultCheck(Entity, Statuses) then
-			IsFlagged = true
-			break
-		elseif Entity:GetAttribute(State) ~= (Value or true) then
-			IsFlagged = false
-			break
+		if State == "Default" then
+			if DefaultCheck(Entity, Statuses) then
+				return true
+			end
+		elseif Entity:GetAttribute(State) == (Value or true) then
+			return true
 		end
 	end
-	
 
-	return IsFlagged
+	return false
 end
 
 function StatusService:IsAlive(Entity: Model) : boolean
