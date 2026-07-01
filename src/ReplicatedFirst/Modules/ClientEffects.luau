@@ -8,7 +8,7 @@
 	PATH relative to the Effects folder, rather than a flat module name:
 
 		"combat.effectfilename"  ->  Effects.Combat.EffectFilename
-		"forcefield"             ->  Effects.ForceField           (root level)
+		"forcefield" ->  Effects.ForceField (root level)
 
 	Path lookups are case-insensitive, so "Combat.Slash" and "combat.slash"
 	resolve to the same module. A bare-name lookup ("forcefield") is kept as a
