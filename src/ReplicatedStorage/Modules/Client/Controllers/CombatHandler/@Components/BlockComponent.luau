@@ -36,6 +36,7 @@ function BlockComponent:Activate(controller, combatState)
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Action,
 		FadeTime = 0.15,
+		Loop = true,
 	})
 
 	controller.StatusService:SetStatus(Character, "IsBlocking", true)

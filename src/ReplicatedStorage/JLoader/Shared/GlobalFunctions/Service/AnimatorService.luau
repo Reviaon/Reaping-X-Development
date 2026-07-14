@@ -108,7 +108,7 @@ function AnimatorService:GetTrack(Entity: Model, Name: string) : AnimationTrack
 	end
 end
 
-function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[string]: number}?) : AnimationTrack
+function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[string]: any}?) : AnimationTrack
 	assert(Entity:IsA("Model"), "Entity has to be a model.")
 	assert(typeof(Name) == "string", "Name has to be a string.")
 
@@ -120,10 +120,12 @@ function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[st
 	local Weight = Properties.Weight or 1
 	local Priority = Properties.Priority or Track.Priority
 	local TimePosition = Properties.TimePosition or nil
-	local Loop = Properties.Loop or false
 
 	Track.Priority = Priority
-	Track.Looped = Loop
+
+	if Properties.Loop ~= nil then
+		Track.Looped = Properties.Loop
+	end
 
 	if TimePosition then
 		Track.TimePosition = TimePosition;

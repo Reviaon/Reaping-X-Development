@@ -54,6 +54,7 @@ local function playAnimation(controller, animName: string)
 		Speed = 1,
 		Priority = Enum.AnimationPriority.Movement,
 		FadeTime = 0.3,
+		Loop = true,
 	})
 
 	_currentAnim = animName
