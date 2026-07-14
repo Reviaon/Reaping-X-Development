@@ -78,6 +78,7 @@ function CameraHandler:InitCharacter(controller)
 	MOUSE_OBJECT = _mouse
 	MOUSE_OBJECT.filterDescendants = {Character, workspace.World.Visuals, workspace.World.Live}
 
+	
 	CameraHandler:ToggleShiftLock(shiftLockEnabled, controller)
 	
 	_trove:Add(_humanoid.Died:Connect(function()
