@@ -13,6 +13,10 @@ Client.Signal = Client.GlobalFunctions.Signal
 
 Client.OnStart = Client.Signal.new()
 
+--@ Networking router (ByteNet). Requiring it resolves the shared namespace
+--  (waiting for the server to replicate it) before any RPC / signal is used.
+local Net = Client.GlobalFunctions.Net
+
 --@ Table Constants
 local Handlers = {}
 local Services = {}
@@ -68,12 +72,17 @@ Client.GetService = function(name)
 	local Service = Services[name]
 	if Service then return Service end
 
-	local ServerInfo = Shared:WaitForChild("GetService"):InvokeServer(name)
+	local ServerInfo = Net.invoke("__JLoader_GetService", name)
+	if not ServerInfo then
+		warn(`[{script.Parent.Name}]: Server returned no info for Service '{name}': {debug.traceback()}`)
+		return
+	end
+
 	Service = BaseService.new(name, ServerInfo)
 
 	for _, Name in ipairs(ServerInfo._sharedFns) do
 		Service[Name] = function(self, ...)
-			return Service.Folder.Calls:InvokeServer(Name, ...)
+			return Net.invoke(name .. "|Calls", Name, ...)
 		end
 	end
 

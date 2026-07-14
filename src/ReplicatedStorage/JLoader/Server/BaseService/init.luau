@@ -25,7 +25,10 @@ ServerService.new = function(template)
 	Folder.Name = self.Name
 	self.Folder = Folder
 
-	--@ Initialize signals for the service
+	--@ Initialize signals for the service.
+	--  Networked signals (Remote / Hybrid) are keyed by a stable channel string
+	--  that the client recomputes identically; no per-signal RemoteEvent is
+	--  created anymore — everything routes through the shared ByteNet namespace.
 	for Type, List in pairs(self.Signals) do
 		if #List == 0 then continue end
 
@@ -34,11 +37,9 @@ ServerService.new = function(template)
 				self[Name] = Signal.new()
 			end
 		else
-			local RemoteFolder = Folder:FindFirstChild(Type) or Instance.new("Folder", Folder)
-			RemoteFolder.Name = Type
-
 			for _, Name in ipairs(List) do
-				self[Name] = (Type == "Remote" and RemoteServer or HybridServer).new(RemoteFolder, Name)
+				local channel = self.Name .. "|" .. Type .. "|" .. Name
+				self[Name] = (Type == "Remote" and RemoteServer or HybridServer).new(channel)
 				table.insert(self._remotes[Type], Name)
 			end
 		end

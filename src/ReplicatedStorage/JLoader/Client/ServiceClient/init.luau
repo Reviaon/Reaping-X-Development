@@ -12,11 +12,13 @@ ClientService.new = function(name, info)
 		Folder = Shared.Parent.Services:FindFirstChild(name)
 	}, {__index = ClientService})
 
-	--@ Initialize remotes and hybrid clients for the service
+	--@ Reconstruct networked signals from the channel naming scheme. The channel
+	--  must be computed identically to the server (serviceName|Type|signalName);
+	--  no RemoteEvent instances are looked up — routing is via the ByteNet namespace.
 	for Type, List in pairs(info._remotes) do
 		for _, Name in ipairs(List) do
-			local Remote = self.Folder[Type]:FindFirstChild(Name)
-			self[Name] = (Type == "Remote" and RemoteClient or HybridClient).new(Remote)
+			local channel = name .. "|" .. Type .. "|" .. Name
+			self[Name] = (Type == "Remote" and RemoteClient or HybridClient).new(channel)
 		end
 	end
 

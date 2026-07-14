@@ -26,15 +26,15 @@ function Connection:Disconnect()
 	self._signal._remote:Disconnect()
 end
 
---@ Create a new hybrid signal instance with the given parent and name
-HybridSignal.new = function(parent, name)
+--@ Create a new hybrid signal instance for the given channel
+HybridSignal.new = function(channel)
 	local self = setmetatable({
-		Name = name or "HybridEvent",
+		Name = channel or "HybridEvent",
 		Connections = {}
 	}, {__index = HybridSignal})
 
 	self._basic = Signal.new()
-	self._remote = Remote.new(parent, self.Name)
+	self._remote = Remote.new(self.Name)
 	return self
 end
 

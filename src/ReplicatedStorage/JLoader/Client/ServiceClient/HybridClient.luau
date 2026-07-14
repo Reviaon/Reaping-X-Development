@@ -26,11 +26,11 @@ function Connection:Disconnect()
 	self._signal._remote:Disconnect()
 end
 
---@ Create a new hybrid client instance with the given remote
-HybridClient.new = function(remote)
+--@ Create a new hybrid client instance for the given channel
+HybridClient.new = function(channel)
 	local self = setmetatable({
 		_basic = Signal.new(),
-		_remote = Remote.new(remote),
+		_remote = Remote.new(channel),
 		Connections = {}
 	}, {__index = HybridClient})
 	return self

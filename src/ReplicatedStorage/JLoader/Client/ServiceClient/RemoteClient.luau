@@ -1,32 +1,43 @@
-local ClientSignal = {}
+--@ RemoteClient — client-side signal, now backed by ByteNet via Net.
+--  Public API is unchanged (:Fire/:Connect), only the transport differs.
+--  Each instance owns a stable `Channel` string matching the server side.
 
---@ Create a new client signal instance with the given remote
-ClientSignal.new = function(remote)
+local Shared = script.Parent.Parent.Parent.Shared
+local Net = require(Shared.GlobalFunctions).Net
+
+local ClientSignal = {}
+ClientSignal.__index = ClientSignal
+
+--@ Create a new client signal for the given channel
+ClientSignal.new = function(channel: string)
 	local self = setmetatable({
-		Remote = remote,
-		Connections = {}
-	}, {__index = ClientSignal})
+		Name = channel,
+		Channel = channel,
+		Connections = {},
+	}, ClientSignal)
 	return self
 end
 
 --@ Fire the signal to the server
 function ClientSignal:Fire(...)
-	self.Remote:FireServer(...)
+	Net.fireServer(self.Channel, ...)
 end
 
---@ Connect a function to the client event
+--@ Connect a function to the signal. Handler receives (...).
 function ClientSignal:Connect(f)
-	local con = self.Remote.OnClientEvent:Connect(f)
+	local con = Net.onEvent(self.Channel, f)
 	table.insert(self.Connections, con)
 	return con
 end
 
---@ Destroy the client signal and disconnect all connections
-function ClientSignal:Destroy()
+--@ Disconnect every connection made through this signal
+function ClientSignal:Disconnect()
 	for _, con in ipairs(self.Connections) do
 		con:Disconnect()
 	end
-	self.Remote:Destroy()
+	self.Connections = {}
 end
+
+ClientSignal.Destroy = ClientSignal.Disconnect
 
 return ClientSignal
