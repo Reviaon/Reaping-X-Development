@@ -28,7 +28,7 @@ function SprintComponent:Activate(controller)
 
 	if Humanoid.MoveDirection.Magnitude <= 0 then return end
 
-	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true }) then return end
+	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true, IsBlocking = true }) then return end
 
 	controller.StatusService:SetStatus(Character, "IsSprinting", true)
 
