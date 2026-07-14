@@ -8,7 +8,7 @@ function CrouchComponent:Activate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true }) then return end
+	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true }) then return end
 
 	controller.StatusService:SetStatus(Character, "IsCrouching", true)
 
