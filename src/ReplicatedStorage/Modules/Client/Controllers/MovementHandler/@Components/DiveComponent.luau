@@ -6,7 +6,6 @@ local TweenService = game:GetService("TweenService")
 
 --@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
 local DIVE_COOLDOWN = 1.5 --@ Temporary
-local _trove 
 
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
@@ -32,7 +31,10 @@ function DiveComponent:Activate(controller)
 	local _checkbinds = controller.InputHandler:AreKeysDown({"W","A","S","D","Q"})
 	local _heldbind = controller.InputHandler:GetKeysDown({"W","A","S","D","Q"}) 
 	local _isShiftLock = controller.StatusService:CheckStatuses(_character, { ShiftLock = true })
-
+	local _isAttacking = controller.StatusService:CheckStatuses(_character, { IsAttacking = true })
+	--@ TODO: Utilize dash momentum while attacking is live
+	--@ TODO: While Attacking Yield The Dash Animation However Carry The momentum Through The Attack Animation
+	
 	if not _checkbinds then
 		return
 	end
@@ -49,7 +51,7 @@ function DiveComponent:Activate(controller)
 			_heldbind = "W"
 		 end
 
-		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action2
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action4
 		_divetracks[_heldbind]:Play()
 	end
 
@@ -57,7 +59,8 @@ function DiveComponent:Activate(controller)
 	local _dive_speed = 60
 	local _dive_duration = 1
 	local _diveDirection = _heldbind
-	 _trove = controller.Trove.new()
+	
+	local _trove = controller.Trove.new()
 
 	local _directionOffsets = {
 		["W"] = _humanoidRootPart.CFrame.LookVector,
@@ -127,8 +130,10 @@ function DiveComponent:Activate(controller)
 	
 	_trove:Add(RunService.RenderStepped:Connect(function()
 		if os.clock() - _start > (_dive_duration + 0.5) then
-			_trove:Clean()
-			_trove = nil
+			if _trove then
+				_trove:Clean()
+				_trove = nil
+			end
 			return
 		end
 
@@ -162,6 +167,7 @@ function DiveComponent:Activate(controller)
 	end))
 
 	controller.StatusService:SetStatus(_character, "IsDiving", true, _dive_duration / 2 )
+	controller.StatusService:SetStatus(_character, "DiveDirection", _heldbind, _dive_duration / 2 )
 	controller.CooldownService:ApplyCooldown(_character, "Dive", DIVE_COOLDOWN)
 end
 
@@ -171,6 +177,7 @@ function DiveComponent:Deactivate(controller)
 
 	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
 		controller.StatusService:RemoveStatus(_character, "IsDiving")
+		controller.StatusService:RemoveStatus(_character, "DiveDirection")
 	end
 end
 

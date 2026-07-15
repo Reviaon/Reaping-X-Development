@@ -26,6 +26,15 @@ local TRANSITION_OUT_SPEED = 30
 local ROTATION_SPEED = 20
 local USE_SMOOTH_ROTATION = false
 
+--@ Dynamic camera offset (drift) — tune to taste.
+local ORIGIN_FOLLOW_SPEED = 10 --@ how fast the origin part catches up to the torso (lower = more drift)
+local DRIFT_STRENGTH = 0.4     --@ fraction of the origin's lag applied as camera drift
+local DRIFT_MAX = 2            --@ max drift magnitude, in studs
+
+local INFLUENCE_FLOOR = 0.2
+local INFLUENCE_BLEND = 6
+local _influenceLevel = INFLUENCE_FLOOR
+
 --@ Springs
 CameraHandler.cameraOffsetSpring = Spring.new(Vector3.zero)
 CameraHandler.cameraOffsetSpring.Damper = 1
@@ -66,35 +75,114 @@ function CameraHandler:Init()
 	InputHandler.BindInput(inputActions, inputConnections, ClientController);
 end
 
+local originCache = nil
+
+local function getOriginCache()
+	if originCache then
+		return originCache
+	end
+
+	local template = Instance.new("Part")
+	template.Name = "CameraOrigin"
+	template.Anchored = true
+	template.CanCollide = false
+	template.CanQuery = false
+	template.CanTouch = false
+	template.Transparency = 1
+	template.Size = Vector3.new(1, 1, 1)
+
+	originCache = GlobalFunctions.PartCache.new(template, 2)
+	template:Destroy()
+
+	return originCache
+end
+
+local function getTorso(Character)
+	return Character
+		and (
+			Character:FindFirstChild("Torso")
+			or Character:FindFirstChild("UpperTorso")
+			or Character:FindFirstChild("HumanoidRootPart")
+		)
+end
+
+function CameraHandler:CreateCameraObject(controller)
+	
+	if controller._camera_origin then
+		getOriginCache():ReturnPart(controller._camera_origin)
+		controller._camera_origin = nil
+	end
+
+	local _camera_origin = getOriginCache():GetPart()
+	controller._camera_origin = _camera_origin
+
+	local torso = getTorso(controller.Character)
+
+	if torso then
+		_camera_origin.CFrame = torso.CFrame
+	end
+
+	return _camera_origin
+end
+
 function CameraHandler:InitCharacter(controller)
 	local Character = controller.Character	
 
 	if not Character then return warn("@CHARACTER FAILED TO LOAD") end
 
+	--@ Tear down any loop/pooled part left over from a previous character.
+	CameraHandler:Cleanup(controller)
+
 	local _humanoid = Character:WaitForChild("Humanoid")
 	local _trove = controller.Trove.new()
+	controller._camera_trove = _trove
+
 	local _mouse = MouseModule.new()
 
 	MOUSE_OBJECT = _mouse
 	MOUSE_OBJECT.filterDescendants = {Character, workspace.World.Visuals, workspace.World.Live}
 
-	
 	CameraHandler:ToggleShiftLock(shiftLockEnabled, controller)
-	
+	CameraHandler:CreateCameraObject(controller)
+
 	_trove:Add(_humanoid.Died:Connect(function()
 		CameraHandler:OnCharacterRemoved(controller)
 	end))
 
-	_trove:Add(RunService.RenderStepped:Connect(function(DeltaTime : number)
+	_trove:BindToRenderStep("CameraOriginUpdate", Enum.RenderPriority.Camera.Value - 1, function(DeltaTime: number)
+		CameraHandler:UpdateOrigin(DeltaTime, controller)
+	end)
+
+	_trove:BindToRenderStep("CameraOffsetUpdate", Enum.RenderPriority.Camera.Value + 2, function(DeltaTime: number)
 		CameraHandler:UpdateCamera(DeltaTime, controller)
-	end))
+	end)
 
 	warn("CAMERA HANDLER INITIALIZED", controller.Character)
 end
 
 
+--@ Release the per-character render loop and return the pooled origin part.
+function CameraHandler:Cleanup(controller)
+	_influenceLevel = INFLUENCE_FLOOR
+	controller._camera_world_lag = nil
+
+	if controller._camera_trove then
+		controller._camera_trove:Destroy()
+		controller._camera_trove = nil
+	end
+
+	if controller._camera_origin then
+		if Camera and Camera.CameraSubject == controller._camera_origin then
+			Camera.CameraSubject = controller.Character and controller.Character:FindFirstChildOfClass("Humanoid")
+		end
+		getOriginCache():ReturnPart(controller._camera_origin)
+		controller._camera_origin = nil
+	end
+end
+
 function CameraHandler:OnCharacterRemoved(controller)
 	CameraHandler:ToggleShiftLock(false, controller)
+	CameraHandler:Cleanup(controller)
 end
 
 --@ TODO: Refractor this for screen shake capabilities, utilize camera shaker.
@@ -168,14 +256,62 @@ function CameraHandler:IsShiftLockEnabled()
 	return shiftLockEnabled
 end
 
-function CameraHandler:UpdateCamera(DeltaTime, controller)
-	if not (Camera and controller.Character) then 
-		return 
+function CameraHandler:UpdateOrigin(DeltaTime, controller)
+	local origin = controller._camera_origin
+	local Character = controller.Character
+
+	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+	if not (origin and Character and Humanoid) then
+		controller._camera_world_lag = Vector3.zero
+		return
 	end
 
-	DeltaTime = DeltaTime or RunService.RenderStepped:Wait() 
+	local torso = getTorso(Character)
+	if not torso then
+		controller._camera_world_lag = Vector3.zero
+		return
+	end
 
-	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position
+	local status = controller.StatusService
+	local torsoFocus = CFrame.new(torso.Position + Vector3.new(0, 2, 0))
+
+	local gated = Humanoid.FloorMaterial ~= Enum.Material.Air
+		and (
+			status:CheckStatuses(Character, { IsAttacking = true })
+			or status:CheckStatuses(Character, { IsCrouching = true })
+			or status:CheckStatuses(Character, { DiveDirection = "S" })
+		)
+
+	_influenceLevel = _influenceLevel + ((gated and 1 or INFLUENCE_FLOOR) - _influenceLevel) * math.min(1, DeltaTime * INFLUENCE_BLEND)
+
+	origin.CFrame = origin.CFrame:Lerp(torsoFocus, math.min(1, DeltaTime * ORIGIN_FOLLOW_SPEED))
+
+	if Camera and Camera.CameraSubject and Camera.CameraSubject ~= origin then
+		Camera.CameraSubject = origin
+	end
+
+	controller._camera_world_lag = torsoFocus.Position - origin.Position
+end
+
+function CameraHandler:UpdateCamera(DeltaTime, controller)
+	if not (Camera and controller.Character) then
+		return
+	end
+
+	local drift = Vector3.zero
+	local worldLag = controller._camera_world_lag
+
+	if worldLag then
+		local localLag = Camera.CFrame:VectorToObjectSpace(worldLag) * DRIFT_STRENGTH * _influenceLevel
+		drift = Vector3.new(localLag.X, localLag.Y, 0)
+
+		if drift.Magnitude > DRIFT_MAX then
+			drift = drift.Unit * DRIFT_MAX
+		end
+	end
+
+	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position + drift
 	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset)
 end
 

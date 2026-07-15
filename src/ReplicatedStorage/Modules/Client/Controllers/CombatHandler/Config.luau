@@ -3,6 +3,7 @@ local CombatConfig = {
 	ComboTimeout = 1.5, --@ Default Combo Time Out
 	DefaultMaxCombo = 3, --@ Default Max Combo
 	DefaultWeapon = "Melee", --@ Default weapon id to resolve to when no weapon is equipped or specified.
+	InputBuffering = false, --@ When true, attack presses blocked by an active attack queue and auto-fire when ready.
 
 	--@ Configure max combo per weapon id/name.
 
@@ -25,7 +26,7 @@ local CombatConfig = {
 			},
 
 			light_impulse = {
-				speed = 10,
+				speed = 8,
 				duration = 0.8,
 				falloff = 0.5,
 
@@ -55,10 +56,10 @@ local CombatConfig = {
 
 			light_impulse = {
 				impulse = {
-					{ speed = 10, duration = 0.8, falloff = 0.5 },
-					{ speed = 10, duration = 0.8, falloff = 0.5 },
-					{ speed = 10, duration = 0.8, falloff = 0.5 },
-					{ speed = 10, duration = 2, falloff = 1.5 },
+					{ speed = 8, duration = 0.8, falloff = 0.5 },
+					{ speed = 8, duration = 0.8, falloff = 0.5 },
+					{ speed = 8, duration = 0.8, falloff = 0.5 },
+					{ speed = 8, duration = 2, falloff = 1.5 },
 				},
 				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
 					0.45,
@@ -116,8 +117,8 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 end
 
 function CombatConfig:ClearImpulse(controller)
-	--@ Cancel a pending impulse delay thread before it fires
 	local thread = controller:Get("_impulseThread")
+
 	if thread then
 		task.cancel(thread)
 		controller:Remove("_impulseThread")
@@ -130,7 +131,7 @@ function CombatConfig:ClearImpulse(controller)
 		controller:Remove("_activeImpulseTrove")
 	end
 
-	--@ Fallback: remove the BodyVelocity directly if it somehow outlived the trove
+	
 	controller.PhysicsService.ClearExistingImpulse(controller)
 end
 
@@ -141,17 +142,14 @@ function CombatConfig:UpdateWeaponConfig(controller)
 	local weaponId = self:ResolveWeaponId(controller)
 	local weaponConfig = self.WeaponConfig[weaponId]
 
-	--@ Play weapon idle animation (add per-weapon idle names below as needed)
 	if not controller._idle_animation then
 		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
-
 	else
-
 		controller.AnimatorService:StopAllWithReference(
 			Character, 
 			controller._idle_animation
 		)
-
+		
 		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
 	end
 end

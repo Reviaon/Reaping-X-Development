@@ -35,7 +35,7 @@ local inputConnections = {}
 local inputActions = {
 	Began = {
 		[Enum.UserInputType.MouseButton1] = {
-			canHold = false,
+			canHold = true,
 			action = function(controller)
 				CombatHandler:TryLightAttack(controller)
 			end,
@@ -46,7 +46,7 @@ local inputActions = {
 				CombatHandler:TryHeavyAttack(controller)
 			end,
 		},
-		[Enum.UserInputType.MouseButton2] = {
+		[Enum.KeyCode.F] = {
 			canHold = false,
 			action = function(controller)
 				CombatHandler:StartBlock(controller)
@@ -59,7 +59,7 @@ local inputActions = {
 			action = function(controller)
 			end,
 		},
-		[Enum.UserInputType.MouseButton2] = {
+		[Enum.KeyCode.F] = {
 			canHold = false,
 			action = function(controller)
 				CombatHandler:StopBlock(controller)
@@ -128,7 +128,12 @@ end
 
 function CombatHandler:TryAttackBranch(controller, branchName: string)
 	if not CombatHandler:CanBeginBranch(controller, branchName) then
-		CombatHandler:QueueBranch(branchName)
+		--@ Presses that land while an attack is still processing are dropped
+		--  unless input buffering is explicitly enabled for combat; otherwise a
+		--  blocked press silently queues and fires later on its own.
+		if CombatConfig.InputBuffering then
+			CombatHandler:QueueBranch(branchName)
+		end
 		return
 	end
 
