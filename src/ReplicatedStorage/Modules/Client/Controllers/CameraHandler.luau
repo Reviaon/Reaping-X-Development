@@ -35,6 +35,8 @@ local INFLUENCE_FLOOR = 0.2
 local INFLUENCE_BLEND = 6
 local _influenceLevel = INFLUENCE_FLOOR
 
+local SUBJECT_HEIGHT_OFFSET = 1.5 --@ Torso subject sits at chest level; raise to the Humanoid subject's default head-level POV
+
 --@ Springs
 CameraHandler.cameraOffsetSpring = Spring.new(Vector3.zero)
 CameraHandler.cameraOffsetSpring.Damper = 1
@@ -288,7 +290,7 @@ function CameraHandler:UpdateOrigin(DeltaTime, controller)
 	origin.CFrame = origin.CFrame:Lerp(torsoFocus, math.min(1, DeltaTime * ORIGIN_FOLLOW_SPEED))
 
 	if Camera and Camera.CameraSubject and Camera.CameraSubject ~= origin then
-		Camera.CameraSubject = origin
+		Camera.CameraSubject = torso
 	end
 
 	controller._camera_world_lag = torsoFocus.Position - origin.Position
@@ -312,7 +314,7 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 	end
 
 	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position + drift
-	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset)
+	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset) + Vector3.new(0, SUBJECT_HEIGHT_OFFSET, 0)
 end
 
 return CameraHandler

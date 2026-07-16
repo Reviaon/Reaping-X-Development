@@ -83,7 +83,6 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 	if not actionInfo then return end
 
 	if Began then
-		--@ Exactly one activation per physical press.
 		actionInfo.action(payload)
 
 		if actionInfo.canHold then
@@ -93,18 +92,13 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 				startedAt = os.clock(),
 			}
 
-			--@ Single shared repeat loop; re-invokes only after the input has
-			--  been genuinely held past HOLD_REPEAT_DELAY, so taps never
-			--  multi-fire or queue while hold-to-repeat stays intact.
 			if not heldLoopRunning then
 				heldLoopRunning = true
 				task.spawn(function()
 					while next(heldInputs) do
 						RunService.Stepped:Wait()
 
-						--@ Death fires no input event, so the loop itself must
-						--  clear held state or a held input keeps acting on the
-						--  corpse and carries into the respawn.
+				
 						local heldCharacter = Players.LocalPlayer.Character
 						local heldHumanoid = heldCharacter and heldCharacter:FindFirstChildOfClass("Humanoid")
 						if not heldHumanoid or heldHumanoid.Health <= 0 then
@@ -115,8 +109,7 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 						local now = os.clock()
 						for _, held in pairs(heldInputs) do
 							if now - held.startedAt >= HOLD_REPEAT_DELAY then
-								--@ pcall so one erroring action cannot kill this
-								--  thread and latch heldLoopRunning forever.
+								
 								local ok, err = pcall(held.action, held.payload)
 								if not ok then
 									warn("[InputHandler] Held action error:", err)
