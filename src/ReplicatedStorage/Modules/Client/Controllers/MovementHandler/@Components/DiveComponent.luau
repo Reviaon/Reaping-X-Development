@@ -44,12 +44,19 @@ function DiveComponent:Activate(controller)
 		["D"] = controller.AnimatorService:GetTrack(_character, "DiveRight")
 	}
 
+	local _dive_start_times = {
+		["W"] = 0.125,
+		["A"] = 0.125,
+		["S"] = 0.2,
+		["D"] = 0.125
+	}
+
 	if _checkbinds then
 		if _heldbind ==  "Q" then 
 			_heldbind = "W"
 		 end
 
-		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action3
 
 		if not _isAttacking then
 			_divetracks[_heldbind]:Play()
@@ -60,6 +67,7 @@ function DiveComponent:Activate(controller)
 	local _dive_speed = 60
 	local _dive_duration = 1
 	local _diveDirection = _heldbind
+	local _dive_start_time = _dive_start_times[_diveDirection] or 0
 	
 	local _trove = controller.Trove.new()
 
@@ -105,16 +113,6 @@ function DiveComponent:Activate(controller)
 
 	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
 	local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
-	tween:Play()
-
-	--@ Clear prior impulses before applying dash momentum: cancels any pending
-	--  attack impulse thread (which would otherwise fire mid-dive and destroy
-	--  this BodyVelocity) along with any live @impulse_velocity mover.
-	if controller.CombatConfig then
-		controller.CombatConfig:ClearImpulse(controller)
-	else
-		controller.PhysicsService.ClearExistingImpulse(controller)
-	end
 
 	local _velocity = Instance.new("BodyVelocity")
 	_velocity.Name = "@impulse_velocity"
@@ -125,10 +123,24 @@ function DiveComponent:Activate(controller)
 		_humanoidRootPart.AssemblyMass
 	) * Vector3.new(1, 0, 1) * 4e4
 
-	_velocity.Velocity = _lockedDirection * speedMultiplier.Value
-	_velocity.Parent = _humanoidRootPart
+	--@ The animation winds up immediately; the momentum follows through after
+	--  the direction's start time. Impulse clearing and the speed falloff both
+	--  happen at momentum start so the dash begins at full strength.
+	task.delay(_dive_start_time, function()
+		if not _character.Parent then return end
 
-	task.delay(_dive_duration, function()
+		if controller.CombatConfig then
+			controller.CombatConfig:ClearImpulse(controller)
+		else
+			controller.PhysicsService.ClearExistingImpulse(controller)
+		end
+
+		tween:Play()
+		_velocity.Velocity = _lockedDirection * speedMultiplier.Value
+		_velocity.Parent = _humanoidRootPart
+	end)
+
+	task.delay(_dive_start_time + _dive_duration, function()
 		if _velocity and _velocity.Parent then
 			_velocity:Destroy()
 		end
@@ -139,7 +151,7 @@ function DiveComponent:Activate(controller)
 	_trove:Add(_velocity)
 	
 	_trove:Add(RunService.RenderStepped:Connect(function()
-		if os.clock() - _start > (_dive_duration + 0.5) then
+		if os.clock() - _start > (_dive_start_time + _dive_duration + 0.5) then
 			if _trove then
 				_trove:Clean()
 				_trove = nil
