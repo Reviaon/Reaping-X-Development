@@ -14,7 +14,7 @@ function DiveComponent:Activate(controller)
 		return
 	end
 
-	if controller.StatusService:CheckStatuses(_character, { IsDiving = true, IsAttacking = true }) then
+	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
 		return
 	end
 
@@ -32,8 +32,6 @@ function DiveComponent:Activate(controller)
 	local _heldbind = controller.InputHandler:GetKeysDown({"W","A","S","D","Q"}) 
 	local _isShiftLock = controller.StatusService:CheckStatuses(_character, { ShiftLock = true })
 	local _isAttacking = controller.StatusService:CheckStatuses(_character, { IsAttacking = true })
-	--@ TODO: Utilize dash momentum while attacking is live
-	--@ TODO: While Attacking Yield The Dash Animation However Carry The momentum Through The Attack Animation
 	
 	if not _checkbinds then
 		return
@@ -51,8 +49,11 @@ function DiveComponent:Activate(controller)
 			_heldbind = "W"
 		 end
 
-		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action4
-		_divetracks[_heldbind]:Play()
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action
+
+		if not _isAttacking then
+			_divetracks[_heldbind]:Play()
+		end
 	end
 
 	--@ TODO: Refactor Dive Settings To be more dynamic and less hardcoded.
@@ -105,6 +106,15 @@ function DiveComponent:Activate(controller)
 	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
 	local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
 	tween:Play()
+
+	--@ Clear prior impulses before applying dash momentum: cancels any pending
+	--  attack impulse thread (which would otherwise fire mid-dive and destroy
+	--  this BodyVelocity) along with any live @impulse_velocity mover.
+	if controller.CombatConfig then
+		controller.CombatConfig:ClearImpulse(controller)
+	else
+		controller.PhysicsService.ClearExistingImpulse(controller)
+	end
 
 	local _velocity = Instance.new("BodyVelocity")
 	_velocity.Name = "@impulse_velocity"
