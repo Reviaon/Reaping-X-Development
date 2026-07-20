@@ -34,7 +34,7 @@ function BlockComponent:Activate(controller, combatState)
 
 	_blockTrack = controller.AnimatorService:PlayTrack(Character, "UniversalBlock", {
 		Speed = 1,
-		Priority = Enum.AnimationPriority.Action,
+		Priority = Enum.AnimationPriority.Idle,
 		FadeTime = 0.15,
 		Loop = true,
 	})

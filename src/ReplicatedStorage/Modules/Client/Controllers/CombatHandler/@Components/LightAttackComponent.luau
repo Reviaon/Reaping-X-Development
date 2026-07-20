@@ -18,7 +18,6 @@ function LightAttackComponent:CanActivate(controller, _combatState): boolean
 	if controller.StatusService:CheckStatuses(Character, { 
 		IsStunned = true, 
 		IsBlocking = true, 
-		IsDiving = true 
 	}) then
 		return false
 	end
@@ -44,6 +43,8 @@ function LightAttackComponent:Activate(controller, combatState)
 		and weaponConfig.attack_duration[comboIndex] 
 		or weaponConfig.attack_duration or 0.2
 
+	local is_diving = controller.StatusService:CheckStatuses(Character, { IsDiving = true })
+
 	local cooldown_duration = comboIndex >= weaponConfig.MaxCombo 
 			and weaponConfig.attack_cooldown_final 
 			or weaponConfig.attack_cooldown or 0.3
@@ -62,7 +63,7 @@ function LightAttackComponent:Activate(controller, combatState)
 
 	warn("Playing animation:", animationName)
 
-	if weaponConfig.light_impulse then
+	if weaponConfig.light_impulse and not is_diving then
 		local impulse_delay = weaponConfig.light_impulse.impulse_delay 
 			and weaponConfig.light_impulse.impulse_delay[comboIndex] or 0.2
 
