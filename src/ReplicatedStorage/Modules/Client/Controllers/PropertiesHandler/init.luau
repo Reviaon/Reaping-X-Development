@@ -6,20 +6,15 @@ local RunService = game:GetService("RunService")
 
 local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
-local SPEED_LERP_ALPHA = 8
 
 local JUMP_DECAY_STEP = 10
 local JUMP_RECOVERY_RATE = 5
-local JUMP_RESET_COOLDOWN = 3
+local JUMP_RESET_COOLDOWN = 1
 
 local _decayedJumpPower = BASE_JUMP_POWER
-local _statusJumpOverride = nil
+local _statusZeroesJump = false
 local _jumpResetPending = false
 local _resetThread = nil
-
-local function lerp(a, b, t)
-	return a + (b - a) * t
-end
 
 local function applyHumanoidProperties(controller)
 	local Character = controller.Character
@@ -51,10 +46,11 @@ local function applyHumanoidProperties(controller)
 	Humanoid.AutoRotate = not noAutoRotate
 
 	controller:Set("GoalSpeed", walkSpeed)
+	Humanoid.WalkSpeed = walkSpeed
 
-	_statusJumpOverride = jumpPower
+	_statusZeroesJump = jumpPower ~= nil and jumpPower <= 0
 
-	local effectiveJump = jumpPower or _decayedJumpPower
+	local effectiveJump = _statusZeroesJump and 0 or _decayedJumpPower
 	Humanoid.JumpPower = math.max(effectiveJump, 0)
 
 	if effectiveJump <= 0 and walkSpeed < BASE_WALK_SPEED then
@@ -62,23 +58,16 @@ local function applyHumanoidProperties(controller)
 	end
 end
 
-local function walkUpdate(controller, dt)
+local function propertyUpdate(controller, dt)
 	local Humanoid = controller.Humanoid
 	if not Humanoid then return end
-
-	local goalSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
-
-	Humanoid.WalkSpeed = lerp(
-		Humanoid.WalkSpeed,
-		goalSpeed,
-		math.clamp(SPEED_LERP_ALPHA * dt, 0, 1)
-	)
 
 	if not _jumpResetPending and _decayedJumpPower < BASE_JUMP_POWER then
 		_decayedJumpPower = math.min(BASE_JUMP_POWER, _decayedJumpPower + JUMP_RECOVERY_RATE * dt)
 	end
 
-	Humanoid.JumpPower = math.max(_statusJumpOverride or _decayedJumpPower, 0)
+	Humanoid.WalkSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
+	Humanoid.JumpPower = _statusZeroesJump and 0 or math.max(_decayedJumpPower, 0)
 end
 
 function PropertyHandler:InitCharacter(controller)
@@ -90,7 +79,7 @@ function PropertyHandler:InitCharacter(controller)
 		_resetThread = nil
 	end
 	_decayedJumpPower = BASE_JUMP_POWER
-	_statusJumpOverride = nil
+	_statusZeroesJump = false
 	_jumpResetPending = false
 
 	local trove = controller.Trove.new()
@@ -127,7 +116,7 @@ function PropertyHandler:InitCharacter(controller)
 	end)
 
 	trove:Connect(RunService.RenderStepped, function(dt)
-		walkUpdate(controller, dt)
+		propertyUpdate(controller, dt)
 	end)
 
 	trove:Connect(Character.AncestryChanged, function()
