@@ -42,6 +42,13 @@ return{
 			IsStun = false
 		},
 
+		NoJump = {
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 4;
+			IsStun = false;
+		},
+
 		Emote = {
 			WalkSpeed = 8,
 			JumpPower = 0,
