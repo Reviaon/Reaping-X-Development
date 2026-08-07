@@ -9,6 +9,11 @@ local TweenService = game:GetService("TweenService")
 -- @ Modules
 local Trove = require(script.Parent.Parent:WaitForChild("Trove"))
 
+-- @ Stamped on every impulse mover so competing impulses can be arbitrated.
+-- Any system that parents its own @impulse_velocity should stamp this too.
+local IMPULSE_PRIORITY_ATTRIBUTE = "impulse_priority"
+PhysicsService.ImpulsePriorityAttribute = IMPULSE_PRIORITY_ATTRIBUTE
+
 --[[
 	PhysicsService.ApplyImpulse(controller, settings) -> Trove | nil
 
@@ -30,6 +35,10 @@ local Trove = require(script.Parent.Parent:WaitForChild("Trove"))
 		maxForce         Vector3       Override MaxForce.                        Default: mass-based
 		blockCast        bool          Enable per-frame obstacle check.          Default: false
 		blockCastDistance number       Cast distance ahead in studs.             Default: 2.5
+		priority         number        Arbitration weight vs the active impulse. Default: 0
+		                               A request is ignored while an impulse of a
+		                               HIGHER priority is live; equal or greater
+		                               priority supersedes it (latest wins).
 ]]
 function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local character = controller.Character
@@ -38,8 +47,18 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	if root:FindFirstChild("@impulse_velocity") then
-		root:FindFirstChild("@impulse_velocity"):Destroy()
+	local priority = settings.priority or 0
+	local existing = root:FindFirstChild("@impulse_velocity")
+
+	if existing then
+		--@ A live impulse of higher priority owns the character's momentum;
+		--  ignore this request rather than stomping it. Equal priority still
+		--  supersedes so combo hits can chain their own impulses.
+		if (existing:GetAttribute(IMPULSE_PRIORITY_ATTRIBUTE) or 0) > priority then
+			return nil
+		end
+
+		existing:Destroy()
 	end
 
 	local speed = settings.speed or 40
@@ -100,6 +119,7 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	velocity.Name = "@impulse_velocity"
 	velocity.MaxForce = maxForce
 	velocity.Velocity = direction * speed
+	velocity:SetAttribute(IMPULSE_PRIORITY_ATTRIBUTE, priority)
 	velocity.Parent = root
 
 	local trove = Trove.new()
