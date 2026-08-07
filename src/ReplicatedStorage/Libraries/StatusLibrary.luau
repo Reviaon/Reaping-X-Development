@@ -43,9 +43,9 @@ return{
 		},
 
 		NoJump = {
-			WalkSpeed = 8,
+			WalkSpeed = 10,
 			JumpPower = 0,
-			Priority = 4;
+			Priority = 3;
 			IsStun = false;
 		},
 
