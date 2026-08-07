@@ -10,11 +10,20 @@ local BASE_JUMP_POWER = 50
 local JUMP_DECAY_STEP = 10
 local JUMP_RECOVERY_RATE = 5
 local JUMP_RESET_COOLDOWN = 1
+local JUMP_MIN_POWER = 25
 
 local _decayedJumpPower = BASE_JUMP_POWER
 local _statusZeroesJump = false
 local _jumpResetPending = false
 local _resetThread = nil
+
+local function resolveJumpPower()
+	if _statusZeroesJump or _decayedJumpPower < JUMP_MIN_POWER then
+		return 0
+	end
+
+	return _decayedJumpPower
+end
 
 local function applyHumanoidProperties(controller)
 	local Character = controller.Character
@@ -50,12 +59,16 @@ local function applyHumanoidProperties(controller)
 
 	_statusZeroesJump = jumpPower ~= nil and jumpPower <= 0
 
-	local effectiveJump = _statusZeroesJump and 0 or _decayedJumpPower
-	Humanoid.JumpPower = math.max(effectiveJump, 0)
+	local effectiveJump = resolveJumpPower()
+	Humanoid.JumpPower = effectiveJump
 
 	if effectiveJump <= 0 and walkSpeed < BASE_WALK_SPEED then
 		Humanoid.Jump = false
 	end
+
+	
+	Humanoid.WalkSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
+	Humanoid.JumpPower = resolveJumpPower()
 end
 
 local function propertyUpdate(controller, dt)
@@ -67,7 +80,7 @@ local function propertyUpdate(controller, dt)
 	end
 
 	Humanoid.WalkSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
-	Humanoid.JumpPower = _statusZeroesJump and 0 or math.max(_decayedJumpPower, 0)
+	Humanoid.JumpPower = resolveJumpPower()
 end
 
 function PropertyHandler:InitCharacter(controller)
@@ -95,6 +108,10 @@ function PropertyHandler:InitCharacter(controller)
 
 		_decayedJumpPower = math.max(0, _decayedJumpPower - JUMP_DECAY_STEP)
 
+		if _decayedJumpPower < JUMP_MIN_POWER then
+			_decayedJumpPower = 0
+		end
+
 		if _decayedJumpPower <= 0 then
 			_jumpResetPending = true
 			_resetThread = task.delay(JUMP_RESET_COOLDOWN, function()
@@ -115,9 +132,9 @@ function PropertyHandler:InitCharacter(controller)
 		end
 	end)
 
-	trove:Connect(RunService.RenderStepped, function(dt)
-		propertyUpdate(controller, dt)
-	end)
+	--trove:Connect(RunService.RenderStepped, function(dt)
+		--propertyUpdate(controller, dt)
+	--end)
 
 	trove:Connect(Character.AncestryChanged, function()
 		if not Character:IsDescendantOf(game) then
