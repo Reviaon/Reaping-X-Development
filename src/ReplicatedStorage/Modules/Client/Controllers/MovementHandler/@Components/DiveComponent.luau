@@ -7,6 +7,10 @@ local TweenService = game:GetService("TweenService")
 --@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
 local DIVE_COOLDOWN = 1.5 --@ Temporary
 
+--@ Dash momentum outranks attack impulses, so a lower-priority impulse landing
+--  mid-dash is ignored instead of stomping it.
+local DIVE_IMPULSE_PRIORITY = 2
+
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
 
@@ -116,6 +120,7 @@ function DiveComponent:Activate(controller)
 
 	local _velocity = Instance.new("BodyVelocity")
 	_velocity.Name = "@impulse_velocity"
+	_velocity:SetAttribute(controller.PhysicsService.ImpulsePriorityAttribute, DIVE_IMPULSE_PRIORITY)
 
 	_velocity.MaxForce = Vector3.new(
 		_humanoidRootPart.AssemblyMass,

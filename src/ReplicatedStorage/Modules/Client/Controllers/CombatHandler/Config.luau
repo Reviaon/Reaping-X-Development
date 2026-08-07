@@ -29,6 +29,7 @@ local CombatConfig = {
 				speed = 8,
 				duration = 0.8,
 				falloff = 0.5,
+				priority = 1, --@ Higher priority impulses cannot be stomped by lower ones (see PhysicsService.ApplyImpulse)
 
 				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
 					0.35,
@@ -55,6 +56,7 @@ local CombatConfig = {
 			},
 
 			light_impulse = {
+				priority = 1, --@ Per-combo entries below may override this individually
 				impulse = {
 					{ speed = 8, duration = 0.8, falloff = 0.5 },
 					{ speed = 8, duration = 0.8, falloff = 0.5 },

@@ -82,12 +82,17 @@ function LightAttackComponent:Activate(controller, combatState)
 			local root = Character:FindFirstChild("HumanoidRootPart")
 
 			if root then
+
 				local trove = controller.PhysicsService.ApplyImpulse(controller, {
 					direction = root.CFrame.LookVector,
 					speed = impulseData.speed or 30,
 					duration = impulseData.duration or 0.2,
 					falloff = impulseData.falloff or 0.2,
 					updateDirection = true,
+					
+					priority = impulseData.priority
+						or weaponConfig.light_impulse.priority
+						or 1,
 				})
 
 				if trove then
@@ -101,6 +106,7 @@ function LightAttackComponent:Activate(controller, combatState)
 
 	controller.StatusService:SetStatus(Character, "IsAttacking", true, attack_duration)
 	controller.CooldownService:ApplyCooldown(Character, "IsAttacking", cooldown_duration)
+	controller.StatusService:SetStatus(Character, "NoJump", true, 1)
 end
 
 function LightAttackComponent:Deactivate(_controller, _combatState)
