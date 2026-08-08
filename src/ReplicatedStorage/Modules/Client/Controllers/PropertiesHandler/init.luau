@@ -9,13 +9,15 @@ local BASE_JUMP_POWER = 50
 
 local JUMP_DECAY_STEP = 10
 local JUMP_RECOVERY_RATE = 5
-local JUMP_RESET_COOLDOWN = 1
+local JUMP_RESET_COOLDOWN = 0.5
 local JUMP_MIN_POWER = 25
+local JUMP_IDLE_RESET = 2
 
 local _decayedJumpPower = BASE_JUMP_POWER
 local _statusZeroesJump = false
 local _jumpResetPending = false
 local _resetThread = nil
+local _idleThread = nil
 
 local function resolveJumpPower()
 	if _statusZeroesJump or _decayedJumpPower < JUMP_MIN_POWER then
@@ -71,6 +73,28 @@ local function applyHumanoidProperties(controller)
 	Humanoid.JumpPower = resolveJumpPower()
 end
 
+--@ Restarted on every jump. Going JUMP_IDLE_RESET seconds without jumping wipes
+--  the accumulated decay entirely, independent of the zeroed-out reset cooldown.
+local function cancelIdleReset()
+	if _idleThread then
+		task.cancel(_idleThread)
+		_idleThread = nil
+	end
+end
+
+local function scheduleIdleReset(controller)
+	cancelIdleReset()
+
+	_idleThread = task.delay(JUMP_IDLE_RESET, function()
+		_idleThread = nil
+
+		if _decayedJumpPower >= BASE_JUMP_POWER then return end
+
+		_decayedJumpPower = BASE_JUMP_POWER
+		applyHumanoidProperties(controller)
+	end)
+end
+
 local function propertyUpdate(controller, dt)
 	local Humanoid = controller.Humanoid
 	if not Humanoid then return end
@@ -91,6 +115,7 @@ function PropertyHandler:InitCharacter(controller)
 		task.cancel(_resetThread)
 		_resetThread = nil
 	end
+	cancelIdleReset()
 	_decayedJumpPower = BASE_JUMP_POWER
 	_statusZeroesJump = false
 	_jumpResetPending = false
@@ -113,6 +138,9 @@ function PropertyHandler:InitCharacter(controller)
 		end
 
 		if _decayedJumpPower <= 0 then
+			--@ Fully decayed: the zeroed-out cooldown owns the reset from here.
+			cancelIdleReset()
+
 			_jumpResetPending = true
 			_resetThread = task.delay(JUMP_RESET_COOLDOWN, function()
 				_resetThread = nil
@@ -120,6 +148,8 @@ function PropertyHandler:InitCharacter(controller)
 				_decayedJumpPower = BASE_JUMP_POWER
 				applyHumanoidProperties(controller)
 			end)
+		else
+			scheduleIdleReset(controller)
 		end
 
 		applyHumanoidProperties(controller)
@@ -130,6 +160,7 @@ function PropertyHandler:InitCharacter(controller)
 			task.cancel(_resetThread)
 			_resetThread = nil
 		end
+		cancelIdleReset()
 	end)
 
 	--trove:Connect(RunService.RenderStepped, function(dt)
