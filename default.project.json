@@ -2,25 +2,34 @@
   "name": "Reaping-X",
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedFirst": {
-      "$className": "ReplicatedFirst",
       "$path": "src/ReplicatedFirst"
     },
-
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
-      "Modules": {
-        "$path": "src/ReplicatedStorage/Modules"
+      "JLoader": {
+        "$path": "src/ReplicatedStorage/JLoader"
       },
       "Libraries": {
         "$path": "src/ReplicatedStorage/Libraries"
       },
-      "JLoader": {
-        "$path": "src/ReplicatedStorage/JLoader"
+      "Modules": {
+        "$path": "src/ReplicatedStorage/Modules"
+      },
+      "Storage": {
+        "$className": "Folder",
+        "Other": {
+          "$className": "Folder",
+          "GrassSystem": {
+            "$className": "LocalScript",
+            "$properties": {
+              "Disabled": true,
+              "Source": "local grassList = {}\n\nlocal Grass = {} do\n\tGrass.__index = Grass\n\n\tlocal TweenService = game:GetService(\"TweenService\")\n\tfunction Grass:Rotate(x, y, z)\n\t\tTweenService:Create(\n\t\t\tself.Part,\n\t\t\tTweenInfo.new(.3, Enum.EasingStyle.Sine),\n\t\t\t{Orientation = Vector3.new(x, y, z)}\n\t\t):Play()\n\tend\n\n\tfunction Grass.new(part)\n\t\tlocal grass = {}\n\t\tgrass.Position = part.Position\n\t\tgrass.LookVector = part.CFrame.LookVector\n\t\tgrass.XVector = part.CFrame.XVector\n\t\tgrass.Part = part\n\t\tgrass.Bone1 = part:FindFirstChild(\"Bone\")\n\n\t\ttable.insert(grassList, grass)\n\t\treturn setmetatable(grass, Grass)\n\tend\nend\n\nlocal currentPlayer = game:GetService(\"Players\").LocalPlayer\nlocal currentCharacter\nlocal currentRoot\n\ncurrentPlayer.CharacterAdded:Connect(function(character)\n\tcurrentCharacter = character\n\tcurrentRoot = character:WaitForChild(\"HumanoidRootPart\", 10)\nend)\n\ncurrentPlayer.CharacterRemoving:Connect(function()\n\tcurrentCharacter = nil\n\tcurrentRoot = nil\nend)\n\ncurrentPlayer.CharacterAdded:Wait()\n\nwait(1)\n\nfor _, grassObject in ipairs(workspace.Foliage:GetChildren()) do\n\tGrass.new(grassObject)\nend\n\ngame:GetService(\"RunService\").Stepped:Connect(function()\n\tif not currentRoot then return end\n\tfor _, grass in ipairs(grassList) do\n\t\tlocal distance = currentPlayer:DistanceFromCharacter(grass.Position)\n\t\tif distance < 7 then\n\t\t\tif distance < 6 then\n\t\t\t\tif (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) < -.5 then\n\t\t\t\t\tgrass:Rotate(-20, 0, 0) --if I stand left\n\t\t\t\tend\n\t\t\t\tif (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) > .5 then\n\t\t\t\t\tgrass:Rotate(20, 0, 0) --if I stand right\n\t\t\t\tend\n\t\t\t\tif (currentRoot.Position - grass.Position).Unit:Dot(grass.XVector) < .5 and (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) < .5 and (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) > -.5  then\n\t\t\t\t\tgrass:Rotate(0, 0, -30) --if I stand Back\n\t\t\t\tend\n\t\t\t\tif (currentRoot.Position - grass.Position).Unit:Dot(grass.XVector) > .5 and (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) < .5 and (currentRoot.Position - grass.Position).Unit:Dot(grass.LookVector) > -.5  then\n\t\t\t\t\tgrass:Rotate(0, 0, 30) --if I stand Front\n\t\t\t\tend\n\t\t\telse\n\t\t\t\tgrass:Rotate(0,0,0)\n\t\t\tend\n\t\tend\n\tend\nend)"
+            }
+          }
+        }
       }
     },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "Core": {
@@ -30,21 +39,15 @@
         "$path": "src/ServerScriptService/Server"
       }
     },
-
     "ServerStorage": {
       "$className": "ServerStorage"
     },
-
     "StarterGui": {
-      "$className": "StarterGui",
       "$path": "src/StarterGui"
     },
-
     "StarterPack": {
-      "$className": "StarterPack",
       "$path": "src/StarterPack"
     },
-
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterCharacterScripts": {
@@ -54,9 +57,7 @@
         "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
     },
-
     "Teams": {
-      "$className": "Teams",
       "$path": "src/Teams"
     }
   }
