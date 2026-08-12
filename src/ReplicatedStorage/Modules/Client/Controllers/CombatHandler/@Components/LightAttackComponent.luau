@@ -1,8 +1,69 @@
 --@ Light Attack Component
 local LightAttackComponent = {}
 
+local RunService = game:GetService("RunService")
+
+local EASE_OUT_DEFAULT = 0.1
+local EASE_PAUSE_DEFAULT = 0.05
+local EASE_FADE_DEFAULT = 0.15
+
 local _currentTrack = nil
 local _impulseThread = nil
+local _easeThread = nil
+
+local function cancelEaseOut()
+	if _easeThread then
+		task.cancel(_easeThread)
+		_easeThread = nil
+	end
+end
+
+--@ Decelerates the tail of an attack animation instead of letting it run out at
+local function scheduleEaseOut(track, weaponConfig, attack_duration)
+	cancelEaseOut()
+
+	if not track then 
+		return 
+	end
+
+	local ease_out = weaponConfig.ease_out or EASE_OUT_DEFAULT
+	if ease_out <= 0 then return end
+
+	ease_out = math.min(ease_out, attack_duration)
+
+	local ease_pause = weaponConfig.ease_pause or EASE_PAUSE_DEFAULT
+	local ease_fade = weaponConfig.ease_fade or EASE_FADE_DEFAULT
+	local start_at = math.max(attack_duration - ease_out, 0)
+
+	_easeThread = task.delay(start_at, function()
+		_easeThread = nil
+
+		if not (track and track.IsPlaying) then return end
+
+		local began = os.clock()
+
+		while track.IsPlaying do
+			local alpha = math.clamp((os.clock() - began) / ease_out, 0, 1)
+			track:AdjustSpeed(1 - alpha)
+
+			if alpha >= 1 then break end
+
+			RunService.Heartbeat:Wait()
+		end
+
+		if not track.IsPlaying then return end
+
+		track:AdjustSpeed(0)
+
+		if ease_pause > 0 then
+			task.wait(ease_pause)
+		end
+
+		if track.IsPlaying then
+			track:Stop(ease_fade)
+		end
+	end)
+end
 
 function LightAttackComponent:Init(_controller)
 end
@@ -26,6 +87,7 @@ function LightAttackComponent:CanActivate(controller, _combatState): boolean
 end
 
 function LightAttackComponent:Activate(controller, combatState)
+	
 	local Character = controller.Character
 	if not Character then return end
 	 
@@ -49,6 +111,8 @@ function LightAttackComponent:Activate(controller, combatState)
 			and weaponConfig.attack_cooldown_final 
 			or weaponConfig.attack_cooldown or 0.3
 
+	cancelEaseOut()
+
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
 		_currentTrack = nil
@@ -60,6 +124,8 @@ function LightAttackComponent:Activate(controller, combatState)
 		FadeTime = 0.1,
 		Loop = false,
 	})
+
+	scheduleEaseOut(_currentTrack, weaponConfig, attack_duration)
 
 	warn("Playing animation:", animationName)
 
@@ -110,6 +176,8 @@ function LightAttackComponent:Activate(controller, combatState)
 end
 
 function LightAttackComponent:Deactivate(_controller, _combatState)
+	cancelEaseOut()
+
 	if _currentTrack then
 		_currentTrack:Stop(0.15)
 		_currentTrack = nil
