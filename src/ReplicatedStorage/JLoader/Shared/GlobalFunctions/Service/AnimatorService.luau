@@ -74,9 +74,24 @@ function AnimatorService:LoadPackage(Entity: Model, Package: Folder)
 	local Animator = GetAnimator(Entity)
 
 	for _, Animation in Package:GetDescendants() do
-		if Animation:IsA("Animation") then
-			Profile[Animation.Name] = Animator:LoadAnimation(Animation)
+		if not Animation:IsA("Animation") then continue end
+
+		--@ A placeholder Animation with no asset id throws out of LoadAnimation, which
+		--@ would abort the whole package load - and with it everything the caller does
+		--@ afterwards (see CharacterProfile.new). Skip it loudly instead.
+		if Animation.AnimationId == "" or Animation.AnimationId == "rbxassetid://0" then
+			warn(`[AnimatorService] Skipping "{Animation:GetFullName()}" - no AnimationId set.`)
+			continue
 		end
+
+		local Loaded, Track = pcall(Animator.LoadAnimation, Animator, Animation)
+
+		if not Loaded then
+			warn(`[AnimatorService] Failed to load "{Animation:GetFullName()}": {Track}`)
+			continue
+		end
+
+		Profile[Animation.Name] = Track
 	end
 end
 
