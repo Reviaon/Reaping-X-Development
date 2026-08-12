@@ -43,11 +43,37 @@ local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local AttributesLibrary = require(Libraries.AttributesLibrary)
 
+--@ WeaponsLibrary is a FOLDER of one ModuleScript per weapon, not a single table.
+--@ The module NAME is the weapon id and must match the Tool's name exactly.
+local WeaponsLibrary = Libraries:WaitForChild("WeaponsLibrary")
+
 local Storage = ReplicatedStorage.Storage
 local Other = Storage.Other
 local Models = Storage.Models
 local Weapons = Models.Weapons
 local RigParts = Models.RigParts
+local Rigs = Storage.Rigs
+
+--@ Marks every instance RigCharacter adds to a live character, so re-rigging can
+--@ strip the previous weapon without touching anything the character shipped with.
+local RIG_PART_ATTRIBUTE = "RigPart"
+
+--@ Resolved through descendants rather than direct indexing, so weapons can be grouped
+--@ into subfolders (categories, tiers) without this lookup changing.
+local function GetWeaponData(WeaponName : string)
+	local Module = WeaponsLibrary:FindFirstChild(WeaponName, true)
+
+	if not Module or not Module:IsA("ModuleScript") then return nil end
+
+	local Loaded, Data = pcall(require, Module)
+
+	if not Loaded then
+		warn(`[ServerController] Weapon module "{Module:GetFullName()}" failed to load: {Data}`)
+		return nil
+	end
+
+	return Data
+end
 
 --========================================================================
 --@ CharacterProfile  (preserved ProfileHandler code - per-character state)
@@ -129,7 +155,7 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	GlobalFunctions.CooldownService:CreateProfile(Character)
 	GlobalFunctions.AnimatorService:LoadPackage(Character, Storage.Animations)
 
-	CharacterProfile:RigCharacter(Character)
+	self:RigCharacter(Character)
 
 	for Attribute, Value in AttributesLibrary do
 		if not Character:GetAttribute(Attribute) then
@@ -138,21 +164,121 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	end
 end
 
-function CharacterProfile:RigCharacter(Character : Model)
-	local Handle = RigParts:FindFirstChild("Handle")
-	local RightArm = Character:FindFirstChild("Right Arm")
-
-	if Handle then
-		self.Handle = Handle:Clone()
-		self.Handle.Parent = Character
-
-		local Motor6D = Instance.new("Motor6D")
-		Motor6D.Part0 = RightArm
-		Motor6D.Part1 = self.Handle
-		Motor6D.Part1.Orientation = Vector3.new(0,180,0)
-		Motor6D.Name = "Handle"
-		Motor6D.Parent = RightArm
+--@ Removes every part/joint a previous rig pass welded onto the character.
+function CharacterProfile.ClearRig(Character : Model)
+	for _, Descendant in Character:GetDescendants() do
+		if Descendant:GetAttribute(RIG_PART_ATTRIBUTE) then
+			Descendant:Destroy()
+		end
 	end
+end
+
+--@ Resolves the Tool -> WeaponsLibrary entry -> rig template, then transplants the
+--@ rig's non-skeleton geometry onto the live character.
+--@
+--@ A rig template (Storage.Rigs.<Name>) is a full R6 dummy: its skeleton joints
+--@ (Neck, Right Shoulder, RootJoint...) already exist on the character and are
+--@ skipped. What we want are the joints whose Part1 is a part the character does
+--@ NOT have - the weapon geometry. Those get cloned in with the Motor6D NAME
+--@ preserved, because the uploaded animations drive the weapon through that joint
+--@ name (e.g. "Meshes/diamond stafflow").
+function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
+	CharacterProfile.ClearRig(Character)
+
+	local WeaponName = Tool and Tool.Name
+
+	if not WeaponName then
+		Character:SetAttribute("EquippedWeapon", nil)
+		return
+	end
+
+	local WeaponData = GetWeaponData(WeaponName)
+
+	if not WeaponData then
+		warn(`[ServerController] Tool "{WeaponName}" has no module under Libraries.WeaponsLibrary - character left unrigged.`)
+		Character:SetAttribute("EquippedWeapon", nil)
+		return
+	end
+
+	if not WeaponData.Rig then
+		--@ A weapon with no Rig is valid (unarmed, or geometry not authored yet). Publish
+		--@ the id anyway so the client still resolves that weapon's animation set.
+		Character:SetAttribute("EquippedWeapon", WeaponName)
+		return
+	end
+
+	local Template = Rigs:FindFirstChild(WeaponData.Rig)
+
+	if not Template then
+		warn(`[ServerController] Weapon "{WeaponName}" names rig "{tostring(WeaponData.Rig)}", which is missing from Storage.Rigs.`)
+		Character:SetAttribute("EquippedWeapon", nil)
+		return
+	end
+
+	local Applied = 0
+
+	for _, Joint in Template:GetDescendants() do
+		if not Joint:IsA("Motor6D") then continue end
+
+		local Limb = Joint.Part0
+		local Piece = Joint.Part1
+
+		if not Limb or not Piece then continue end
+
+		local CharacterLimb = Character:FindFirstChild(Limb.Name)
+
+		if not CharacterLimb or not CharacterLimb:IsA("BasePart") then continue end
+		if Character:FindFirstChild(Piece.Name) then continue end --@ Skeleton joint, the character already owns it
+
+		local PieceClone = Piece:Clone()
+		PieceClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
+		PieceClone.CanCollide = false
+		PieceClone.CanQuery = false
+		PieceClone.CanTouch = false
+		PieceClone.Massless = true
+		PieceClone.Parent = Character
+
+		local JointClone = Joint:Clone()
+		JointClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
+		JointClone.Part0 = CharacterLimb
+		JointClone.Part1 = PieceClone
+		JointClone.Parent = CharacterLimb
+
+		Applied += 1
+	end
+
+	if Applied == 0 then
+		warn(`[ServerController] Rig "{Template.Name}" welded nothing onto {Character.Name} - no Motor6D in the template attaches a part the character lacks.`)
+		Character:SetAttribute("EquippedWeapon", nil)
+		return
+	end
+
+	--@ Replicated so every client's CombatConfig:ResolveWeaponId agrees on the weapon;
+	--@ the client owns idle/attack animation swapping off the back of this.
+	Character:SetAttribute("EquippedWeapon", WeaponName)
+end
+
+function CharacterProfile:RigCharacter(Character : Model)
+	if not Character then return end
+
+	--@ Spawn pass: tools live in the Backpack until equipped, so this is usually a no-op
+	--@ that just clears state. The listeners below are what actually drive rigging.
+	self:ApplyRig(Character, Character:FindFirstChildOfClass("Tool"))
+
+	if not self._Trove then return end
+
+	self._Trove:Connect(Character.ChildAdded, function(Child)
+		if not Child:IsA("Tool") then return end
+		self:ApplyRig(Character, Child)
+	end)
+
+	self._Trove:Connect(Character.ChildRemoved, function(Child)
+		if not Child:IsA("Tool") then return end
+		if Character:GetAttribute("EquippedWeapon") ~= Child.Name then return end
+
+		--@ Fall through to whatever else is still equipped, if anything
+		self:ApplyRig(Character, Character:FindFirstChildOfClass("Tool"))
+	end)
 end
 
 function CharacterProfile:GetProfile(Character)
