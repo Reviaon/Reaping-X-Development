@@ -39,6 +39,8 @@ ClientController.State = {
 	Humanoid = nil,
 	HumanoidRootPart = nil,
 
+	Debug = true, --@ Enables Debug Mode Related To Player Character.
+
 	--@ Animation track handles (set and cleared by components)
 	-- e.g. CrouchIdle, SprintTrack, etc.
 
