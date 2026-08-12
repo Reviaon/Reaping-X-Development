@@ -1,77 +1,41 @@
 --@ Combat Config
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--@ Weapon configs are one ModuleScript per weapon under Libraries.WeaponsLibrary.
+--@ The module NAME is the weapon id, and must match the Tool's name exactly - that is
+--@ what ResolveWeaponId hands back and what the server publishes through the
+--@ EquippedWeapon attribute. Read through descendants so weapons can be grouped into
+--@ subfolders later without touching this file.
+local WeaponsLibrary = ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("WeaponsLibrary")
+
+local function BuildWeaponConfig()
+	local config = {}
+
+	for _, module in WeaponsLibrary:GetDescendants() do
+		if not module:IsA("ModuleScript") then continue end
+
+		--@ One malformed weapon module must not take the whole combat config down with it
+		local loaded, data = pcall(require, module)
+
+		if not loaded then
+			warn(`[CombatConfig] Weapon module "{module:GetFullName()}" failed to load: {data}`)
+			continue
+		end
+
+		config[module.Name] = data
+	end
+
+	return config
+end
+
 local CombatConfig = {
 	ComboTimeout = 1.5, --@ Default Combo Time Out
 	DefaultMaxCombo = 3, --@ Default Max Combo
 	DefaultWeapon = "Melee", --@ Default weapon id to resolve to when no weapon is equipped or specified.
 	InputBuffering = false, --@ When true, attack presses blocked by an active attack queue and auto-fire when ready.
 
-	--@ Configure max combo per weapon id/name.
-
-	--@ This Configuration WILL not handle data the server will need to know, such as damage values, hitbox sizes, etc. 
-	--@ This is purely for client visual and combo handling purposes.
-	WeaponConfig = {
-		Melee = {
-			MaxCombo = 6,
-
-			attack_cooldown = 0.5,
-			attack_cooldown_final = 1,
-
-			attack_duration = {
-				0.63,
-				0.56,
-				0.76,
-				0.583,
-				0.583,
-				0.833
-			},
-
-			light_impulse = {
-				speed = 8,
-				duration = 0.8,
-				falloff = 0.5,
-				priority = 1, --@ Higher priority impulses cannot be stomped by lower ones (see PhysicsService.ApplyImpulse)
-
-				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
-					0.35,
-					0.217,
-					0.35,
-					0.267,
-					0.25,
-					0.533
-				}
-			}
-		},
-
-		WoodenSword = {
-			MaxCombo = 4,
-
-			attack_cooldown = .5,
-			attack_cooldown_final = 2,
-
-			attack_duration = {
-				0.733,
-				0.850,
-				0.750,
-				2
-			},
-
-			light_impulse = {
-				priority = 1, --@ Per-combo entries below may override this individually
-				impulse = {
-					{ speed = 8, duration = 0.8, falloff = 0.5 },
-					{ speed = 8, duration = 0.8, falloff = 0.5 },
-					{ speed = 8, duration = 0.8, falloff = 0.5 },
-					{ speed = 8, duration = 2, falloff = 1.5 },
-				},
-				impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
-					0.45,
-					0.550,
-					0.383,
-					0.25
-				}
-			}
-		}
-	},
+	--@ Keyed by weapon id -> that weapon's module under Libraries.WeaponsLibrary.
+	WeaponConfig = BuildWeaponConfig(),
 }
 
 function CombatConfig:GetMaxComboForWeapon(weaponId: string): number
@@ -92,6 +56,10 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 		controller:Set("EquippedWeapon", existing.Name)
 		if onChanged then onChanged(existing.Name) end
 	end
+
+	--@ Resolve once up front, armed or not, so the idle stance has a name to play from
+	--@ the first frame instead of waiting on the next equip/unequip event.
+	self:UpdateWeaponConfig(controller)
 
 	trove:Connect(Character.ChildAdded, function(child)
 		if not child:IsA("Tool") then return end
@@ -137,23 +105,14 @@ function CombatConfig:ClearImpulse(controller)
 	controller.PhysicsService.ClearExistingImpulse(controller)
 end
 
+--@ Publishes the name of the idle stance for the currently resolved weapon.
+--@ IdleComponent owns playing/stopping the track and swaps itself when this changes,
+--@ so this only has to keep the name current.
 function CombatConfig:UpdateWeaponConfig(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	local weaponId = self:ResolveWeaponId(controller)
-	local weaponConfig = self.WeaponConfig[weaponId]
-
-	if not controller._idle_animation then
-		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
-	else
-		controller.AnimatorService:StopAllWithReference(
-			Character, 
-			controller._idle_animation
-		)
-		
-		controller._idle_animation = string.format("%s%s", weaponId, "Idle")
-	end
+	controller._idle_animation = string.format("%s%s", self:ResolveWeaponId(controller), "Idle")
 end
 
 function CombatConfig:ResolveWeaponId(controller): string
