@@ -3,6 +3,9 @@ local Jloader = require(game.ReplicatedStorage.JLoader)
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local DEBUG_STATUS_UI = true
 
 local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
@@ -107,6 +110,67 @@ local function propertyUpdate(controller, dt)
 	Humanoid.JumpPower = resolveJumpPower()
 end
 
+--@ Displays the character's active status attribute in the debug UI's TextLabel.
+--  Only the status with the highest Priority is shown when several are active.
+--  The clone and its listener ride the character trove, so they tear down on respawn.
+local function setupDebugStatusUI(controller, trove)
+	if not controller.Debug then 
+		return 
+	end
+
+	local Character = controller.Character
+	local Head = Character and Character:FindFirstChild("Head")
+
+	if not Head then
+		warn("[PropertiesHandler] Debug status UI could not find the character's Head.")
+		return
+	end
+
+	local Storage = ReplicatedStorage:FindFirstChild("Storage")
+	local UIFolder = Storage and Storage:FindFirstChild("UIFolder")
+	local DebugTemplate = UIFolder and UIFolder:FindFirstChild("DebugStatusUI")
+
+	if not DebugTemplate then
+		warn("[PropertiesHandler] Debug status UI is enabled but Storage.UIFolder.DebugStatusUI is missing.")
+		return
+	end
+
+	local DebugUI = DebugTemplate:Clone()
+	DebugUI.Parent = Head
+	trove:Add(DebugUI)
+
+	local StatusLabel = DebugUI:FindFirstChildWhichIsA("TextLabel", true)
+
+	if not StatusLabel then
+		warn("[PropertiesHandler] DebugStatusUI has no TextLabel to display statuses in.")
+		return
+	end
+
+	local StatusStates = controller.StatusService:GetStatesTable()
+
+	local function updateStatusLabel()
+		local activeStatus, highestPriority = nil, -math.huge
+
+		for Attribute, Value in Character:GetAttributes() do
+			local statusData = StatusStates[Attribute]
+
+			if statusData and Value then
+				local priority = statusData.Priority or 0
+
+				if priority > highestPriority then
+					highestPriority = priority
+					activeStatus = Attribute
+				end
+			end
+		end
+
+		StatusLabel.Text = activeStatus or "None"
+	end
+
+	updateStatusLabel()
+	trove:Connect(Character.AttributeChanged, updateStatusLabel)
+end
+
 function PropertyHandler:InitCharacter(controller)
 	local Character = controller.Character
 	if not Character then return end
@@ -123,6 +187,7 @@ function PropertyHandler:InitCharacter(controller)
 	local trove = controller.Trove.new()
 
 	applyHumanoidProperties(controller)
+	setupDebugStatusUI(controller, trove)
 
 	trove:Connect(Character.AttributeChanged, function()
 		applyHumanoidProperties(controller)
