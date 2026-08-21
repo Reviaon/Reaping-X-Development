@@ -20,6 +20,10 @@ function EffectService:SpawnVisual(Player, Args)
 end;
 
 function EffectService:Init()
+	--@ Server-side init registers ForgeVFX's collision groups (debris, mouse-ignore);
+	--@ the emitting half runs on the client.
+	GlobalFunctions.ForgeVFX.init()
+
 	for _, modulesscript in script:GetDescendants() do
 		if modulesscript:IsA("ModuleScript") then
 			components[modulesscript.Name] = require(modulesscript);

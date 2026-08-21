@@ -1,11 +1,6 @@
 --@ Light Attack Component
 local LightAttackComponent = {}
-
 local RunService = game:GetService("RunService")
-
-local EASE_OUT_DEFAULT = 0.1
-local EASE_PAUSE_DEFAULT = 0.05
-local EASE_FADE_DEFAULT = 0.15
 
 local _currentTrack = nil
 local _impulseThread = nil
@@ -18,22 +13,21 @@ local function cancelEaseOut()
 	end
 end
 
---@ Decelerates the tail of an attack animation instead of letting it run out at
-local function scheduleEaseOut(track, weaponConfig, attack_duration)
+--@ Decelerates the tail of an attack animation instead of letting it run out at full
+local function scheduleEaseOut(track, timing)
 	cancelEaseOut()
 
 	if not track then 
 		return 
 	end
 
-	local ease_out = weaponConfig.ease_out or EASE_OUT_DEFAULT
+	local speed = timing.speed
+	local ease_out = math.min(timing.ease_out, timing.duration)
 	if ease_out <= 0 then return end
 
-	ease_out = math.min(ease_out, attack_duration)
-
-	local ease_pause = weaponConfig.ease_pause or EASE_PAUSE_DEFAULT
-	local ease_fade = weaponConfig.ease_fade or EASE_FADE_DEFAULT
-	local start_at = math.max(attack_duration - ease_out, 0)
+	local ease_pause = timing.ease_pause
+	local ease_fade = timing.ease_fade
+	local start_at = math.max(timing.duration - ease_out, 0)
 
 	_easeThread = task.delay(start_at, function()
 		_easeThread = nil
@@ -44,7 +38,7 @@ local function scheduleEaseOut(track, weaponConfig, attack_duration)
 
 		while track.IsPlaying do
 			local alpha = math.clamp((os.clock() - began) / ease_out, 0, 1)
-			track:AdjustSpeed(1 - alpha)
+			track:AdjustSpeed(speed * (1 - alpha))
 
 			if alpha >= 1 then break end
 
@@ -65,7 +59,25 @@ local function scheduleEaseOut(track, weaponConfig, attack_duration)
 	end)
 end
 
-function LightAttackComponent:Init(_controller)
+--@ Broadcasts this hit's weapon visual. Nothing renders here - the request round-trips
+--@ through the server so every client, the attacker included, plays the same sequence.
+local function broadcastVisual(controller, weaponId, comboIndex, speed)
+	local path = controller.CombatConfig:ResolveWeaponVisuals(weaponId)
+	if not path then return end
+
+	local relay = controller.VisualRelay
+	if not relay then return end
+
+	relay.CreateVisual:Fire("SpawnVisual", {
+		Effect = path,
+		Method = "Attack",
+		Info = {
+			Character = controller.Character,
+			ComboIndex = comboIndex,
+			Speed = speed,
+			WeaponId = weaponId,
+		},
+	})
 end
 
 function LightAttackComponent:CanActivate(controller, _combatState): boolean
@@ -101,15 +113,10 @@ function LightAttackComponent:Activate(controller, combatState)
 	local comboIndex = combatState.ComboIndex
 	local animationName = string.format("%s%s%d", weaponId, "Attack", comboIndex)
 
-	local attack_duration = typeof(weaponConfig.attack_duration) == "table" 
-		and weaponConfig.attack_duration[comboIndex] 
-		or weaponConfig.attack_duration or 0.2
+	--@ One resolve per swing: the playback speed plus every timing already scaled by it.
+	local timing = controller.CombatConfig:ResolveAttackTiming(controller, comboIndex, weaponConfig)
 
 	local is_diving = controller.StatusService:CheckStatuses(Character, { IsDiving = true })
-
-	local cooldown_duration = comboIndex >= weaponConfig.MaxCombo 
-			and weaponConfig.attack_cooldown_final 
-			or weaponConfig.attack_cooldown or 0.3
 
 	cancelEaseOut()
 
@@ -119,22 +126,21 @@ function LightAttackComponent:Activate(controller, combatState)
 	end
 
 	_currentTrack = controller.AnimatorService:PlayTrack(Character, animationName, {
-		Speed = 1,
+		Speed = timing.speed,
 		Priority = Enum.AnimationPriority.Action4,
 		FadeTime = 0.1,
 		Loop = false,
 	})
 
-	scheduleEaseOut(_currentTrack, weaponConfig, attack_duration)
+	scheduleEaseOut(_currentTrack, timing)
 
-	warn("Playing animation:", animationName)
+	warn("Playing animation:", animationName, "at", timing.speed .. "x")
 
-	if weaponConfig.light_impulse and not is_diving then
-		local impulse_delay = weaponConfig.light_impulse.impulse_delay 
-			and weaponConfig.light_impulse.impulse_delay[comboIndex] or 0.2
+	broadcastVisual(controller, weaponId, comboIndex, timing.speed)
 
-		local impulseData = (weaponConfig.light_impulse.impulse and weaponConfig.light_impulse.impulse[comboIndex])
-			or weaponConfig.light_impulse
+	if timing.impulse and not is_diving then
+		local impulse_delay = timing.impulse_delay
+		local impulseData = timing.impulse
 
 		--@ Cancel any pending impulse before scheduling a new one
 		if _impulseThread then
@@ -151,14 +157,18 @@ function LightAttackComponent:Activate(controller, combatState)
 
 				local trove = controller.PhysicsService.ApplyImpulse(controller, {
 					direction = root.CFrame.LookVector,
-					speed = impulseData.speed or 30,
-					duration = impulseData.duration or 0.2,
-					falloff = impulseData.falloff or 0.2,
+					--@ Already scaled by attack_speed; the fallbacks these used to inline now
+					--@ live in Config so an unauthored impulse gets retimed as well.
+					speed = impulseData.speed,
+					duration = impulseData.duration,
+					falloff = impulseData.falloff,
 					updateDirection = true,
-					
-					priority = impulseData.priority
-						or weaponConfig.light_impulse.priority
-						or 1,
+
+					--@ Held WASD stays folded into the lunge instead of the push owning the
+					--@ character outright - see PhysicsService.ApplyImpulse.
+					influence = impulseData.influence,
+
+					priority = timing.impulse_priority,
 				})
 
 				if trove then
@@ -170,8 +180,8 @@ function LightAttackComponent:Activate(controller, combatState)
 		controller:Set("_impulseThread", _impulseThread)
 	end
 
-	controller.StatusService:SetStatus(Character, "IsAttacking", true, attack_duration)
-	controller.CooldownService:ApplyCooldown(Character, "IsAttacking", cooldown_duration)
+	controller.StatusService:SetStatus(Character, "IsAttacking", true, timing.duration)
+	controller.CooldownService:ApplyCooldown(Character, "IsAttacking", timing.cooldown)
 	controller.StatusService:SetStatus(Character, "NoJump", true, 1)
 end
 
