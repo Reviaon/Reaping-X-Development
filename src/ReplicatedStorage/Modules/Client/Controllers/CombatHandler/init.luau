@@ -91,6 +91,10 @@ function CombatHandler:InitCharacter(controller)
 
 	CombatHandler.State.ActiveWeapon = CombatHandler:ResolveActiveWeapon(controller)
 
+	--@ Components resolve through the controller, so the config has to be on it before
+	--@ any of them initialise.
+	controller.CombatConfig = CombatConfig
+
 	for _, component in CombatHandler.components do
 		if typeof(component.Init) == "function" then
 			component:Init(controller)
@@ -100,7 +104,6 @@ function CombatHandler:InitCharacter(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	controller.CombatConfig = CombatConfig
 	controller.VisualRelay = getVisualRelay()
 
 	CombatHandler.Trove:Connect(RunService.Heartbeat, function()
