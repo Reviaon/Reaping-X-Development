@@ -1,6 +1,5 @@
 --@ Idle Component
 --@ Holds the equipped weapon's idle stance ({WeaponId}Idle) while the character is
---@ standing still, and gets out of the way the moment they are not.
 local IdleComponent = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,15 +7,10 @@ local RunService = game:GetService("RunService")
 
 local Animations = ReplicatedStorage:WaitForChild("Storage"):WaitForChild("Animations")
 
---@ Above the default R6 Animate idle (which plays at Core) so this wins, and below
---@ Movement so the walk set - and every Action animation (sprint, block, attacks) -
---@ still overrides it. Attacks deliberately play OVER the idle rather than replacing
---@ it, which is why AnimatorService:StopAllAnimations skips "Idle" tracks.
 local IDLE_PRIORITY = Enum.AnimationPriority.Idle
+local IDLE_SUFFIX = "Idle"
 local FADE_TIME = 0.3
 
---@ States that own the character's pose themselves. CrouchIdle plays at this same
---@ priority, so letting both run would blend two stances into mush.
 local BLOCKING_STATUSES = { "IsCrouching", "IsDiving" }
 
 local AIRBORNE_STATES = {
@@ -31,9 +25,6 @@ local _trove = nil
 local _track = nil
 local _currentAnim = nil
 
---@ Not every weapon has an idle authored, and AnimatorService:GetTrack ASSERTS on a
---@ name it cannot find - so a missing idle would throw every frame. Memoised because
---@ this is checked from a RenderStepped loop.
 local _animationExists = {}
 
 local function animationExists(name: string): boolean
@@ -62,8 +53,6 @@ local function shouldIdle(controller): boolean
 	if not Character or not Humanoid then return false end
 	if Humanoid.Health <= 0 then return false end
 
-	--@ MoveDirection is the input vector, so this goes false the instant a key is held
-	--@ rather than waiting for velocity to build - same signal StrafeComponent gates on.
 	if Humanoid.MoveDirection.Magnitude > 0 then return false end
 
 	if Humanoid.FloorMaterial == Enum.Material.Air then return false end
@@ -84,13 +73,24 @@ local function update(controller)
 		return
 	end
 
-	--@ Set by CombatConfig:UpdateWeaponConfig off the resolved weapon id
-	local desired = controller._idle_animation
-
-	if not desired then
+	local config = controller.CombatConfig
+	if not config then
 		stopIdle()
 		return
 	end
+
+	--@ Resolved every frame rather than read from _idle_animation: that field is only
+	--@ refreshed on equip events, and an unequip recomputes it from an attribute that is
+	--@ still stale at that moment, which left the last weapon's stance playing forever.
+	local equipped = config:ResolveEquippedWeapon(controller)
+
+	--@ Unarmed is not a stance.
+	if not equipped then
+		stopIdle()
+		return
+	end
+
+	local desired = equipped .. IDLE_SUFFIX
 
 	--@ Weapon swapped out from under a playing idle
 	if _currentAnim and _currentAnim ~= desired then
