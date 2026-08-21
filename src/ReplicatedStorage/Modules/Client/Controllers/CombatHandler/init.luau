@@ -13,6 +13,15 @@ local GarbageCollection = GlobalFunctions.Trove
 local ClientController = GlobalFunctions.ClientController
 local CombatConfig = require(script:WaitForChild("Config"))
 
+--@ Visuals are built and played on clients only; the relay hands one request to the
+--@ server, which fans it back out so every client renders the same hit.
+local visualRelay = nil
+
+local function getVisualRelay()
+	visualRelay = visualRelay or Jloader.GetService("EffectService")
+	return visualRelay
+end
+
 --@ Components
 CombatHandler.components = {}
 CombatHandler.Trove = GarbageCollection.new()
@@ -92,6 +101,7 @@ function CombatHandler:InitCharacter(controller)
 	if not Character then return end
 
 	controller.CombatConfig = CombatConfig
+	controller.VisualRelay = getVisualRelay()
 
 	CombatHandler.Trove:Connect(RunService.Heartbeat, function()
 		CombatHandler:UpdateComboTimeout()
