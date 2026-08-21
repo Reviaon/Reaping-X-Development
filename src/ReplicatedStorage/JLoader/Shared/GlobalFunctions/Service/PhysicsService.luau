@@ -35,6 +35,11 @@ PhysicsService.ImpulsePriorityAttribute = IMPULSE_PRIORITY_ATTRIBUTE
 		maxForce         Vector3       Override MaxForce.                        Default: mass-based
 		blockCast        bool          Enable per-frame obstacle check.          Default: false
 		blockCastDistance number       Cast distance ahead in studs.             Default: 2.5
+		influence        number        How much of the character's own walk velocity is
+		                               folded back in each frame. 0 = the impulse owns
+		                               movement outright, 1 = their full WalkSpeed adds
+		                               on top, so held WASD steers, extends or eats the
+		                               push and control returns gradually. Default: 0
 		priority         number        Arbitration weight vs the active impulse. Default: 0
 		                               A request is ignored while an impulse of a
 		                               HIGHER priority is live; equal or greater
@@ -47,13 +52,16 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	--@ A negative influence would invert the player's own input, which is never wanted.
+	local influence = math.max(settings.influence or 0, 0)
+
 	local priority = settings.priority or 0
 	local existing = root:FindFirstChild("@impulse_velocity")
 
 	if existing then
-		--@ A live impulse of higher priority owns the character's momentum;
-		--  ignore this request rather than stomping it. Equal priority still
-		--  supersedes so combo hits can chain their own impulses.
+		
 		if (existing:GetAttribute(IMPULSE_PRIORITY_ATTRIBUTE) or 0) > priority then
 			return nil
 		end
@@ -79,6 +87,21 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	end
 
 	local direction = resolveDirection(settings.direction or root.CFrame.LookVector)
+
+	local function resolveVelocity(dir: Vector3, currentSpeed: number): Vector3
+		local carried = dir * currentSpeed
+
+		if influence <= 0 or not humanoid then
+			return carried
+		end
+
+		local moveDirection = humanoid.MoveDirection
+		if moveDirection.Magnitude <= 0 then
+			return carried
+		end
+
+		return carried + resolveDirection(moveDirection) * humanoid.WalkSpeed * influence
+	end
 
 	local doBlockCast = settings.blockCast == true -- default false
 	local castDistance = settings.blockCastDistance or 2.5
@@ -118,7 +141,7 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 	local velocity = Instance.new("BodyVelocity")
 	velocity.Name = "@impulse_velocity"
 	velocity.MaxForce = maxForce
-	velocity.Velocity = direction * speed
+	velocity.Velocity = resolveVelocity(direction, speed)
 	velocity:SetAttribute(IMPULSE_PRIORITY_ATTRIBUTE, priority)
 	velocity.Parent = root
 
@@ -164,7 +187,7 @@ function PhysicsService.ApplyImpulse(controller: {}, settings: {})
 			end
 		end
 
-		velocity.Velocity = currentDir * speedValue.Value
+		velocity.Velocity = resolveVelocity(currentDir, speedValue.Value)
 	end))
 
 	task.delay(duration, function()
