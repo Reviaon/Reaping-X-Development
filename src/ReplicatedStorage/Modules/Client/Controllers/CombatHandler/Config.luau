@@ -1,29 +1,16 @@
 --@ Combat Config
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
---@ Weapon configs are one ModuleScript per weapon under Libraries.WeaponsLibrary.
---@ The module NAME is the weapon id, and must match the Tool's name exactly - that is
---@ what ResolveWeaponId hands back and what the server publishes through the
---@ EquippedWeapon attribute. Read through descendants so weapons can be grouped into
---@ subfolders later without touching this file.
 local WeaponsLibrary = ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("WeaponsLibrary")
 
---@ Per-weapon visuals live at Effects.Combat.Weapons.<WeaponId>Visuals, resolved by name,
---@ so giving a weapon visuals is a new module there and nothing else.
 local VISUALS_SUFFIX = "Visuals"
 local VISUALS_PATH = "Combat.Weapons."
 
 local VisualsFolder = nil
 
---@ Fallbacks for weapons that leave a timing unauthored. They live here rather than in
---@ the components so every attack resolves the same answer for a missing field.
 local DEFAULT_ATTACK_DURATION = 0.2
 local DEFAULT_ATTACK_COOLDOWN = 0.3
 local DEFAULT_IMPULSE_DELAY = 0.2
 
---@ These mirror what LightAttackComponent used to inline at the call site, so a weapon
---@ that authors no impulse numbers keeps exactly the push it had - and now gets it
---@ retimed with everything else instead of sitting at a fixed length.
 local DEFAULT_IMPULSE_SPEED = 30
 local DEFAULT_IMPULSE_DURATION = 0.2
 local DEFAULT_IMPULSE_FALLOFF = 0.2
@@ -31,15 +18,9 @@ local DEFAULT_EASE_OUT = 0.1
 local DEFAULT_EASE_PAUSE = 0.05
 local DEFAULT_EASE_FADE = 0.15
 
---@ attack_speed divides every timing, so 0 would produce inf and a negative would play
---@ the animation backwards while handing out negative cooldowns. Clamp instead of
---@ erroring: a bad number in a weapon module should feel wrong, not break the character.
 local MIN_ATTACK_SPEED = 0.1
 local MAX_ATTACK_SPEED = 10
 
---@ A weapon timing is authored either as one value shared by the whole string, or as an
---@ array indexed by combo hit. This reads both, so any field can be promoted to per-hit
---@ tuning later without a code change here.
 local function ResolveIndexed(value: any, comboIndex: number?): any
 	if typeof(value) == "table" then
 		return comboIndex and value[comboIndex] or nil
@@ -60,16 +41,9 @@ local function ResolveNumber(value: any, comboIndex: number?, fallback: number):
 	return resolved
 end
 
---@ Retimes the momentum half of an attack. Time compresses and velocity expands by the
---@ same factor, so the step covers the SAME ground it always did and simply gets there
---@ sooner - exactly like the animation it is glued to. Scaling the duration alone would
---@ quietly shorten every lunge as a weapon got faster.
 local function ScaleImpulse(impulseData, parent, speed: number)
 	if not impulseData then return nil end
 
-	--@ Cloned rather than rebuilt so every other ApplyImpulse setting a weapon carries
-	--@ (influence, blockCast, lockToHorizontal, falloffStyle, ...) passes straight through
-	--@ untouched, and so the weapon module's own table is never mutated.
 	local scaled = table.clone(impulseData)
 
 	scaled.speed = ResolveNumber(impulseData.speed, nil, DEFAULT_IMPULSE_SPEED) * speed
@@ -181,17 +155,24 @@ function CombatConfig:ClearImpulse(controller)
 	controller.PhysicsService.ClearExistingImpulse(controller)
 end
 
---@ Publishes the name of the idle stance for the currently resolved weapon.
---@ IdleComponent owns playing/stopping the track and swaps itself when this changes,
---@ so this only has to keep the name current.
 function CombatConfig:UpdateWeaponConfig(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	controller._idle_animation = string.format("%s%s", self:ResolveWeaponId(controller), "Idle")
+	local equipped = self:ResolveEquippedWeapon(controller)
+
+	--@ nil when unarmed: there is no stance to hold, and publishing the default weapon's
+	--@ name would keep an idle playing with nothing in hand.
+	controller._idle_animation = equipped and (equipped .. "Idle") or nil
 end
 
-function CombatConfig:ResolveWeaponId(controller): string
+function CombatConfig:ResolveEquippedWeapon(controller): string?
+	local Character = controller.Character
+	if not Character then return nil end
+
+	local equippedTool = Character:FindFirstChildOfClass("Tool")
+	if not equippedTool then return nil end
+
 	local explicitWeapon = controller:Get("EquippedWeapon")
 		or controller:Get("Weapon")
 		or controller:Get("WeaponType")
@@ -200,20 +181,23 @@ function CombatConfig:ResolveWeaponId(controller): string
 		return explicitWeapon
 	end
 
-	local Character = controller.Character
-	if Character then
-		local attrWeapon = Character:GetAttribute("EquippedWeapon")
-			or Character:GetAttribute("Weapon")
-			or Character:GetAttribute("WeaponType")
+	local attrWeapon = Character:GetAttribute("EquippedWeapon")
+		or Character:GetAttribute("Weapon")
+		or Character:GetAttribute("WeaponType")
 
-		if typeof(attrWeapon) == "string" and attrWeapon ~= "" then
-			return attrWeapon
-		end
+	if typeof(attrWeapon) == "string" and attrWeapon ~= "" then
+		return attrWeapon
+	end
 
-		local equippedTool = Character:FindFirstChildOfClass("Tool")
-		if equippedTool then
-			return equippedTool.Name
-		end
+	return equippedTool.Name
+end
+
+--@ Same answer with the unarmed case folded onto the default weapon, which is what the
+--@ attack path wants: an unarmed swing still needs a weapon id to build animation names.
+function CombatConfig:ResolveWeaponId(controller): string
+	local equipped = self:ResolveEquippedWeapon(controller)
+	if equipped then
+		return equipped
 	end
 
 	return self.DefaultWeapon
