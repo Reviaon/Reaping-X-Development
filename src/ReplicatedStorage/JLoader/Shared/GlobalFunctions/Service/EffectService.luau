@@ -20,6 +20,11 @@ type Config = {[string]: any}
 
 local HiddenTransparencyCache = setmetatable({}, {__mode = "k"})
 
+--@ The weld that carries the effect on its host, and the welds that hold the effect's
+--@ own geometry together. Named apart so either set can be found or cleared alone.
+local HOST_WELD_NAME = "@EffectWeld"
+local SELF_WELD_NAME = "@EffectSelfWeld"
+
 --@ Template
 local Template = {
 	Effect  = nil,
@@ -280,6 +285,42 @@ function EffectService:_CleanupCancellable()
 	self._cancelConnections = nil
 end
 
+--@ Binds every BasePart in an effect to its root. The assets ship unanchored and
+--@ unjointed, so without this the geometry drifts off the root the moment the clone
+--@ enters the workspace, dragging the mesh-VFX Start/End markers off their origin.
+--@
+--@ Constraints are parented to the ROOT, never inside the part they bind. ForgeVFX's
+--@ mesh emitter clones the Start marker and reparents its children onto the pooled part
+--@ it then drives per frame, so a constraint sitting inside a marker rides along, chains
+--@ that driven part back into the character's assembly and flings the player.
+local function WeldToRoot(root: BasePart, effect: Instance): number
+	local bound = 0
+	local alreadyBound = {}
+
+	for _, existing in root:GetChildren() do
+		if existing:IsA("WeldConstraint") and existing.Name == SELF_WELD_NAME then
+			alreadyBound[existing.Part1] = true
+		end
+	end
+
+	for _, descendant in effect:GetDescendants() do
+		if not descendant:IsA("BasePart") or descendant == root or alreadyBound[descendant] then
+			continue
+		end
+
+		local weldconstraint = Instance.new("WeldConstraint")
+		weldconstraint.Name = SELF_WELD_NAME
+		weldconstraint.Part0 = root
+		weldconstraint.Part1 = descendant
+		weldconstraint.Parent = root
+
+		alreadyBound[descendant] = true
+		bound += 1
+	end
+
+	return bound
+end
+
 function EffectService:Weld(Part : {Any})
 	if not self.Effect then return end
 
@@ -295,7 +336,15 @@ function EffectService:Weld(Part : {Any})
 		part0 = (host and host:IsA("BasePart")) and host or nil
 	end
 
-	if not part0 or part0 == Part then
+	if not part0 then
+		return
+	end
+
+	--@ Runs before the early return below so an effect is made rigid even when there is
+	--@ nothing to carry it: holding its own geometry together is its own concern.
+	WeldToRoot(part0, self.Effect)
+
+	if part0 == Part then
 		return
 	end
 
@@ -303,7 +352,7 @@ function EffectService:Weld(Part : {Any})
 	weldconstraint.Part0 = part0
 
 	weldconstraint.Part1 = Part
-	weldconstraint.Name = "@EffectWeld"
+	weldconstraint.Name = HOST_WELD_NAME
 	weldconstraint.Parent = part0
 
 	return weldconstraint
