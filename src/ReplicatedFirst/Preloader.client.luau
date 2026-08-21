@@ -5,15 +5,15 @@ local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PRELOADABLE_CLASSES = {
-	Animation      = true,
-	Sound          = true,
-	ImageLabel     = true,
-	ImageButton    = true,
-	Decal          = true,
+	Animation = true,
+	Sound = true,
+	ImageLabel = true,
+	ImageButton = true,
+	Decal = true,
 	ParticleEmitter = true,
-	Texture        = true,
-	MeshPart       = true,
-	SpecialMesh    = true,
+	Texture = true,
+	MeshPart = true,
+	SpecialMesh = true,
 }
 
 local Storage = ReplicatedStorage:WaitForChild("Storage")
