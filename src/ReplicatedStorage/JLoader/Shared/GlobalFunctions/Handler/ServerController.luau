@@ -164,6 +164,21 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	end
 end
 
+local function WeldRigGeometry(Piece : BasePart)
+	for _, Descendant in Piece:GetDescendants() do
+		if not Descendant:IsA("BasePart") then continue end
+
+		--@ Welded into the character's assembly, so it must not add mass to it.
+		Descendant.Massless = true
+
+		local GeometryWeld = Instance.new("WeldConstraint")
+		GeometryWeld.Name = "@RigGeometryWeld"
+		GeometryWeld.Part0 = Piece
+		GeometryWeld.Part1 = Descendant
+		GeometryWeld.Parent = Piece
+	end
+end
+
 --@ Removes every part/joint a previous rig pass welded onto the character.
 function CharacterProfile.ClearRig(Character : Model)
 	for _, Descendant in Character:GetDescendants() do
@@ -173,15 +188,6 @@ function CharacterProfile.ClearRig(Character : Model)
 	end
 end
 
---@ Resolves the Tool -> WeaponsLibrary entry -> rig template, then transplants the
---@ rig's non-skeleton geometry onto the live character.
---@
---@ A rig template (Storage.Rigs.<Name>) is a full R6 dummy: its skeleton joints
---@ (Neck, Right Shoulder, RootJoint...) already exist on the character and are
---@ skipped. What we want are the joints whose Part1 is a part the character does
---@ NOT have - the weapon geometry. Those get cloned in with the Motor6D NAME
---@ preserved, because the uploaded animations drive the weapon through that joint
---@ name (e.g. "Meshes/diamond stafflow").
 function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 	CharacterProfile.ClearRig(Character)
 
@@ -238,6 +244,8 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		PieceClone.Massless = true
 		PieceClone.Parent = Character
 
+		WeldRigGeometry(PieceClone)
+
 		local JointClone = Joint:Clone()
 		JointClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
 		JointClone.Part0 = CharacterLimb
@@ -261,8 +269,6 @@ end
 function CharacterProfile:RigCharacter(Character : Model)
 	if not Character then return end
 
-	--@ Spawn pass: tools live in the Backpack until equipped, so this is usually a no-op
-	--@ that just clears state. The listeners below are what actually drive rigging.
 	self:ApplyRig(Character, Character:FindFirstChildOfClass("Tool"))
 
 	if not self._Trove then return end
