@@ -8,6 +8,81 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 --@ subfolders later without touching this file.
 local WeaponsLibrary = ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("WeaponsLibrary")
 
+--@ Per-weapon visuals live at Effects.Combat.Weapons.<WeaponId>Visuals, resolved by name,
+--@ so giving a weapon visuals is a new module there and nothing else.
+local VISUALS_SUFFIX = "Visuals"
+local VISUALS_PATH = "Combat.Weapons."
+
+local VisualsFolder = nil
+
+--@ Fallbacks for weapons that leave a timing unauthored. They live here rather than in
+--@ the components so every attack resolves the same answer for a missing field.
+local DEFAULT_ATTACK_DURATION = 0.2
+local DEFAULT_ATTACK_COOLDOWN = 0.3
+local DEFAULT_IMPULSE_DELAY = 0.2
+
+--@ These mirror what LightAttackComponent used to inline at the call site, so a weapon
+--@ that authors no impulse numbers keeps exactly the push it had - and now gets it
+--@ retimed with everything else instead of sitting at a fixed length.
+local DEFAULT_IMPULSE_SPEED = 30
+local DEFAULT_IMPULSE_DURATION = 0.2
+local DEFAULT_IMPULSE_FALLOFF = 0.2
+local DEFAULT_EASE_OUT = 0.1
+local DEFAULT_EASE_PAUSE = 0.05
+local DEFAULT_EASE_FADE = 0.15
+
+--@ attack_speed divides every timing, so 0 would produce inf and a negative would play
+--@ the animation backwards while handing out negative cooldowns. Clamp instead of
+--@ erroring: a bad number in a weapon module should feel wrong, not break the character.
+local MIN_ATTACK_SPEED = 0.1
+local MAX_ATTACK_SPEED = 10
+
+--@ A weapon timing is authored either as one value shared by the whole string, or as an
+--@ array indexed by combo hit. This reads both, so any field can be promoted to per-hit
+--@ tuning later without a code change here.
+local function ResolveIndexed(value: any, comboIndex: number?): any
+	if typeof(value) == "table" then
+		return comboIndex and value[comboIndex] or nil
+	end
+
+	return value
+end
+
+local function ResolveNumber(value: any, comboIndex: number?, fallback: number): number
+	local resolved = ResolveIndexed(value, comboIndex)
+
+	--@ resolved ~= resolved catches NaN, which would otherwise propagate silently through
+	--@ every derived timing and stall the attack instead of erroring anywhere useful.
+	if typeof(resolved) ~= "number" or resolved ~= resolved then
+		return fallback
+	end
+
+	return resolved
+end
+
+--@ Retimes the momentum half of an attack. Time compresses and velocity expands by the
+--@ same factor, so the step covers the SAME ground it always did and simply gets there
+--@ sooner - exactly like the animation it is glued to. Scaling the duration alone would
+--@ quietly shorten every lunge as a weapon got faster.
+local function ScaleImpulse(impulseData, parent, speed: number)
+	if not impulseData then return nil end
+
+	--@ Cloned rather than rebuilt so every other ApplyImpulse setting a weapon carries
+	--@ (influence, blockCast, lockToHorizontal, falloffStyle, ...) passes straight through
+	--@ untouched, and so the weapon module's own table is never mutated.
+	local scaled = table.clone(impulseData)
+
+	scaled.speed = ResolveNumber(impulseData.speed, nil, DEFAULT_IMPULSE_SPEED) * speed
+	scaled.duration = ResolveNumber(impulseData.duration, nil, DEFAULT_IMPULSE_DURATION) / speed
+	scaled.falloff = ResolveNumber(impulseData.falloff, nil, DEFAULT_IMPULSE_FALLOFF) / speed
+
+	if scaled.influence == nil and parent then
+		scaled.influence = parent.influence
+	end
+
+	return scaled
+end
+
 local function BuildWeaponConfig()
 	local config = {}
 
@@ -32,6 +107,7 @@ local CombatConfig = {
 	ComboTimeout = 1.5, --@ Default Combo Time Out
 	DefaultMaxCombo = 3, --@ Default Max Combo
 	DefaultWeapon = "Melee", --@ Default weapon id to resolve to when no weapon is equipped or specified.
+	DefaultAttackSpeed = 1, --@ Playback multiplier for weapons that do not author attack_speed.
 	InputBuffering = false, --@ When true, attack presses blocked by an active attack queue and auto-fire when ready.
 
 	--@ Keyed by weapon id -> that weapon's module under Libraries.WeaponsLibrary.
@@ -147,6 +223,113 @@ function CombatConfig:ResolveWeaponConfig(controller)
 	local weaponId = self:ResolveWeaponId(controller)
 
 	return self.WeaponConfig[weaponId] or {}
+end
+
+--@ Dotted ClientEffects path for a weapon's visual module, or nil when it has none, so a
+--@ weapon without visuals is skipped instead of making every client warn about it.
+function CombatConfig:ResolveWeaponVisuals(weaponId: string): string?
+	if typeof(weaponId) ~= "string" or weaponId == "" then return nil end
+
+	if not VisualsFolder then
+		local modules = ReplicatedStorage:FindFirstChild("Modules")
+		local effects = modules and modules:FindFirstChild("Effects")
+		local combat = effects and effects:FindFirstChild("Combat")
+		VisualsFolder = combat and combat:FindFirstChild("Weapons")
+	end
+
+	local module = VisualsFolder and VisualsFolder:FindFirstChild(weaponId .. VISUALS_SUFFIX)
+	if not module or not module:IsA("ModuleScript") then return nil end
+
+	return VISUALS_PATH .. module.Name
+end
+
+--========================================================================
+--@ Attack timing resolution
+--
+--@ Every timing in a weapon module is authored at 1x - the natural length of the
+--@ animation as it was exported. `attack_speed` is the single knob that decides how fast
+--@ the attack actually plays, and everything that has to stay glued to the animation is
+--@ derived from it here instead of being hand-tuned per weapon:
+--@
+--@     playback speed   = attack_speed
+--@     attack_duration  \
+--@     impulse_delay     |
+--@     ease_out          |  authored value / attack_speed
+--@     ease_pause        |
+--@     ease_fade         |
+--@     attack_cooldown  /
+--@
+--@ Doubling attack_speed therefore halves the swing, its ease-out tail, the fade and the
+--@ recovery together - the rhythm is preserved and only the tempo changes. Retiming a
+--@ weapon is one number, and the authored values stay a truthful record of how long the
+--@ animation actually is.
+--@
+--@ The momentum half is retimed too, but velocity moves the OTHER way:
+--@
+--@     impulse duration \  authored value / attack_speed
+--@     impulse falloff  /
+--@     impulse speed    =  authored value * attack_speed
+--@
+--@ Time compresses while velocity expands by the same factor, so the step covers the
+--@ same ground and simply gets there sooner, landing on the same animation frame it
+--@ always did.
+--@
+--@ Not scaled: light_impulse.influence, which is a ratio of the player's own walk speed
+--@ rather than a distance or a time, and priority, which is pure arbitration.
+--========================================================================
+
+--@ The playback multiplier for one hit. Accepts a number, or an array keyed by combo
+--@ index for per-hit tuning; anything else falls back to the config-wide default.
+function CombatConfig:ResolveAttackSpeed(weaponConfig, comboIndex: number?): number
+	local fallback = self.DefaultAttackSpeed or 1
+	local speed = ResolveNumber(weaponConfig and weaponConfig.attack_speed, comboIndex, fallback)
+
+	return math.clamp(speed, MIN_ATTACK_SPEED, MAX_ATTACK_SPEED)
+end
+
+--@ Resolves one swing into the numbers a component actually runs on, already divided by
+--@ attack_speed. A component should never reach past this into the raw weapon table for a
+--@ timing - that is how the animation and everything scheduled against it drift apart.
+function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weaponConfig)
+	weaponConfig = weaponConfig or self:ResolveWeaponConfig(controller)
+	comboIndex = comboIndex or 1
+
+	local speed = self:ResolveAttackSpeed(weaponConfig, comboIndex)
+
+	--@ Falls back to the config-wide default so a weapon that never declared MaxCombo still
+	--@ resolves a number here - comparing comboIndex against a nil MaxCombo used to throw.
+	local maxCombo = weaponConfig.MaxCombo or self.DefaultMaxCombo
+	local isFinal = comboIndex >= maxCombo
+
+	local cooldown = isFinal
+		and (weaponConfig.attack_cooldown_final or weaponConfig.attack_cooldown)
+		or weaponConfig.attack_cooldown
+
+	local impulse = weaponConfig.light_impulse
+	local impulseData = impulse and (ResolveIndexed(impulse.impulse, comboIndex) or impulse) or nil
+
+	return {
+		combo_index = comboIndex,
+		is_final = isFinal,
+
+		--@ Handed straight to AnimationTrack:Play and AdjustSpeed.
+		speed = speed,
+
+		duration = ResolveNumber(weaponConfig.attack_duration, comboIndex, DEFAULT_ATTACK_DURATION) / speed,
+		cooldown = ResolveNumber(cooldown, comboIndex, DEFAULT_ATTACK_COOLDOWN) / speed,
+
+		ease_out = ResolveNumber(weaponConfig.ease_out, comboIndex, DEFAULT_EASE_OUT) / speed,
+		ease_pause = ResolveNumber(weaponConfig.ease_pause, comboIndex, DEFAULT_EASE_PAUSE) / speed,
+		ease_fade = ResolveNumber(weaponConfig.ease_fade, comboIndex, DEFAULT_EASE_FADE) / speed,
+
+		--@ Retimed as a whole: same displacement, played at the animation's tempo, with the
+		--@ cue point moving alongside it so the step still fires on the same frame.
+		impulse = ScaleImpulse(impulseData, impulse, speed),
+		impulse_delay = impulse
+			and ResolveNumber(impulse.impulse_delay, comboIndex, DEFAULT_IMPULSE_DELAY) / speed
+			or DEFAULT_IMPULSE_DELAY,
+		impulse_priority = impulseData and (impulseData.priority or impulse.priority) or 1,
+	}
 end
 
 return CombatConfig
