@@ -38,6 +38,18 @@ local Effects = Modules:WaitForChild("Effects")
 
 local PATH_SEPARATOR = "."
 
+--@ A payload arrives as a plain table - ByteNet ships it by reference and the remote
+--@ serializer drops metatables - so give it the same GlobalFunctions fallback the
+--@ ClientController has. That is what lets a visual read Info.EffectService or
+--@ Info.GetPath instead of requiring the framework in every effect module.
+local function WithTools(Info)
+	if typeof(Info) ~= "table" or getmetatable(Info) then
+		return Info
+	end
+
+	return setmetatable(Info, { __index = Jloader.GlobalFunctions })
+end
+
 --@ Effect lookup tables (keys are always lower-cased)
 local ByPath = {} --@ ["combat.template"] = module
 local ByName = {} --@ ["template"]        = module   (bare-name fallback)
@@ -86,6 +98,8 @@ end
 
 --@ Run a resolved effect. Handles function-style and method-style modules.
 function ClientEffects:Play(path, Info, Method)
+	Info = WithTools(Info)
+
 	local EffectMod = self:Resolve(path)
 	if not EffectMod then
 		warn(string.format("[ClientEffects]: No effect found at path '%s'.", tostring(path)))
@@ -120,6 +134,10 @@ end
 
 --@ Start Method
 function ClientEffects:Init()
+	--@ Every weapon visual emits through ForgeVFX, so its caches and services have to be
+	--@ up before any effect can play. init() is guarded, so calling it here is safe.
+	Jloader.GlobalFunctions.ForgeVFX.init()
+
 	self:LoadEffects()
 
 	EffectService.CreateVisual:Connect(function(Data)
