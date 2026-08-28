@@ -54,10 +54,8 @@ Server.InitService = function(module)
 		table.insert(Service._sharedFns, Name)
 	end
 
-	--@ Register an RPC channel for the service's shared functions. Only names in
-	--  the declared _sharedFns allow-list are callable, and rawget bypasses the
-	--  Shared __index=self / __index=ServerService chain so a client cannot reach
-	--  arbitrary server methods (SpawnVisual, Init, new, ...).
+	--@ RPC channel for the service's shared fns: only declared _sharedFns names are callable, and
+	--@ rawget bypasses the Shared __index chain so a client cannot reach arbitrary server methods.
 	if #Service._sharedFns > 0 then
 		Net.onRpc(Service.Name .. "|Calls", function(plr, func, ...)
 			if typeof(func) ~= "string" or not table.find(Service._sharedFns, func) then
@@ -104,16 +102,13 @@ Server.Load = function()
 	Server.OnStart:Fire()
 end
 
---@ Strip function values from a service's Shared table before it crosses the
---  network. Function *names* travel in _sharedFns and are re-bound to RPC calls
---  on the client; the raw functions themselves cannot be serialized. Recurses so
---  a function nested inside a Shared table value cannot slip through and crash the
---  RPC response serialization; `seen` guards against cyclic tables.
+--@ Strip functions from a service's Shared table before it crosses the network - only their names
+--@ travel (in _sharedFns) and are re-bound to RPC calls client-side. Recurses so a nested function
+--@ cannot crash response serialization; `seen` guards cyclic tables.
 local function packSharedValues(shared, seen)
 	seen = seen or {}
-	--@ Memoize input table -> cleaned copy so cyclic refs terminate AND aliased
-	--  sub-tables (same table under two keys) resolve to one cleaned copy instead
-	--  of being dropped on the second visit.
+	--@ Memoize table -> cleaned copy so cyclic refs terminate and aliased sub-tables resolve to
+	--@ one copy instead of being dropped on the second visit.
 	if seen[shared] then
 		return seen[shared]
 	end

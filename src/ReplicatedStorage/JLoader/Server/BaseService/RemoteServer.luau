@@ -1,6 +1,5 @@
---@ RemoteServer — server-side signal, now backed by ByteNet via Net.
---  Public API is unchanged (:Fire/:FireAll/:FireExcept/:FireFilter/:Connect),
---  only the transport differs. Each instance owns a stable `Channel` string.
+--@ RemoteServer - server-side signal backed by ByteNet via Net. Public API
+--@ (:Fire/:FireAll/:FireExcept/:FireFilter/:Connect) is unchanged; each owns a stable `Channel`.
 
 local Players = game:GetService("Players")
 

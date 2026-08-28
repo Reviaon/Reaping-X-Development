@@ -25,10 +25,8 @@ ServerService.new = function(template)
 	Folder.Name = self.Name
 	self.Folder = Folder
 
-	--@ Initialize signals for the service.
-	--  Networked signals (Remote / Hybrid) are keyed by a stable channel string
-	--  that the client recomputes identically; no per-signal RemoteEvent is
-	--  created anymore — everything routes through the shared ByteNet namespace.
+	--@ Networked signals are keyed by a stable channel string the client recomputes identically;
+	--@ no per-signal RemoteEvent - everything routes through the shared ByteNet namespace.
 	for Type, List in pairs(self.Signals) do
 		if #List == 0 then continue end
 

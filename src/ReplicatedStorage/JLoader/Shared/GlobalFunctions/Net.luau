@@ -25,10 +25,8 @@ local ByteNet = require(ReplicatedStorage:WaitForChild("Libraries"):WaitForChild
 local IS_SERVER = RunService:IsServer()
 local NAMESPACE_NAME = "JLoaderNet"
 
---@ On the client the namespace layout replicates from the server as a
---@  StringValue under ReplicatedStorage.BytenetStorage. ByteNet resolves it with
---@  FindFirstChild (no wait) and JSON-decodes it immediately, so we must block
---@  until it exists AND is populated before defining the namespace.
+--@ The client namespace layout replicates as a StringValue under ReplicatedStorage.BytenetStorage.
+--@ ByteNet resolves it with FindFirstChild (no wait), so block until it exists AND is populated.
 if not IS_SERVER then
 	local storage = ReplicatedStorage:WaitForChild("BytenetStorage")
 	local nsValue = storage:WaitForChild(NAMESPACE_NAME)
@@ -68,9 +66,8 @@ local eventHandlers: { [string]: { [any]: (...any) -> () } } = {}
 --@ channel -> single RPC handler
 local rpcHandlers: { [string]: (player: Player?, ...any) -> ...any } = {}
 
---@ Events received for a channel before any handler is registered are buffered
---  here (bounded) and flushed on registration, mirroring the queue-until-listener
---  behaviour of raw RemoteEvents so first-join server->client events aren't lost.
+--@ Events for a channel with no handler yet are buffered here (bounded) and flushed on
+--@ registration, so first-join server->client events are not lost.
 local pendingEvents: { [string]: { { payload: any, player: Player? } } } = {}
 local MAX_PENDING_PER_CHANNEL = 32
 
@@ -193,9 +190,8 @@ end
 --================================ RPC ================================--
 
 if IS_SERVER then
-	--@ A single query listener dispatches by channel and returns the packed
-	--  result. Packing guarantees a non-nil response table even when the handler
-	--  returns nil/false, which keeps the query layer from stalling.
+	--@ One query listener dispatches by channel and returns the packed result; packing keeps the
+	--@ response non-nil even when the handler returns nil/false, so the query layer cannot stall.
 	rpcQuery.listen(function(data, player)
 		if typeof(data) ~= "table" then
 			return table.pack(nil)

@@ -1,6 +1,5 @@
---@ RemoteClient — client-side signal, now backed by ByteNet via Net.
---  Public API is unchanged (:Fire/:Connect), only the transport differs.
---  Each instance owns a stable `Channel` string matching the server side.
+--@ RemoteClient - client-side signal backed by ByteNet via Net. Public API (:Fire/:Connect) is
+--@ unchanged; each instance owns a stable `Channel` string matching the server side.
 
 local Shared = script.Parent.Parent.Parent.Shared
 local Net = require(Shared.GlobalFunctions).Net
