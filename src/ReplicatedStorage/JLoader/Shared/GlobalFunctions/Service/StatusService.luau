@@ -114,7 +114,7 @@ function StatusService:RemoveStatus(Entity: Model, Status: string)
 end
 
 function StatusService:GetStatesTable()
-	local StatesLibrary = require(Libraries.StatusLibrary).Types
+	local StatesLibrary = require(Libraries.CharacterLibrary.StatusLibrary).Types
 	
 	return StatesLibrary
 end
