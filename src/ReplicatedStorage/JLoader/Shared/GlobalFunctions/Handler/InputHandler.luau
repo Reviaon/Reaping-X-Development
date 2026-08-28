@@ -54,17 +54,14 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 	local InputType = Input.UserInputType
 	local heldKey = Key ~= Enum.KeyCode.Unknown and Key or InputType
 
-	--@ Releases must ALWAYS clear the held state, before any gate below can
-	--  swallow the event (GPE, focused textbox, missing Ended mapping), so a
-	--  tapped canHold input can never keep repeating after release.
+	--@ Releases must ALWAYS clear held state before any gate below can swallow the event, or a
+	--@ tapped canHold input keeps repeating after release.
 	if not Began then
 		heldInputs[heldKey] = nil
 	end
 
-	--@ Never yield here: a press that arrives before the first character spawn
-	--  must be dropped, not suspended on CharacterAdded — a suspended press
-	--  resumes AFTER its release already cleared the held state and stores a
-	--  phantom hold for a button that is no longer down.
+	--@ Never yield here: a press before the first character spawn must be dropped, not suspended on
+	--@ CharacterAdded - it would resume after its release and store a phantom hold.
 	local Character = Players.LocalPlayer.Character
 	if not Character then return end
 
