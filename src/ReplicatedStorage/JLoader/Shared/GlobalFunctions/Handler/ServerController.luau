@@ -41,7 +41,7 @@ local Trove = GlobalFunctions.Trove
 
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
-local AttributesLibrary = require(Libraries.AttributesLibrary)
+local AttributesLibrary = require(Libraries.CharacterLibrary.AttributesLibrary)
 
 --@ WeaponsLibrary is a FOLDER of one ModuleScript per weapon, not a single table.
 --@ The module NAME is the weapon id and must match the Tool's name exactly.
