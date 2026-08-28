@@ -12,7 +12,7 @@ local DataService = Jloader.CreateService({ Name = script.Name })
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local ProfileService = require(script.Parent.Parent:WaitForChild("ProfileService"))
-local TempData = require(Libraries:WaitForChild("TempData"))
+local TempData = require(Libraries:WaitForChild("DataLibrary"):WaitForChild("TempData"))
 
 --@ Shared
 local ProfileStores = {
