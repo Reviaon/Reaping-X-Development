@@ -38,10 +38,9 @@ local Effects = Modules:WaitForChild("Effects")
 
 local PATH_SEPARATOR = "."
 
---@ A payload arrives as a plain table - ByteNet ships it by reference and the remote
---@ serializer drops metatables - so give it the same GlobalFunctions fallback the
---@ ClientController has. That is what lets a visual read Info.EffectService or
---@ Info.GetPath instead of requiring the framework in every effect module.
+--@ Payloads arrive as plain tables (ByteNet drops metatables), so give them the same
+--@ GlobalFunctions fallback ClientController has - that is what lets a visual read
+--@ Info.EffectService or Info.GetPath without requiring the framework in every effect module.
 local function WithTools(Info)
 	if typeof(Info) ~= "table" or getmetatable(Info) then
 		return Info
