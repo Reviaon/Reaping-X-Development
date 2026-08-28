@@ -12,9 +12,8 @@ ClientService.new = function(name, info)
 		Folder = Shared.Parent.Services:FindFirstChild(name)
 	}, {__index = ClientService})
 
-	--@ Reconstruct networked signals from the channel naming scheme. The channel
-	--  must be computed identically to the server (serviceName|Type|signalName);
-	--  no RemoteEvent instances are looked up — routing is via the ByteNet namespace.
+	--@ Rebuild networked signals from the channel naming scheme (serviceName|Type|signalName),
+	--@ computed identically to the server; routing is the ByteNet namespace, not RemoteEvents.
 	for Type, List in pairs(info._remotes) do
 		for _, Name in ipairs(List) do
 			local channel = name .. "|" .. Type .. "|" .. Name
