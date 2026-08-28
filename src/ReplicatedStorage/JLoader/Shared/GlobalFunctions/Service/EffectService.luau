@@ -285,14 +285,10 @@ function EffectService:_CleanupCancellable()
 	self._cancelConnections = nil
 end
 
---@ Binds every BasePart in an effect to its root. The assets ship unanchored and
---@ unjointed, so without this the geometry drifts off the root the moment the clone
---@ enters the workspace, dragging the mesh-VFX Start/End markers off their origin.
---@
---@ Constraints are parented to the ROOT, never inside the part they bind. ForgeVFX's
---@ mesh emitter clones the Start marker and reparents its children onto the pooled part
---@ it then drives per frame, so a constraint sitting inside a marker rides along, chains
---@ that driven part back into the character's assembly and flings the player.
+--@ Binds every BasePart in an effect to its root; the assets ship unanchored and would
+--@ otherwise drift off it, dragging the mesh-VFX Start/End markers away. Constraints go on
+--@ the ROOT, never inside the part they bind - ForgeVFX reparents a marker's children onto a
+--@ pooled part, so a constraint inside one chains it into the character assembly and flings the player.
 local function WeldToRoot(root: BasePart, effect: Instance): number
 	local bound = 0
 	local alreadyBound = {}
@@ -787,33 +783,17 @@ function EffectService.Util.playRigAnimation(rig: Instance?, animationId: string
 	return track
 end
 
---@ TrackProjectileCollision
---@
---@ Shared swept-raycast collision + single-shot detonation for a moving projectile visual. The
---@ CALLER tweens / moves opts.part; this helper only watches its path each Heartbeat and fires
---@ opts.onDetonate(impactPosition, reason) EXACTLY ONCE - the first frame the swept segment
---@ (last position -> current position, so a fast projectile can't tunnel a thin wall) crosses a
---@ valid TARGET (a living Humanoid model that isn't the caster) or a valid map SURFACE (a part under
---@ the map root), or - when a tween is supplied - the frame that tween finishes at max range.
---@
---@ opts:
---@   part          BasePart    (required) the projectile part to follow.
---@   onDetonate    function     (required) (impactPosition: Vector3?, reason: string) -> (). reason is
---@                              "target" | "surface" | "range"; impactPosition is the contact point for
---@                              target/surface impacts and nil for the max-range route.
---@   caster        Model?      the casting character - excluded from the sweep and never a target.
---@   tween         Tween?      the flight tween: its Completed -> a "range" detonation, and any impact
---@                              cancels it. Omit for a projectile the caller drives without a tween.
---@   ignore        {Instance}? extra instances to exclude from the sweep (the Visuals FX folder is
---@                              always excluded, so self-hits never register).
---@   mapRoot       Instance?   surface root; defaults to workspace.Terrain.World.Map.
---@   lifetime      number?     sweep cutoff in seconds if the tween never completes. Default 5.
---@   snapOnImpact  boolean?    snap opts.part to the contact point (rotation preserved) so the
---@                              detonation lands on contact. Default true.
---@   targets       boolean?    detonate on living targets. Default true.
---@   surfaces      boolean?    detonate on map surfaces. Default true.
---@
---@ Returns stop(): cancel tracking WITHOUT detonating (early cleanup, e.g. the cast was parried).
+--@ TrackProjectileCollision - swept-raycast collision + single-shot detonation for a moving
+--@ projectile visual. The CALLER moves opts.part; this only watches its path each Heartbeat and
+--@ fires opts.onDetonate(impactPosition, reason) EXACTLY ONCE, on the first frame the swept
+--@ segment (so a fast projectile cannot tunnel a wall) hits a living non-caster Humanoid, a part
+--@ under the map root, or - with a tween - that tween completing at max range.
+--@ opts: part BasePart (req) | onDetonate function (req) (pos: Vector3?, reason: target|surface|range)
+--@   caster Model? excluded from the sweep | tween Tween? Completed -> range, cancelled on impact
+--@   ignore {Instance}? extra exclusions (the Visuals FX folder is always excluded)
+--@   mapRoot Instance? default workspace.Terrain.World.Map | lifetime number? sweep cutoff, default 5
+--@   snapOnImpact boolean? snap part to contact, default true | targets/surfaces boolean? default true
+--@ Returns stop(): cancel tracking WITHOUT detonating.
 function EffectService.Util.TrackProjectileCollision(opts: { [string]: any }): () -> ()
 	local part: BasePart? = opts.part
 	local onDetonate = opts.onDetonate
@@ -947,22 +927,13 @@ function EffectService.Util.TrackProjectileCollision(opts: { [string]: any }): (
 	end
 end
 
---@ TrackServerImpact
---@
---@ Shared single-shot listener for a SERVER-authoritative impact. The server, when its hitbox
---@ stops on a target, stamps the caster's Character with an impact WORLD POSITION via
---@ character:SetAttribute(opts.attribute, stopPosition) (a Vector3). This helper watches that
---@ attribute and fires opts.onImpact(position) EXACTLY ONCE - the first frame it changes to a
---@ Vector3 - then stops listening. It lets a moveset detonate / align its visual to exactly where
---@ the server landed the hit, instead of trusting its own client-side sweep (which drifts under
---@ latency). Pairs with TrackProjectileCollision: run both and let whichever fires first win.
---@
---@ opts:
---@   character  Model      (required) the caster character the server stamps the attribute on.
---@   attribute  string     (required) the attribute name (e.g. "ArcaneMissiles_Impact").
---@   onImpact   function   (required) (position: Vector3) -> (). Fired once with the server position.
---@
---@ Returns stop(): cancel listening WITHOUT firing (early cleanup, e.g. another trigger detonated).
+--@ TrackServerImpact - single-shot listener for a SERVER-authoritative impact. The server stamps
+--@ the caster with character:SetAttribute(opts.attribute, stopPosition); this fires
+--@ opts.onImpact(position) EXACTLY ONCE on the first Vector3 it sees, then stops. Lets a moveset
+--@ align its visual to where the server landed the hit rather than its own client sweep.
+--@ Pair with TrackProjectileCollision and let whichever fires first win.
+--@ opts: character Model (req) | attribute string (req) | onImpact function (req) (pos: Vector3)
+--@ Returns stop(): cancel listening WITHOUT firing.
 function EffectService.Util.TrackServerImpact(opts: { [string]: any }): () -> ()
 	local character: Model? = opts.character
 	local attribute = opts.attribute
