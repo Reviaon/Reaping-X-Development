@@ -229,37 +229,11 @@ end
 
 --========================================================================
 --@ Attack timing resolution
---
---@ Every timing in a weapon module is authored at 1x - the natural length of the
---@ animation as it was exported. `attack_speed` is the single knob that decides how fast
---@ the attack actually plays, and everything that has to stay glued to the animation is
---@ derived from it here instead of being hand-tuned per weapon:
---@
---@     playback speed   = attack_speed
---@     attack_duration  \
---@     impulse_delay     |
---@     ease_out          |  authored value / attack_speed
---@     ease_pause        |
---@     ease_fade         |
---@     attack_cooldown  /
---@
---@ Doubling attack_speed therefore halves the swing, its ease-out tail, the fade and the
---@ recovery together - the rhythm is preserved and only the tempo changes. Retiming a
---@ weapon is one number, and the authored values stay a truthful record of how long the
---@ animation actually is.
---@
---@ The momentum half is retimed too, but velocity moves the OTHER way:
---@
---@     impulse duration \  authored value / attack_speed
---@     impulse falloff  /
---@     impulse speed    =  authored value * attack_speed
---@
---@ Time compresses while velocity expands by the same factor, so the step covers the
---@ same ground and simply gets there sooner, landing on the same animation frame it
---@ always did.
---@
---@ Not scaled: light_impulse.influence, which is a ratio of the player's own walk speed
---@ rather than a distance or a time, and priority, which is pure arbitration.
+--@ Weapon timings are authored at 1x; `attack_speed` retimes them here, so retuning a weapon
+--@ is one number. Divided by attack_speed: attack_duration, impulse_delay, ease_out/pause/fade,
+--@ attack_cooldown, impulse duration + falloff. Multiplied by it: impulse speed, so the step
+--@ covers the same ground and just gets there sooner. Not scaled: light_impulse.influence
+--@ (a ratio of walk speed) and priority (pure arbitration).
 --========================================================================
 
 --@ The playback multiplier for one hit. Accepts a number, or an array keyed by combo

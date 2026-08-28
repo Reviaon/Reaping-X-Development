@@ -83,8 +83,6 @@ function CombatHandler:Init()
 end
 
 function CombatHandler:InitCharacter(controller)
-	warn("Initializing CombatHandler for character:", controller.Character and controller.Character.Name or "nil")
-
 	CombatHandler.Trove:Destroy()
 	CombatHandler.Trove = GarbageCollection.new()
 	CombatHandler:ResetBranchState()
