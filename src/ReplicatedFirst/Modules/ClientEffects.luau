@@ -50,11 +50,11 @@ local function WithTools(Info)
 end
 
 --@ Effect lookup tables (keys are always lower-cased)
-local ByPath = {} --@ ["combat.template"] = module
-local ByName = {} --@ ["template"]        = module   (bare-name fallback)
+local ByPath = {} --@ ["combat.weapons.staffvisuals"] = module
+local ByName = {} --@ ["staffvisuals"]              = module   (bare-name fallback)
 
 --@ Build a module's dotted path relative to the Effects folder,
---  e.g. Effects.Combat.Template -> "Combat.Template"
+--  e.g. Effects.Combat.Weapons.StaffVisuals -> "Combat.Weapons.StaffVisuals"
 local function getEffectPath(module: Instance): string
 	local segments = { module.Name }
 	local ancestor = module.Parent
