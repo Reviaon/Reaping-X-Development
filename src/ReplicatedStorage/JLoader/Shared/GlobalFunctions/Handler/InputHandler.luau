@@ -16,7 +16,7 @@ local HOLD_REPEAT_DELAY = 0.25
 
 --@ Libraries
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
-local KeybindList = require(Libraries:WaitForChild("KeybindsLibrary"))
+local KeybindList = require(Libraries:WaitForChild("InputLibrary"):WaitForChild("KeybindsLibrary"))
 
 --@ Imports
 function InputHandler.Init()
