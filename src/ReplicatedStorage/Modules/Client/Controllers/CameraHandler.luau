@@ -27,7 +27,7 @@ local ROTATION_SPEED = 20
 local USE_SMOOTH_ROTATION = false
 
 --@ Dynamic camera offset (drift) — tune to taste.
-local ORIGIN_FOLLOW_SPEED = 10 --@ how fast the origin part catches up to the torso (lower = more drift)
+local ORIGIN_FOLLOW_SPEED = 20 --@ how fast the origin part catches up to the torso (lower = more drift)
 local DRIFT_STRENGTH = 0.4     --@ fraction of the origin's lag applied as camera drift
 local DRIFT_MAX = 2            --@ max drift magnitude, in studs
 
@@ -158,8 +158,6 @@ function CameraHandler:InitCharacter(controller)
 	_trove:BindToRenderStep("CameraOffsetUpdate", Enum.RenderPriority.Camera.Value + 2, function(DeltaTime: number)
 		CameraHandler:UpdateCamera(DeltaTime, controller)
 	end)
-
-	warn("CAMERA HANDLER INITIALIZED", controller.Character)
 end
 
 
