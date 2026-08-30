@@ -17,11 +17,19 @@ TridentVisuals.Settings = {
 	--@ impulse_delay x 60fps, from Libraries/WeaponsLibrary/Trident
 	Frames = { 25, 27, 25 },
 	AfterImage = {},
+
+	--@ Extra visuals keyed by combo index or by name - spec schema in VisualsCore
+	OneShots = {},
 }
 
 --@ Handles Combat Visuals For Trident
 TridentVisuals.Attack = function(controller)
 	VisualsCore.Attack(controller, TridentVisuals.Settings)
+end
+
+--@ Plays a named one-shot from Settings.OneShots, independent of the combo
+TridentVisuals.OneShot = function(controller)
+	VisualsCore.OneShot(controller, TridentVisuals.Settings)
 end
 
 return TridentVisuals
