@@ -1,6 +1,9 @@
 return{
 	Rig = "DaggerRig",
 	MaxCombo = 5,
+
+	--@ Rig attachments carried onto the matching character limb; VFX modules emit off these by name
+	RigAttachments = { "Spin" },
 	
 	attack_speed = 1.2,
 
