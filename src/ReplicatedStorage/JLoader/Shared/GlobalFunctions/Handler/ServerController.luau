@@ -1,6 +1,8 @@
 --@ ServerController
 
 --[[
+	Author: Jae 
+
 	Server-side counterpart to ClientController.
 
 	Modules are cached on first require(), so every server Service and
@@ -179,6 +181,32 @@ local function WeldRigGeometry(Piece : BasePart)
 	end
 end
 
+local function ApplyRigAttachments(Character : Model, Template : Model, Names : {string}?)
+	if typeof(Names) ~= "table" then return end
+
+	for _, Name in Names do
+		local Source = Template:FindFirstChild(Name, true)
+
+		if not Source or not Source:IsA("Attachment") then
+			warn(`[ServerController] Rig "{Template.Name}" whitelists attachment "{tostring(Name)}", which it does not contain.`)
+			continue
+		end
+
+		local Host = Source.Parent
+		local CharacterHost = Host and Character:FindFirstChild(Host.Name)
+
+		if not CharacterHost then continue end
+
+		--@ A piece the Motor6D pass already cloned brought its own attachments across with it.
+		if CharacterHost:GetAttribute(RIG_PART_ATTRIBUTE) then continue end
+		if CharacterHost:FindFirstChild(Name) then continue end
+
+		local Clone = Source:Clone()
+		Clone:SetAttribute(RIG_PART_ATTRIBUTE, true)
+		Clone.Parent = CharacterHost
+	end
+end
+
 --@ Removes every part/joint a previous rig pass welded onto the character.
 function CharacterProfile.ClearRig(Character : Model)
 	for _, Descendant in Character:GetDescendants() do
@@ -260,6 +288,8 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		Character:SetAttribute("EquippedWeapon", nil)
 		return
 	end
+
+	ApplyRigAttachments(Character, Template, WeaponData.RigAttachments)
 
 	--@ Replicated so every client's CombatConfig:ResolveWeaponId agrees on the weapon;
 	--@ the client owns idle/attack animation swapping off the back of this.
