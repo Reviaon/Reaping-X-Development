@@ -15,12 +15,21 @@ DaggerVisuals.Settings = {
 
 	--@ impulse_delay x 60fps, from Libraries/WeaponsLibrary/Dagger
 	Frames = { 23, 27, 16, 25, 27 },
-	AfterImage = {},
+	--@ The rig authors this one onto the Right Arm as a Spin attachment, not onto a weapon part
+	AfterImage = { [2] = { Frame = 3, Source = "Spin", Within = "Right Arm" } },
+
+	--@ Extra visuals keyed by combo index or by name - spec schema in VisualsCore
+	OneShots = {},
 }
 
 --@ Handles Combat Visuals For Dagger
 DaggerVisuals.Attack = function(controller)
 	VisualsCore.Attack(controller, DaggerVisuals.Settings)
+end
+
+--@ Plays a named one-shot from Settings.OneShots, independent of the combo
+DaggerVisuals.OneShot = function(controller)
+	VisualsCore.OneShot(controller, DaggerVisuals.Settings)
 end
 
 return DaggerVisuals
