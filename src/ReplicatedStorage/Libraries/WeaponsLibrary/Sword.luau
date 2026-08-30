@@ -1,5 +1,5 @@
 return{
-	Rig = nil,
+	Rig = "SwordRig",
 	MaxCombo = 4,
 
 	attack_cooldown = .5,
