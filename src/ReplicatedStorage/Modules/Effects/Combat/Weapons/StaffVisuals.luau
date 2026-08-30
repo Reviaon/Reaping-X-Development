@@ -18,11 +18,19 @@ StaffVisuals.Settings = {
 	--@ early (31 and 26 derived) - hand-tuned, do not regenerate.
 	Frames = { 30, 28, 29, 15, 25 },
 	AfterImage = { [1] = 15, [3] = 9 },
+
+	--@ Extra visuals keyed by combo index or by name - spec schema in VisualsCore
+	OneShots = {},
 }
 
 --@ Handles Combat Visuals For Staff
 StaffVisuals.Attack = function(controller)
 	VisualsCore.Attack(controller, StaffVisuals.Settings)
+end
+
+--@ Plays a named one-shot from Settings.OneShots, independent of the combo
+StaffVisuals.OneShot = function(controller)
+	VisualsCore.OneShot(controller, StaffVisuals.Settings)
 end
 
 return StaffVisuals
