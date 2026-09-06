@@ -53,11 +53,15 @@ Load.LoadRunners = function(List, controllerFactory)
 
 	local function InitCharacter(Character)
 		if not Character then return end
-		
+
 		local controller = controllerFactory and controllerFactory(Character) or Character
+		local IsLocal = Players.LocalPlayer ~= nil and Character == Players.LocalPlayer.Character
 
 		for _, Runner in ipairs(EventInits.Characters) do
-			local IsLocal = Players.LocalPlayer and Character == Players.LocalPlayer.Character
+			if controllerFactory and not IsLocal and not Runner.RemoteCharacters then
+				continue
+			end
+
 			task.spawn(Runner.InitCharacter, Runner, controller, IsLocal)
 		end
 	end
