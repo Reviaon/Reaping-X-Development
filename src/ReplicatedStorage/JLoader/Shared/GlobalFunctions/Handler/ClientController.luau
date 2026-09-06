@@ -39,7 +39,6 @@ ClientController.State = {
 	Humanoid = nil,
 	HumanoidRootPart = nil,
 
-	Debug = true, --@ Enables Debug Mode Related To Player Character.
 
 	--@ Animation track handles (set and cleared by components)
 	-- e.g. CrouchIdle, SprintTrack, etc.
@@ -72,6 +71,24 @@ function ClientController:Reset()
 	end
 end
 
+function ClientController:Scope(namespace: string)
+	local scopes = self.State._scopes
+
+	if not scopes then
+		scopes = {}
+		self.State._scopes = scopes
+	end
+
+	local scope = scopes[namespace]
+
+	if not scope then
+		scope = {}
+		scopes[namespace] = scope
+	end
+
+	return scope
+end
+
 function ClientController:SetCharacter(character: Model)
 	local humanoid = character:WaitForChild("Humanoid")
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
@@ -85,6 +102,8 @@ function ClientController:SetCharacter(character: Model)
 end
 
 function ClientController:ClearCharacter()
+	self.State._scopes = nil
+
 	self:Update({
 		Character = nil,
 		Humanoid = nil,
