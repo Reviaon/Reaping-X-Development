@@ -109,11 +109,24 @@ function GameService:Initialize()
 		end
 	end)
 
-	for _, live in Live:GetChildren() do
-		if live:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(live) then
-			GlobalFunctions.ServerController:SetCharacter(live)
-		end
+	local function adoptCharacter(live: Instance)
+		if not live:IsA("Model") then return end
+		if Players:GetPlayerFromCharacter(live) then return end
+		if not live:FindFirstChild("Humanoid") then return end
+		if GlobalFunctions.ServerController:GetProfile(live) then return end
+
+		GlobalFunctions.AnimatorService:EnsureAnimator(live)
+
+		GlobalFunctions.ServerController:SetCharacter(live)
 	end
+
+	for _, live in Live:GetChildren() do
+		adoptCharacter(live)
+	end
+
+	Live.ChildAdded:Connect(function(child)
+		task.defer(adoptCharacter, child)
+	end)
 
 	game:BindToClose(function()
 		for _, player in Players:GetPlayers() do
