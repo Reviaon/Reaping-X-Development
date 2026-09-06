@@ -28,5 +28,18 @@ return{
 			0.450,
 			0.417,
 		}
-	}
+	},
+
+	--@ Attack hitbox. shape is Box, Sphere or Cylinder. size is one Vector3 whatever the shape:
+	--@ Box uses all three axes, Cylinder takes radius from X and height from Y, Sphere takes
+	--@ radius from X. offset is from the root, -Z forward. duration is how long the volume stays
+	--@ live. Omit hitbox_delay and the cue rides impulse_delay above.
+	hitbox = {
+		shape = "Box",
+		size = Vector3.new(6, 5, 9.5),
+		offset = Vector3.new(0, 0, -5),
+		duration = 0.1,
+		max_targets = -1,
+		effect = "BladeHit", --@ Impact particle under CombatVFX.Hit
+	},
 }
