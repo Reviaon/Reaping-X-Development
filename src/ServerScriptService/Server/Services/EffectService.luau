@@ -16,6 +16,11 @@ local Runservice = game:GetService("RunService")
 local components = {}
 
 function EffectService:SpawnVisual(Player, Args)
+	if Player and typeof(Args) == "table" and Args.SkipSender then
+		self.CreateVisual:FireExcept(Player, Args)
+		return
+	end
+
 	self.CreateVisual:FireAll(Args);
 end;
 
