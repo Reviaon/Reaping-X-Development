@@ -29,7 +29,7 @@ local function Visualize(Data)
 		Effect.Parent = workspace.Terrain
 	end
 
-	Effect.Color3 = Color3.fromRGB(31, 128, 29)
+	Effect.Color3 = if (Data.Hits or 0) > 0 then Color3.fromRGB(31, 128, 29) else Color3.fromRGB(255, 255, 255)
 
 	task.delay(0.1, function()
 		if Effect and Effect.CFrame == Cframe then
@@ -130,17 +130,6 @@ return function(Data, whitelist, blacklist, filterType)
 		workspace:GetPartBoundsInBox(AttackCFrame, Vector3.new(Radius * 2, Height, Radius * 2), overlapParams)
 	local result: any = Results
 
-	task.defer(function()
-		Visualize({
-			Radius = Radius,
-			Height = Height,
-			CFrame = AttackCFrame,
-			Attacker = Attacker,
-			Debug = Data.Debug,
-			Identifier = tostring(Data),
-		})
-	end)
-
 	if result then
 		for _, Part in result do
 			local Model: Model = GetTopModel(Part) or Part
@@ -194,6 +183,21 @@ return function(Data, whitelist, blacklist, filterType)
 		for i = 1, MaxTargets do
 			table.insert(results, TempResults[i])
 		end
+	end
+
+	if Data.Debug then
+		local hits = #TempResults
+		task.defer(function()
+			Visualize({
+				Radius = Radius,
+				Height = Height,
+				CFrame = AttackCFrame,
+				Attacker = Attacker,
+				Debug = Data.Debug,
+				Identifier = tostring(Data),
+				Hits = hits,
+			})
+		end)
 	end
 
 	return results

@@ -27,7 +27,7 @@ local function Visualize(Data)
 		Effect.Parent = workspace.Terrain
 	end
 
-	Effect.Color3 = Color3.fromRGB(31, 128, 29)
+	Effect.Color3 = if (Data.Hits or 0) > 0 then Color3.fromRGB(31, 128, 29) else Color3.fromRGB(255, 255, 255)
 
 	task.delay(0.1, function()
 		if Effect and Effect.CFrame == Cframe then
@@ -81,12 +81,6 @@ return function(Data, whitelist, blacklist, filterType)
 	overlapParams.FilterType = filterType or Enum.RaycastFilterType.Include
 	overlapParams.FilterDescendantsInstances = whitelist
 	overlapParams.CollisionGroup = Data.CollisionGroup or "HitboxFunction"
-
-	if Data.Debug then
-		task.defer(function()
-			Visualize({ Size = Size, Cframe = AttackCFrame, Attacker = Attacker, Debug = Data.Debug })
-		end)
-	end
 
 	local Results = workspace:GetPartBoundsInBox(AttackCFrame, Size, overlapParams)
 
@@ -144,6 +138,13 @@ return function(Data, whitelist, blacklist, filterType)
 				table.insert(results, TempResults[i])
 			end
 		end
+	end
+
+	if Data.Debug then
+		local hits = #TempResults
+		task.defer(function()
+			Visualize({ Size = Size, Cframe = AttackCFrame, Attacker = Attacker, Debug = Data.Debug, Hits = hits })
+		end)
 	end
 
 	return results
