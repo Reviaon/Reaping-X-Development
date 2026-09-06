@@ -1,0 +1,215 @@
+--@ Diving
+local DiveComponent = {}
+
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+--@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
+local DIVE_COOLDOWN = 1.5 --@ Temporary
+
+--@ Dash momentum outranks attack impulses, so a lower-priority impulse landing
+--  mid-dash is ignored instead of stomping it.
+local DIVE_IMPULSE_PRIORITY = 2
+
+function DiveComponent:Activate(controller)
+	local _character = controller.Character
+
+	if not _character then
+		return
+	end
+
+	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
+		return
+	end
+
+	if controller.CooldownService:CheckCooldown(_character, "Dive") then
+		return
+	end
+
+	local _humanoidRootPart = _character:FindFirstChild("HumanoidRootPart")
+
+	if not _humanoidRootPart then 
+		return 
+	end
+
+	local _checkbinds = controller.InputHandler:AreKeysDown({"W","A","S","D","Q"})
+	local _heldbind = controller.InputHandler:GetKeysDown({"W","A","S","D","Q"}) 
+	local _isShiftLock = controller.StatusService:CheckStatuses(_character, { ShiftLock = true })
+	local _isAttacking = controller.StatusService:CheckStatuses(_character, { IsAttacking = true })
+	
+	if not _checkbinds then
+		return
+	end
+
+	local _divetracks = {
+		["W"] = controller.AnimatorService:GetTrack(_character, "DiveForward"), --@ Omni Directional Route
+		["A"] = controller.AnimatorService:GetTrack(_character, "DiveLeft"),
+		["S"] = controller.AnimatorService:GetTrack(_character, "DiveBackward"),
+		["D"] = controller.AnimatorService:GetTrack(_character, "DiveRight")
+	}
+
+	local _dive_start_times = {
+		["W"] = 0.125,
+		["A"] = 0.125,
+		["S"] = 0.2,
+		["D"] = 0.125
+	}
+
+	if _checkbinds then
+		if _heldbind ==  "Q" then 
+			_heldbind = "W"
+		 end
+
+		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action3
+
+		if not _isAttacking then
+			_divetracks[_heldbind]:Play()
+		end
+	end
+
+	--@ TODO: Refactor Dive Settings To be more dynamic and less hardcoded.
+	local _dive_speed = 60
+	local _dive_duration = 1
+	local _diveDirection = _heldbind
+	local _dive_start_time = _dive_start_times[_diveDirection] or 0
+	
+	local _trove = controller.Trove.new()
+
+	local _directionOffsets = {
+		["W"] = _humanoidRootPart.CFrame.LookVector,
+		["S"] = -_humanoidRootPart.CFrame.LookVector,
+		["A"] = -_humanoidRootPart.CFrame.RightVector,
+		["D"] = _humanoidRootPart.CFrame.RightVector,
+	}
+
+	local _offset = _directionOffsets[_diveDirection]
+	local _diveVelocity = (_directionOffsets[_diveDirection] * _dive_speed)
+  
+	local _camera = workspace.CurrentCamera
+	local _startCFrame = _humanoidRootPart.CFrame
+
+	local function _updateOrientation()
+		local _, camY = _camera.CFrame:ToOrientation()
+		local targetCFrame = CFrame.new(_humanoidRootPart.Position) * CFrame.Angles(0, camY, 0)
+		_humanoidRootPart.CFrame = targetCFrame
+		return targetCFrame
+	end
+
+	local _lockedDiveCFrame = _updateOrientation()
+
+	local _lockedDirectionOffsets = {
+		["W"] = _lockedDiveCFrame.LookVector,
+		["S"] = -_lockedDiveCFrame.LookVector,
+		["A"] = -_lockedDiveCFrame.RightVector,
+		["D"] = _lockedDiveCFrame.RightVector,
+	}
+
+	local _lockedDirection = Vector3.new(
+		_lockedDirectionOffsets[_diveDirection].X,
+		0,
+		_lockedDirectionOffsets[_diveDirection].Z
+	).Unit
+
+	local _start = os.clock()
+
+	local speedMultiplier = Instance.new("NumberValue")
+	speedMultiplier.Value = _dive_speed
+
+	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+	local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
+
+	local _velocity = Instance.new("LinearVelocity")
+	_velocity.Name = controller.PhysicsService.ImpulseName
+	_velocity:SetAttribute(controller.PhysicsService.ImpulsePriorityAttribute, DIVE_IMPULSE_PRIORITY)
+
+	_velocity.Attachment0 = controller.PhysicsService.ImpulseAttachment(_humanoidRootPart)
+	_velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	_velocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	_velocity.ForceLimitMode = Enum.ForceLimitMode.PerAxis
+	_velocity.MaxAxesForce = Vector3.new(
+		_humanoidRootPart.AssemblyMass,
+		_humanoidRootPart.AssemblyMass,
+		_humanoidRootPart.AssemblyMass
+	) * Vector3.new(1, 0, 1) * 4e4
+
+	--@ The animation winds up immediately; the momentum follows through after
+	--  the direction's start time. Impulse clearing and the speed falloff both
+	--  happen at momentum start so the dash begins at full strength.
+	task.delay(_dive_start_time, function()
+		if not _character.Parent then return end
+
+		if controller.CombatConfig then
+			controller.CombatConfig:ClearImpulse(controller)
+		else
+			controller.PhysicsService.ClearExistingImpulse(controller)
+		end
+
+		tween:Play()
+		_velocity.VectorVelocity = _lockedDirection * speedMultiplier.Value
+		_velocity.Parent = _humanoidRootPart
+	end)
+
+	task.delay(_dive_start_time + _dive_duration, function()
+		if _velocity and _velocity.Parent then
+			_velocity:Destroy()
+		end
+	end)
+
+
+	_trove:Add(tween)
+	_trove:Add(_velocity)
+	
+	_trove:Add(RunService.RenderStepped:Connect(function()
+		if os.clock() - _start > (_dive_start_time + _dive_duration + 0.5) then
+			if _trove then
+				_trove:Clean()
+				_trove = nil
+			end
+			return
+		end
+
+		if speedMultiplier.Value <= 10 then
+			if _velocity and _velocity.Parent then
+				_velocity:Destroy()
+			end
+		end
+
+		if not _isShiftLock or controller.StatusService:CheckStatuses(_character, { IsSprinting = true }) then
+			_updateOrientation()
+		end
+
+		if _velocity and _velocity.Parent then
+
+			local currentOffsets = {
+				["W"] = _humanoidRootPart.CFrame.LookVector,
+				["S"] = -_humanoidRootPart.CFrame.LookVector,
+				["A"] = -_humanoidRootPart.CFrame.RightVector,
+				["D"] = _humanoidRootPart.CFrame.RightVector,
+			}
+
+			local currentDirection = Vector3.new(
+				currentOffsets[_diveDirection].X,
+				0,
+				currentOffsets[_diveDirection].Z
+			).Unit
+
+			_velocity.VectorVelocity = currentDirection * speedMultiplier.Value
+		end
+	end))
+
+	controller.StatusService:SetStatus(_character, "IsDiving", true, _dive_duration / 2 )
+	controller.StatusService:SetStatus(_character, "DiveDirection", _heldbind, _dive_duration / 2 )
+	controller.CooldownService:ApplyCooldown(_character, "Dive", DIVE_COOLDOWN)
+end
+
+function DiveComponent:Deactivate(controller)
+	local _character = controller.Character
+	if not _character then return end
+
+	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
+		controller.StatusService:RemoveStatus(_character, "IsDiving")
+		controller.StatusService:RemoveStatus(_character, "DiveDirection")
+	end
+end
+
+return DiveComponent

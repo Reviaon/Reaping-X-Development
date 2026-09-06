@@ -1,0 +1,137 @@
+--@ Strafing
+local StrafeComponent = {}
+
+local RunService = game:GetService("RunService")
+
+local CameraHandler = require(game:GetService("ReplicatedStorage"):WaitForChild("JLoader")).GetHandler("CameraHandler")
+
+local DOT_THRESHOLD = 0.9
+
+--@ Animation sets keyed by controller state flag.
+--@ We'll use this to determine strafe animation sets for Weapons
+
+--@ TODO: Work on Blending between sets.
+local STATE_ANIMATIONS = {
+	{ state = "IsCrouching", anims = {
+		Forward = "CrouchForwardWalk",
+		Backward = "CrouchBackwardWalk",
+		Left = "CrouchLeftWalk",
+		Right = "CrouchRightWalk",
+	}},
+
+	{ state = "Default", anims = {
+		Forward = "WalkForward",
+		Backward = "WalkBackward",
+		Left = "WalkLeft",
+		Right  = "WalkRight",
+	}},
+}
+
+local function resolveAnimSet(controller)
+	local Character = controller.Character
+	for _, entry in ipairs(STATE_ANIMATIONS) do
+		if entry.state == "Default" then
+			return entry.anims
+		end
+		if Character and controller.StatusService:CheckStatuses(Character, { [entry.state] = true }) then
+			return entry.anims
+		end
+	end
+end
+
+local SCOPE = "Strafe"
+
+local function playAnimation(controller, animName: string)
+	local state = controller:Scope(SCOPE)
+
+	if state.currentAnim == animName then return end
+
+	if state.track then
+		state.track:Stop(0.3)
+	end
+
+	state.track = controller.AnimatorService:PlayTrack(controller.Character, animName, {
+		Speed = 1,
+		Priority = Enum.AnimationPriority.Movement,
+		FadeTime = 0.3,
+		Loop = true,
+	})
+
+	state.currentAnim = animName
+end
+
+local function stopAnimation(controller)
+	local state = controller:Scope(SCOPE)
+
+	if state.track then
+		state.track:Stop(0.3)
+		state.track = nil
+		state.currentAnim = nil
+	end
+end
+
+local function update(controller)
+	local Humanoid = controller.Humanoid
+	local HumanoidRootPart = controller.HumanoidRootPart
+	if not Humanoid or not HumanoidRootPart then return end
+
+	local MoveDirection = Humanoid.MoveDirection
+
+	if MoveDirection.Magnitude <= 0 then
+		stopAnimation(controller)
+		return
+	end
+
+	local anims = resolveAnimSet(controller)
+
+	if CameraHandler:IsShiftLockEnabled() then
+		local MoveDirectionLocal = HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
+		if MoveDirectionLocal:Dot(Vector3.new( 1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0, -1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Forward)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Right)
+		elseif MoveDirectionLocal:Dot(Vector3.new( 0, 0,  1).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Backward)
+		elseif MoveDirectionLocal:Dot(Vector3.new(-1, 0,  0).Unit) > DOT_THRESHOLD then playAnimation(controller, anims.Left)
+		end
+	elseif controller.StatusService:CheckStatuses(controller.Character, { IsSprinting = true }) then
+		stopAnimation(controller)
+	else
+		playAnimation(controller, anims.Forward)
+	end
+end
+
+function StrafeComponent:Init(controller)
+	if not controller.Character then return end
+
+	StrafeComponent.Reset(controller)
+
+	local state = controller:Scope(SCOPE)
+	state.trove = controller.Trove.new()
+
+	state.trove:Add(RunService.RenderStepped:Connect(function()
+		update(controller)
+	end))
+
+	state.trove:Add(controller.Humanoid.Died:Connect(function()
+		StrafeComponent.Reset(controller)
+	end))
+
+	update(controller)
+end
+
+function StrafeComponent.Reset(controller)
+	if not controller then return end
+
+	stopAnimation(controller)
+
+	local state = controller:Scope(SCOPE)
+
+	if state.trove then
+		state.trove:Clean()
+		state.trove = nil
+	end
+end
+
+return StrafeComponent
