@@ -73,7 +73,9 @@ function module.New(
 	data.MaxTargets = data.MaxTargets or -1
 	data.MaxHitsPerTarget = data.MaxHitsPerTarget or 1
 
-	data.Debug = FORCE_DEBUG
+	if data.Debug == nil then
+		data.Debug = FORCE_DEBUG
+	end
 
 	local self = setmetatable({
 		onDispose = Signal.new(),
