@@ -14,9 +14,13 @@ local Signal = GlobalFunctions.Signal
 local WorldConstants = GlobalFunctions.WorldConstants
 local Gizmo = GlobalFunctions.Gizmo
 
+--@ Classes ClearBodyMovers will strip. Keyed by ClassName, which is how it is looked up.
 local BODYMOVER_TYPES = {
-	"BodyPosition",
-	"BodyVelocity"
+	LinearVelocity = true,
+	AlignPosition = true,
+	VectorForce = true,
+	BodyPosition = true,
+	BodyVelocity = true,
 }
 
 function Utils.GetCFrame(character: Model, client_check: boolean)
