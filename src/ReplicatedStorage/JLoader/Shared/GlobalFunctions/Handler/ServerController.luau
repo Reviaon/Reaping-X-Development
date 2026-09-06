@@ -83,8 +83,44 @@ end
 
 local CharacterProfile = {}
 
-CharacterProfile.__index = CharacterProfile
 CharacterProfile.ProfileCache = {}
+CharacterProfile.ProfilesById = {}
+
+CharacterProfile.IdAttribute = "ProfileId"
+
+local nextProfileId = 0
+
+local function makeProfileId(Character: Model, Player: Player?): string
+	nextProfileId += 1
+	return string.format("%s_%s_%d", Player and "Player" or "NPC", Character.Name, nextProfileId)
+end
+
+CharacterProfile.__index = function(self, key)
+	local member = rawget(CharacterProfile, key)
+	if member ~= nil then
+		return member
+	end
+
+	local state = rawget(self, "State")
+	if state then
+		local value = state[key]
+		if value ~= nil then
+			return value
+		end
+	end
+
+	local GlobalFunctions = require(script.Parent.Parent)
+	return GlobalFunctions[key]
+end
+
+CharacterProfile.__newindex = function(self, key, value)
+	local state = rawget(self, "State")
+	if state then
+		state[key] = value
+	else
+		rawset(self, key, value)
+	end
+end
 
 --@ Default humanoid properties applied to every character on spawn
 CharacterProfile.DefaultSettings = {
@@ -112,9 +148,21 @@ function CharacterProfile.new(Character)
 
 	CollectionService:AddTag(Character, "Character")
 
+	local Id = makeProfileId(Character, Player)
+	Character:SetAttribute(CharacterProfile.IdAttribute, Id)
+
 	local self = {
 		_Character = Character,
 		_Trove = Trove.new(),
+
+		Id = Id,
+
+		State = {
+			Character = Character,
+			Humanoid = Humanoid,
+			HumanoidRootPart = HumanoidRootPart,
+			Player = Player,
+		},
 
 		ClientProperties = {
 			["CFrame"] = CFrame.new(),
@@ -125,6 +173,7 @@ function CharacterProfile.new(Character)
 	}
 
 	setmetatable(self, CharacterProfile)
+	CharacterProfile.ProfilesById[Id] = self
 
 	self._Trove:Connect(Humanoid.Died, function()
 		self:Destroy()
@@ -317,6 +366,42 @@ function CharacterProfile:RigCharacter(Character : Model)
 	end)
 end
 
+function CharacterProfile:Set(key: string, value: any)
+	self.State[key] = value
+end
+
+function CharacterProfile:Get(key: string): any
+	return self.State[key]
+end
+
+function CharacterProfile:Remove(key: string)
+	self.State[key] = nil
+end
+
+function CharacterProfile:Update(data: {[string]: any})
+	for k, v in pairs(data) do
+		self.State[k] = v
+	end
+end
+
+function CharacterProfile:Scope(namespace: string)
+	local scopes = self.State._scopes
+
+	if not scopes then
+		scopes = {}
+		self.State._scopes = scopes
+	end
+
+	local scope = scopes[namespace]
+
+	if not scope then
+		scope = {}
+		scopes[namespace] = scope
+	end
+
+	return scope
+end
+
 function CharacterProfile:GetProfile(Character)
 	return CharacterProfile.ProfileCache[Character]
 end
@@ -332,6 +417,7 @@ function CharacterProfile:Destroy()
 	self._Trove:Destroy()
 
 	CharacterProfile.ProfileCache[self._Character] = nil
+	CharacterProfile.ProfilesById[self.Id] = nil
 end
 
 local ServerController = {}
@@ -374,6 +460,10 @@ function ServerController:GetProfile(character: Model)
 	return CharacterProfile.ProfileCache[character]
 end
 
+function ServerController:GetProfileById(id: string)
+	return CharacterProfile.ProfilesById[id]
+end
+
 function ServerController:ClearCharacter(character: Model)
 	local profile = CharacterProfile.ProfileCache[character]
 	if profile then
@@ -383,7 +473,12 @@ end
 
 return setmetatable(ServerController, {
 	__index = function(_, key)
-		return ServerController.State[key]
+		local stateValue = ServerController.State[key]
+		if stateValue ~= nil then
+			return stateValue
+		end
+		local GlobalFunctions = require(script.Parent.Parent)
+		return GlobalFunctions[key]
 	end,
 	__newindex = function(_, key, value)
 		ServerController.State[key] = value
