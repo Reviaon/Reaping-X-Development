@@ -16,6 +16,9 @@
       "Modules": {
         "$path": "src/ReplicatedStorage/Modules"
       },
+      "Utilities": {
+        "$path": "src/ReplicatedStorage/Utilities"
+      },
       "Storage": {
         "$className": "Folder",
         "Other": {
