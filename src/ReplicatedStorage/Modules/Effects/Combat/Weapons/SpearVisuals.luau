@@ -5,7 +5,7 @@ local VisualsCore = require(script.Parent.Parent.VisualsCore)
 SpearVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Spear",
 	Parent = "Workspace/World/Visuals",
-	Weapon = nil, --@ Afterimage source part name; set when the trail is authored
+	Weapon = "blade", --@ Afterimage source part name; set when the trail is authored
 
 	Prefix = "Hit", --@ Asset child name is Prefix .. comboIndex
 
@@ -16,7 +16,7 @@ SpearVisuals.Settings = {
 
 	--@ impulse_delay x 60fps, from Libraries/WeaponsLibrary/Spear
 	Frames = { 28, 33, 34 },
-	AfterImage = {},
+	AfterImage = {[3] = 8},
 
 	--@ Extra visuals keyed by combo index or by name - spec schema in VisualsCore
 	OneShots = {},
