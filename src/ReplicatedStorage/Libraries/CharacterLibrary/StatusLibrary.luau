@@ -1,5 +1,12 @@
 return{
 	Types = {
+		IsStunned = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			Priority = 10;
+			IsStun = true;
+		};
+
 		IsSprinting = {
 			WalkSpeed = 30,
 			JumpPower = 50,
