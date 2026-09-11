@@ -4,7 +4,14 @@ local PushComponent = {}
 function PushComponent:Init(_controller)
 end
 
-function PushComponent:CanActivate(_controller, _combatState): boolean
+function PushComponent:CanActivate(controller, _combatState): boolean
+	local Character = controller.Character
+	if not Character then return false end
+
+	if controller.StatusService:CheckStatuses(Character, { IsStunned = true }) then
+		return false
+	end
+
 	return true
 end
 
