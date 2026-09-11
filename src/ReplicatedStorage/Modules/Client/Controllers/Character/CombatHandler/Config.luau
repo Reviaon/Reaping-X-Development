@@ -205,6 +205,7 @@ local HITBOX_ENTRY_SCHEMA = {
 	size = "Vector3",
 	offset = "Vector3",
 	duration = "number",
+	hitbox_delay = "number",
 	max_targets = "number",
 	max_hits_per_target = "number",
 	effect = "string",
@@ -462,7 +463,11 @@ function CombatConfig:ClearImpulse(controller)
 	controller.PhysicsService.ClearExistingImpulse(controller)
 
 	if controller.Character then
-		controller.KnockbackService.Cancel(controller.Character)
+		local recipe = controller.KnockbackService.Active(controller.Character)
+
+		if recipe and recipe.steer then
+			controller.KnockbackService.Cancel(controller.Character)
+		end
 	end
 end
 
@@ -604,7 +609,9 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 	local knockbackData = knockback and (ResolveIndexed(knockback.knockback, comboIndex) or knockback) or nil
 
 	local hitboxDelay = impulseDelay
-	if hitbox and hitbox.hitbox_delay ~= nil then
+	if hitboxData and hitboxData ~= hitbox and hitboxData.hitbox_delay ~= nil then
+		hitboxDelay = ResolveNumber(hitboxData.hitbox_delay, nil, DEFAULT_IMPULSE_DELAY) / speed
+	elseif hitbox and hitbox.hitbox_delay ~= nil then
 		hitboxDelay = ResolveNumber(hitbox.hitbox_delay, comboIndex, DEFAULT_IMPULSE_DELAY) / speed
 	end
 
