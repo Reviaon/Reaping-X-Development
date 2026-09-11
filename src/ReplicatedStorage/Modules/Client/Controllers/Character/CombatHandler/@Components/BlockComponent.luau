@@ -12,7 +12,7 @@ function BlockComponent:CanActivate(controller, _combatState): boolean
 		return false
 	end
 
-	if controller.StatusService:CheckStatuses(Character, { IsAttacking = true, IsCrouching = true }) then
+	if controller.StatusService:CheckStatuses(Character, { IsAttacking = true, IsCrouching = true, IsStunned = true }) then
 		return false
 	end
 
