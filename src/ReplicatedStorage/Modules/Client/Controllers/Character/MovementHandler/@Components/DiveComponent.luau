@@ -11,21 +11,46 @@ local DIVE_COOLDOWN = 1.5 --@ Temporary
 --  mid-dash is ignored instead of stomping it.
 local DIVE_IMPULSE_PRIORITY = 2
 
+local function isKnockedBack(controller, character)
+	local recipe = controller.KnockbackService.Active(character)
+	return recipe ~= nil and not recipe.steer and (recipe.priority or 0) >= DIVE_IMPULSE_PRIORITY
+end
+
+local function isInterrupted(controller, character)
+	return controller.StatusService:CheckStatuses(character, { IsStunned = true }) or isKnockedBack(controller, character)
+end
+
+function DiveComponent:CanActivate(controller)
+	local _character = controller.Character
+
+
+	if controller.StatusService:CheckStatuses(_character, { IsDiving = true, IsStunned = true }) then
+		return false
+	end
+
+	if isKnockedBack(controller, _character) then
+		return false
+	end
+
+	if controller.CooldownService:CheckCooldown(_character, "Dive") then
+		return false
+	end
+	
+	
+	return true
+end
+
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
 
 	if not _character then
 		return
 	end
-
-	if controller.StatusService:CheckStatuses(_character, { IsDiving = true }) then
+	
+	if not DiveComponent:CanActivate(controller) then
 		return
 	end
-
-	if controller.CooldownService:CheckCooldown(_character, "Dive") then
-		return
-	end
-
+	
 	local _humanoidRootPart = _character:FindFirstChild("HumanoidRootPart")
 
 	if not _humanoidRootPart then 
@@ -132,11 +157,26 @@ function DiveComponent:Activate(controller)
 		_humanoidRootPart.AssemblyMass
 	) * Vector3.new(1, 0, 1) * 4e4
 
+	local function _interrupt()
+		if _trove then
+			_trove:Clean()
+			_trove = nil
+		end
+
+		_divetracks[_diveDirection]:Stop(0.1)
+		DiveComponent:Deactivate(controller)
+	end
+
 	--@ The animation winds up immediately; the momentum follows through after
 	--  the direction's start time. Impulse clearing and the speed falloff both
 	--  happen at momentum start so the dash begins at full strength.
 	task.delay(_dive_start_time, function()
-		if not _character.Parent then return end
+		if not _trove or not _character.Parent then return end
+
+		if isInterrupted(controller, _character) then
+			_interrupt()
+			return
+		end
 
 		if controller.CombatConfig then
 			controller.CombatConfig:ClearImpulse(controller)
@@ -165,6 +205,11 @@ function DiveComponent:Activate(controller)
 				_trove:Clean()
 				_trove = nil
 			end
+			return
+		end
+
+		if isInterrupted(controller, _character) then
+			_interrupt()
 			return
 		end
 
