@@ -2,7 +2,6 @@
 local Jloader = require(game.ReplicatedStorage.JLoader)
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 
@@ -10,7 +9,6 @@ local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
 
 local JUMP_DECAY_STEP = 10
-local JUMP_RECOVERY_RATE = 5
 local JUMP_RESET_COOLDOWN = 0.5
 local JUMP_MIN_POWER = 25
 local JUMP_IDLE_RESET = 2
@@ -22,7 +20,7 @@ local function stateOf(controller)
 
 	if state.decayedJumpPower == nil then
 		state.decayedJumpPower = BASE_JUMP_POWER
-		state.statusZeroesJump = false
+		state.jumpLimit = BASE_JUMP_POWER
 		state.jumpResetPending = false
 	end
 
@@ -32,64 +30,37 @@ end
 local function resolveJumpPower(controller)
 	local state = stateOf(controller)
 
-	if state.statusZeroesJump or state.decayedJumpPower < JUMP_MIN_POWER then
+	if state.decayedJumpPower < JUMP_MIN_POWER then
 		return 0
 	end
 
-	return state.decayedJumpPower
+	return math.min(state.decayedJumpPower, state.jumpLimit)
 end
 
 local function applyHumanoidProperties(controller)
 	local Character = controller.Character
-	local Humanoid  = controller.Humanoid
+	local Humanoid = controller.Humanoid
 	if not Character or not Humanoid then return end
 
 	local state = stateOf(controller)
-	local walkSpeed, jumpPower, highestPriority = BASE_WALK_SPEED, nil, -math.huge
-	local noAutoRotate = false
-
-	local StatusStates = controller.StatusService:GetStatesTable()
-
-	for attrName in Character:GetAttributes() do
-		local statusData = StatusStates[attrName]
-		if statusData then
-			local priority = statusData.Priority or 0
-			if priority > highestPriority then
-				highestPriority = priority
-
-				if attrName == "NoAutoRotate" then
-					noAutoRotate = true
-				end
-
-				walkSpeed = statusData.WalkSpeed or walkSpeed
-				jumpPower = statusData.JumpPower or jumpPower
-			end
-		end
-	end
-
-	Humanoid.AutoRotate = not noAutoRotate
-
+	local properties = controller.StatusService:ResolveProperties(Character, {
+		WalkSpeed = BASE_WALK_SPEED,
+		JumpPower = BASE_JUMP_POWER,
+	})
+	state.jumpLimit = math.max(0, properties.JumpPower)
+	local walkSpeed = math.max(0, properties.WalkSpeed)
+	local jumpPower = resolveJumpPower(controller)
 	controller:Set("GoalSpeed", walkSpeed)
 	Humanoid.WalkSpeed = walkSpeed
-
-	state.statusZeroesJump = jumpPower ~= nil and jumpPower <= 0
-
-	local effectiveJump = resolveJumpPower(controller)
-	Humanoid.JumpPower = effectiveJump
-
-	if effectiveJump <= 0 and walkSpeed < BASE_WALK_SPEED then
+	Humanoid.JumpPower = jumpPower
+	if jumpPower <= 0 then
 		Humanoid.Jump = false
 	end
-
-	
-	Humanoid.WalkSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
-	Humanoid.JumpPower = resolveJumpPower(controller)
 end
 
 --@ Restarted on every jump. Going JUMP_IDLE_RESET seconds without jumping wipes
 --  the accumulated decay entirely, independent of the zeroed-out reset cooldown.
-local function cancelIdleReset(controller)
-	local state = controller:Scope(SCOPE)
+local function cancelIdleReset(state)
 
 	if state.idleThread then
 		task.cancel(state.idleThread)
@@ -98,11 +69,13 @@ local function cancelIdleReset(controller)
 end
 
 local function scheduleIdleReset(controller)
-	cancelIdleReset(controller)
+	cancelIdleReset(stateOf(controller))
 
 	local state = stateOf(controller)
+	local Character = controller.Character
 
 	state.idleThread = task.delay(JUMP_IDLE_RESET, function()
+		if controller.Character ~= Character then return end
 		state.idleThread = nil
 
 		if state.decayedJumpPower >= BASE_JUMP_POWER then return end
@@ -110,20 +83,6 @@ local function scheduleIdleReset(controller)
 		state.decayedJumpPower = BASE_JUMP_POWER
 		applyHumanoidProperties(controller)
 	end)
-end
-
-local function propertyUpdate(controller, dt)
-	local Humanoid = controller.Humanoid
-	if not Humanoid then return end
-
-	local state = stateOf(controller)
-
-	if not state.jumpResetPending and state.decayedJumpPower < BASE_JUMP_POWER then
-		state.decayedJumpPower = math.min(BASE_JUMP_POWER, state.decayedJumpPower + JUMP_RECOVERY_RATE * dt)
-	end
-
-	Humanoid.WalkSpeed = controller:Get("GoalSpeed") or BASE_WALK_SPEED
-	Humanoid.JumpPower = resolveJumpPower(controller)
 end
 
 --@ Displays the character's active status attribute in the debug UI's TextLabel.
@@ -166,25 +125,8 @@ local function setupDebugStatusUI(controller, trove)
 		return
 	end
 
-	local StatusStates = controller.StatusService:GetStatesTable()
-
 	local function updateStatusLabel()
-		local activeStatus, highestPriority = nil, -math.huge
-
-		for Attribute, Value in Character:GetAttributes() do
-			local statusData = StatusStates[Attribute]
-
-			if statusData and Value then
-				local priority = statusData.Priority or 0
-
-				if priority > highestPriority then
-					highestPriority = priority
-					activeStatus = Attribute
-				end
-			end
-		end
-
-		StatusLabel.Text = activeStatus or "None"
+		StatusLabel.Text = controller.StatusService:GetDominantStatus(Character) or "None"
 	end
 
 	updateStatusLabel()
@@ -201,6 +143,9 @@ local function setupDebugStatusUI(controller, trove)
 end
 
 function PropertyHandler:InitCharacter(controller)
+	if self.CharacterTrove then
+		self.CharacterTrove:Destroy()
+	end
 	local Character = controller.Character
 	if not Character then return end
 
@@ -210,22 +155,25 @@ function PropertyHandler:InitCharacter(controller)
 		task.cancel(state.resetThread)
 		state.resetThread = nil
 	end
-	cancelIdleReset(controller)
+	cancelIdleReset(stateOf(controller))
 	state.decayedJumpPower = BASE_JUMP_POWER
-	state.statusZeroesJump = false
+	state.jumpLimit = BASE_JUMP_POWER
 	state.jumpResetPending = false
 
 	local trove = controller.Trove.new()
+	self.CharacterTrove = trove
 
 	applyHumanoidProperties(controller)
 	setupDebugStatusUI(controller, trove)
 
 	trove:Connect(Character.AttributeChanged, function()
-		applyHumanoidProperties(controller)
+		if controller.Character == Character then
+			applyHumanoidProperties(controller)
+		end
 	end)
 
 	trove:Connect(controller.Humanoid.Jumping, function(active)
-		if not active or state.jumpResetPending then return end
+		if controller.Character ~= Character or not active or state.jumpResetPending then return end
 
 		state.decayedJumpPower = math.max(0, state.decayedJumpPower - JUMP_DECAY_STEP)
 
@@ -235,10 +183,11 @@ function PropertyHandler:InitCharacter(controller)
 
 		if state.decayedJumpPower <= 0 then
 			--@ Fully decayed: the zeroed-out cooldown owns the reset from here.
-			cancelIdleReset(controller)
+			cancelIdleReset(stateOf(controller))
 
 			state.jumpResetPending = true
 			state.resetThread = task.delay(JUMP_RESET_COOLDOWN, function()
+				if controller.Character ~= Character then return end
 				state.resetThread = nil
 				state.jumpResetPending = false
 				state.decayedJumpPower = BASE_JUMP_POWER
@@ -256,12 +205,13 @@ function PropertyHandler:InitCharacter(controller)
 			task.cancel(state.resetThread)
 			state.resetThread = nil
 		end
-		cancelIdleReset(controller)
+		cancelIdleReset(state)
 	end)
 
-	--trove:Connect(RunService.RenderStepped, function(dt)
-		--propertyUpdate(controller, dt)
-	--end)
+
+	trove:Connect(controller.Humanoid.Died, function()
+		trove:Clean()
+	end)
 
 	trove:Connect(Character.AncestryChanged, function()
 		if not Character:IsDescendantOf(game) then
