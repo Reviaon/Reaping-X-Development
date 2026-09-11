@@ -25,6 +25,7 @@ local TRANSITION_OUT_SPEED = 30
 
 local ROTATION_SPEED = 20
 local USE_SMOOTH_ROTATION = false
+local USE_DYNAMIC_INFLUENCE = false
 
 --@ Dynamic camera offset (drift) — tune to taste.
 local ORIGIN_FOLLOW_SPEED = 20 --@ how fast the origin part catches up to the torso (lower = more drift)
@@ -288,7 +289,7 @@ function CameraHandler:UpdateOrigin(DeltaTime, controller)
 	origin.CFrame = origin.CFrame:Lerp(torsoFocus, math.min(1, DeltaTime * ORIGIN_FOLLOW_SPEED))
 
 	if Camera and Camera.CameraSubject and Camera.CameraSubject ~= origin then
-		Camera.CameraSubject = torso
+		Camera.CameraSubject = USE_DYNAMIC_INFLUENCE and torso or Humanoid
 	end
 
 	controller._camera_world_lag = torsoFocus.Position - origin.Position
@@ -302,7 +303,7 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 	local drift = Vector3.zero
 	local worldLag = controller._camera_world_lag
 
-	if worldLag then
+	if worldLag and USE_DYNAMIC_INFLUENCE then
 		local localLag = Camera.CFrame:VectorToObjectSpace(worldLag) * DRIFT_STRENGTH * _influenceLevel
 		drift = Vector3.new(localLag.X, localLag.Y, 0)
 
@@ -312,7 +313,7 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 	end
 
 	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position + drift
-	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset) + Vector3.new(0, SUBJECT_HEIGHT_OFFSET, 0)
+	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset) + Vector3.new(0,  USE_DYNAMIC_INFLUENCE and SUBJECT_HEIGHT_OFFSET or 0, 0)
 end
 
 return CameraHandler
