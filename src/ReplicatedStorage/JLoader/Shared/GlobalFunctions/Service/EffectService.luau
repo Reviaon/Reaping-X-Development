@@ -317,12 +317,29 @@ local function WeldToRoot(root: BasePart, effect: Instance): number
 	return bound
 end
 
+local function MakeWeightless(effect : Instance)
+	local parts = effect:GetDescendants()
+
+	if effect:IsA("BasePart") then
+		table.insert(parts, effect)
+	end
+
+	for _, part in parts do
+		if not part:IsA("BasePart") then continue end
+
+		part.Massless = true
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+	end
+end
+
 function EffectService:Weld(Part : {Any})
 	if not self.Effect then return end
 
-	--@ Resolve something weldable: a Model welds by its PrimaryPart, and a bare
-	--@ Trail/Beam/ParticleEmitter has no geometry at all, so it welds by the part it is
-	--@ parented to. Assigning a non-BasePart to Part0 is an error, hence the guard.
+	MakeWeightless(self.Effect)
+
 	local part0 = self.Effect
 
 	if part0:IsA("Model") then
