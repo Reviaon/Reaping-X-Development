@@ -3,10 +3,23 @@ return{
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
+		Default = {
+			WalkSpeed = 12,
+			JumpPower = 50,
+			AutoRotate = true,
+			Priority = 0
+		},
+		
 		IsStunned = {
 			WalkSpeed = 6,
 			JumpPower = 0,
 			Priority = 10;
+		};
+
+		IsRagdolled = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			Priority = 11;
 		};
 
 		IsSprinting = {
