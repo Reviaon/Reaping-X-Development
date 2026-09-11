@@ -133,6 +133,7 @@ function CameraHandler:InitCharacter(controller)
 	CameraHandler:Cleanup(controller)
 
 	local _humanoid = Character:WaitForChild("Humanoid")
+	
 	local _trove = controller.Trove.new()
 	controller._camera_trove = _trove
 
@@ -214,7 +215,7 @@ function CameraHandler:ToggleShiftLock(state, controller)
 		RunService:BindToRenderStep("ShiftLockRotation", Enum.RenderPriority.Camera.Value + 1, function(dt)
 			if not (Character.Parent and HumanoidRootPart.Parent) then return end
 
-			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true})  
+			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true, IsRagdolled = true})  
 				and not (controller.StatusService:CheckStatuses(Character, {IsSprinting = true}) 
 				and not controller.StatusService:CheckStatuses(Character, {IsAttacking = true})) then
 
