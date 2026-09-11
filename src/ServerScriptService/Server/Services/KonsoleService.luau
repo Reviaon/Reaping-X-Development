@@ -10,9 +10,6 @@ local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local WeaponsLibrary = Libraries:WaitForChild("WeaponsLibrary")
 
-local Storage = ReplicatedStorage:WaitForChild("Storage")
-local RigParts = Storage:WaitForChild("Models"):WaitForChild("RigParts")
-
 local ServerStorage = game:GetService("ServerStorage")
 local NPCs = ServerStorage:WaitForChild("NPCs")
 
@@ -202,29 +199,7 @@ function KonsoleService.Allows(entity)
 end
 
 local function buildWeaponTool(weaponName)
-	local handle = RigParts:FindFirstChild("Handle")
-
-	if not handle or not handle:IsA("BasePart") then
-		return nil, "Storage.Models.RigParts.Handle is missing, so no Tool can be equipped"
-	end
-
-	local tool = Instance.new("Tool")
-	tool.Name = weaponName
-	tool.RequiresHandle = true
-
-	tool.CanBeDropped = false
-
-	local clone = handle:Clone()
-	clone.Name = "Handle"
-
-	clone.Transparency = 1
-	clone.CanCollide = false
-	clone.CanQuery = false
-	clone.CanTouch = false
-	clone.Massless = true
-	clone.Parent = tool
-
-	return tool
+	return Jloader.GlobalFunctions.ServerController.CharacterProfile.BuildWeaponTool(weaponName)
 end
 
 local Implementations = {}
@@ -357,6 +332,15 @@ function Implementations.spawnNpcServer(context)
 		return context.err("no-npcs", "ServerStorage.NPCs holds no models")
 	end
 
+	local weapon = nil
+	if #tokens > 1 then
+		weapon = resolve(tokens[#tokens], weaponNames())
+
+		if weapon then
+			table.remove(tokens)
+		end
+	end
+
 	local wanted = #tokens > 0 and table.concat(tokens, " ") or roster[1]
 	local name, why = resolve(wanted, roster)
 
@@ -379,10 +363,45 @@ function Implementations.spawnNpcServer(context)
 		clone:PivotTo(root.CFrame * CFrame.new(sideways, 0, -settings.SpawnDistance))
 
 		clone:SetAttribute(SPAWNED_ATTRIBUTE, true)
+
+		if weapon then
+			clone:SetAttribute("Weapon", weapon)
+		end
+
 		clone.Parent = living
 	end
 
-	return context.reply(("spawned %d %s %d studs ahead"):format(count, name, settings.SpawnDistance))
+	return context.reply(("spawned %d %s%s %d studs ahead"):format(
+		count, name, weapon and (" holding " .. weapon) or "", settings.SpawnDistance))
+end
+
+function Implementations.armServer(context)
+	local living = livingFolder()
+	if not living then
+		return context.err("no-live-folder", "workspace.World.Live is missing")
+	end
+
+	local tokens = argumentsOf(context)
+	local weapon, why = resolve(table.concat(tokens, " "), weaponNames())
+
+	if not weapon then
+		return context.err("unknown-weapon", why)
+	end
+
+	local armed = 0
+
+	for _, child in living:GetChildren() do
+		if child:IsA("Model") and not Players:GetPlayerFromCharacter(child) then
+			child:SetAttribute("Weapon", weapon)
+			armed += 1
+		end
+	end
+
+	if armed == 0 then
+		return context.reply("no npcs in workspace.World.Live to arm")
+	end
+
+	return context.reply(("%d %s now holding %s"):format(armed, armed == 1 and "npc" or "npcs", weapon))
 end
 
 function Implementations.debugServer(context)
@@ -427,6 +446,59 @@ function Implementations.clearNpcsServer(context)
 	end
 
 	return context.reply(("cleared %d spawned %s"):format(removed, removed == 1 and "npc" or "npcs"))
+end
+
+local function stateWord(token)
+	local word = token and string.lower(token) or nil
+
+	if word == nil or word == "toggle" then
+		return "toggle"
+	elseif word == "on" or word == "true" or word == "1" or word == "enable" then
+		return true
+	elseif word == "off" or word == "false" or word == "0" or word == "disable" then
+		return false
+	end
+
+	return nil
+end
+
+function Implementations.aggroServer(context)
+	local living = livingFolder()
+	if not living then
+		return context.err("no-live-folder", "workspace.World.Live is missing")
+	end
+
+	local tokens = argumentsOf(context)
+	local state = stateWord(tokens[1])
+
+	if state == nil then
+		return context.err("bad-argument", ("'%s' is not on, off or toggle"):format(tokens[1]))
+	end
+
+	local DummyService = Jloader.GetService("DummyService")
+	local changed, enabled = 0, 0
+
+	for _, child in living:GetChildren() do
+		if not child:IsA("Model") or Players:GetPlayerFromCharacter(child) then continue end
+
+		local target = state
+		if target == "toggle" then
+			target = not DummyService:IsAggressive(child)
+		end
+
+		if DummyService:SetAggressive(child, target) then
+			changed += 1
+			if target then
+				enabled += 1
+			end
+		end
+	end
+
+	if changed == 0 then
+		return context.reply("no npcs in workspace.World.Live to set")
+	end
+
+	return context.reply(("%d %s attacking, %d idle"):format(enabled, enabled == 1 and "npc" or "npcs", changed - enabled))
 end
 
 function KonsoleService:Init()
@@ -485,7 +557,7 @@ function KonsoleService:Init()
 		name = "spawn",
 		rank = settings.CommandRank,
 		aliases = { "spawnnpc", "npc", "dummy" },
-		description = "Spawns an NPC from ServerStorage.NPCs in front of you.",
+		description = "Spawns an NPC from ServerStorage.NPCs in front of you, optionally holding a weapon.",
 		server = "spawnNpcServer",
 		args = {
 			{
@@ -493,6 +565,12 @@ function KonsoleService:Init()
 				type = "string",
 				required = false,
 				suggestions = npcNames(),
+			},
+			{
+				name = "weapon",
+				type = "string",
+				required = false,
+				suggestions = weaponNames(),
 			},
 			{
 				name = "count",
@@ -503,11 +581,43 @@ function KonsoleService:Init()
 	})
 
 	Konsole.define({
+		name = "arm",
+		rank = settings.CommandRank,
+		aliases = { "armnpcs", "dummyweapon", "equipnpcs" },
+		description = "Hands every NPC in World.Live a weapon; Melee takes it away.",
+		server = "armServer",
+		args = {
+			{
+				name = "weapon",
+				type = "string",
+				required = true,
+				suggestions = weaponNames(),
+			},
+		},
+	})
+
+	Konsole.define({
 		name = "debug",
 		rank = settings.CommandRank,
 		aliases = { "debugmode", "dbg" },
 		description = "Toggles debug mode: hitbox volumes, hit reports and status UI.",
 		server = "debugServer",
+		args = {
+			{
+				name = "state",
+				type = "string",
+				required = false,
+				suggestions = { "on", "off", "toggle" },
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "aggro",
+		rank = settings.CommandRank,
+		aliases = { "aggressive", "attackdummy", "hostile" },
+		description = "Makes every NPC in World.Live attack players, or stops them.",
+		server = "aggroServer",
 		args = {
 			{
 				name = "state",

@@ -83,6 +83,30 @@ end
 
 local CharacterProfile = {}
 
+function CharacterProfile.BuildWeaponTool(WeaponName : string)
+	local Handle = RigParts:FindFirstChild("Handle")
+
+	if not Handle or not Handle:IsA("BasePart") then
+		return nil, "Storage.Models.RigParts.Handle is missing, so no Tool can be equipped"
+	end
+
+	local Tool = Instance.new("Tool")
+	Tool.Name = WeaponName
+	Tool.RequiresHandle = true
+	Tool.CanBeDropped = false
+
+	local Clone = Handle:Clone()
+	Clone.Name = "Handle"
+	Clone.Transparency = 1
+	Clone.CanCollide = false
+	Clone.CanQuery = false
+	Clone.CanTouch = false
+	Clone.Massless = true
+	Clone.Parent = Tool
+
+	return Tool
+end
+
 CharacterProfile.ProfileCache = {}
 CharacterProfile.ProfilesById = {}
 
