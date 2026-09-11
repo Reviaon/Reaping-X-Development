@@ -21,6 +21,7 @@ return{
 			{ speed = 8, duration = 0.8, falloff = 0.5 },
 			{ speed = 8, duration = 2, falloff = 1.5 },
 		},
+		
 		impulse_delay = { --@ When to apply the impulse after the attack has started (useful for syncing with animation events)
 			0.45,
 			0.550,
@@ -44,6 +45,7 @@ return{
 		--@ Per-combo overrides, indexed like impulse_delay. The finisher swings wider.
 		hitbox = {
 			[4] = {
+				hitbox_delay = 0.8,
 				size = Vector3.new(9, 6, 9),
 				offset = Vector3.new(0, 0, -4.5),
 			},
