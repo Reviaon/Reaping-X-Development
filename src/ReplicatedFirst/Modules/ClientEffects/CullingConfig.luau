@@ -2,7 +2,7 @@
 local CullingConfig = {}
 
 CullingConfig.Enabled = true
-CullingConfig.MaxDistance = 50
+CullingConfig.MaxDistance = 400
 
 --@ Per-effect distance overrides, keyed by the lower-cased Effect path from the payload
 --@ ("combat.weapons.staffvisuals", "forcefield"). Use for effects that read at range and
