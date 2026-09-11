@@ -67,7 +67,11 @@ function LightAttackComponent:Activate(controller, combatState)
 	AttackService:ScheduleHitbox(controller, SWING, Character, timing, { weaponId = weaponId })
 
 	if not is_diving then
-		AttackService:ScheduleImpulse(controller, SWING, Character, timing)
+		AttackService:ScheduleImpulse(controller, SWING, Character, timing, {
+			onLunge = function(_, direction)
+				AttackService:ReportLunge(controller, weaponId, comboIndex, direction)
+			end,
+		})
 	end
 
 	controller.StatusService:SetStatus(Character, "IsAttacking", true, timing.duration)

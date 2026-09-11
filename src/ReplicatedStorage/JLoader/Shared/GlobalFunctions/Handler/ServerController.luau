@@ -231,6 +231,7 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	GlobalFunctions.AnimatorService:LoadPackage(Character, Storage.Animations)
 
 	self:RigCharacter(Character)
+	GlobalFunctions.RagdollService.Setup(Character)
 
 	for Attribute, Value in AttributesLibrary do
 		if not Character:GetAttribute(Attribute) then

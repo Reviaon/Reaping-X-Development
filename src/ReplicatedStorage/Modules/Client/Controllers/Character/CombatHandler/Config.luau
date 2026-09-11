@@ -161,6 +161,27 @@ local function ScaleHitbox(hitboxData, parent, speed: number)
 	return scaled
 end
 
+--@ The final hit of a combo launches and ragdolls its victim; a weapon's `finisher` overrides any key, `false` turns it off.
+local DEFAULT_FINISHER = {
+	ragdoll = 1.5, --@ Seconds the victim stays ragdolled
+	getup = 0.6, --@ Seconds of stun after the ragdoll while they stand back up
+	speed = 40, --@ Studs per second the victim is thrown away from the attacker
+	lift = 32, --@ Studs per second of upward launch; 32 peaks about 2.6 studs up
+}
+
+local function ResolveFinisher(data)
+	if data == false then return nil end
+	if typeof(data) == "table" and data.enabled == false then return nil end
+
+	local finisher = {}
+
+	for key, fallback in DEFAULT_FINISHER do
+		finisher[key] = ResolveNumber(typeof(data) == "table" and data[key] or nil, nil, fallback)
+	end
+
+	return finisher
+end
+
 local WEAPON_SCHEMA = {
 	Rig = "string",
 	RigAttachments = "table",
@@ -175,6 +196,15 @@ local WEAPON_SCHEMA = {
 	light_impulse = "table",
 	hitbox = "table",
 	knockback = "table",
+	finisher = "table|boolean",
+}
+
+local FINISHER_SCHEMA = {
+	enabled = "boolean",
+	ragdoll = "number",
+	getup = "number",
+	speed = "number",
+	lift = "number",
 }
 
 local IMPULSE_ENTRY_SCHEMA = {
@@ -342,6 +372,10 @@ local function ValidateWeapon(weapon: string, data)
 				end
 			end
 		end
+	end
+
+	if typeof(data.finisher) == "table" then
+		validateShape(weapon, "finisher.", data.finisher, FINISHER_SCHEMA)
 	end
 
 	local hitbox = data.hitbox
@@ -639,6 +673,8 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 		hitbox_delay = hitboxDelay,
 
 		knockback = ScaleKnockback(knockbackData, knockback, speed, ScaleImpulse(impulseData, impulse, speed)),
+
+		finisher = isFinal and ResolveFinisher(weaponConfig.finisher) or nil,
 	}
 end
 

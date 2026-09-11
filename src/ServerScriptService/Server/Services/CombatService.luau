@@ -5,7 +5,7 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot" } },
+	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "Launch" } },
 })
 
 local CombatConfig = require(
@@ -27,12 +27,16 @@ CombatService.Settings = {
 	--@ Seconds. Floor on how often one player's root report is accepted.
 	RootReportCooldown = 0.05,
 
+	--@ Seconds. Floor on how often one player's lunge report is relayed.
+	LungeReportCooldown = 0.1,
+
 	--@ Seconds a hit victim is stunned. 0 disables.
 	HitstunDuration = 0.25,
 }
 
 local lastReport = {}
 local lastRootReport = {}
+local lastLungeReport = {}
 
 local function livingFolder()
 	local world = workspace:FindFirstChild("World")
@@ -76,10 +80,45 @@ function CombatService:ResolveKnockback(weaponId: string, comboIndex: number)
 	return knockback
 end
 
-function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number)
-	local knockback = self:ResolveKnockback(weaponId, comboIndex)
-	if not knockback then return false end
+function CombatService:ResolveFinisher(weaponId: string, comboIndex: number)
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	if not weaponConfig then return nil end
 
+	return CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).finisher
+end
+
+function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher)
+	local RagdollService = GlobalFunctions.RagdollService
+	local TrajectoryService = GlobalFunctions.TrajectoryService
+	local root = rootOf(victim)
+	local velocity = direction * finisher.speed + Vector3.yAxis * finisher.lift
+
+	GlobalFunctions.KnockbackService.Cancel(victim)
+
+	local landing = TrajectoryService.PredictLanding(root.Position, velocity, root.Size)
+
+	if not RagdollService.Ragdoll(victim, finisher.ragdoll) then return false end
+
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll + finisher.getup)
+
+	if landing then
+		landing.At = workspace:GetServerTimeNow() + landing.Time
+
+		task.delay(landing.Time, function()
+			TrajectoryService.Landed:Fire(victim, landing)
+		end)
+	end
+
+	self.Launch:FireAll(victim, velocity, landing)
+
+	if not Players:GetPlayerFromCharacter(victim) then
+		RagdollService.Launch(victim, velocity)
+	end
+
+	return true
+end
+
+function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number)
 	profile = profile or GlobalFunctions.ServerController:GetProfile(victim)
 	if not profile then return false end
 
@@ -87,6 +126,17 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	local direction = knockbackDirection(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
+
+	local finisher = self:ResolveFinisher(weaponId, comboIndex)
+
+	if finisher then
+		return self:ApplyFinisher(victim, direction, finisher)
+	end
+
+	if GlobalFunctions.RagdollService.IsRagdolled(victim) then return false end
+
+	local knockback = self:ResolveKnockback(weaponId, comboIndex)
+	if not knockback then return false end
 
 	local KnockbackService = GlobalFunctions.KnockbackService
 
@@ -107,7 +157,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	local hitstun = self.Settings.HitstunDuration
 
 	if hitstun > 0 then
-		GlobalFunctions.StatusService:SetStatus(victim, "IsStunned", true, hitstun)
+		GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, hitstun)
 	end
 
 	--@ Every client draws it; the server drives only what it owns. Fired before Apply so the
@@ -116,6 +166,73 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	KnockbackService.Apply(victim, recipe)
 
 	return true
+end
+
+function CombatService:ResolveLunge(weaponId: string, comboIndex: number)
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	if not weaponConfig then return nil end
+
+	local timing = CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig)
+	local impulse = timing.impulse
+	if not impulse then return nil end
+
+	return {
+		speed = impulse.speed,
+		duration = impulse.duration,
+		falloff = impulse.falloff,
+		rampIn = impulse.rampIn,
+		distance = impulse.distance,
+		priority = timing.impulse_priority,
+	}
+end
+
+--@ Observers draw a lunge the way they draw a knockback: a straight recipe from the attacker's
+--@ reference position along the cue direction, settling onto replicated position as it slows. The
+--@ attacker's own client keeps its steered drive and is left out of the broadcast.
+function CombatService:BroadcastLunge(attacker: Model, direction: Vector3, weaponId: string, comboIndex: number, except: Player?)
+	local impulse = self:ResolveLunge(weaponId, comboIndex)
+	if not impulse then return false end
+
+	local KnockbackService = GlobalFunctions.KnockbackService
+	local recipe = KnockbackService.Compose(attacker, direction, impulse, nil, KnockbackService.Active(attacker))
+	if not recipe then return false end
+
+	if except then
+		self.Knockback:FireExcept(except, attacker, recipe)
+	else
+		self.Knockback:FireAll(attacker, recipe)
+	end
+
+	return true
+end
+
+function CombatService:HandleLungeReport(player: Player, weaponId, comboIndex, payload)
+	local character = player and player.Character
+	if not character or not rootOf(character) then return end
+
+	if typeof(weaponId) ~= "string" then return end
+	if typeof(comboIndex) ~= "number" or comboIndex < 1 then return end
+	if typeof(payload) ~= "table" then return end
+
+	local numbers = table.create(3)
+
+	for index = 1, 3 do
+		local value = tonumber(payload[index])
+		if not value or value ~= value or math.abs(value) == math.huge then return end
+		numbers[index] = value
+	end
+
+	local direction = Vector3.new(numbers[1], 0, numbers[3])
+	if direction.Magnitude <= 1e-3 then return end
+
+	local now = os.clock()
+	local last = lastLungeReport[player]
+
+	if last and now - last < self.Settings.LungeReportCooldown then return end
+
+	lastLungeReport[player] = now
+
+	self:BroadcastLunge(character, direction.Unit, weaponId, math.floor(comboIndex), player)
 end
 
 function CombatService:HandleRootReport(player: Player, payload)
@@ -184,6 +301,10 @@ function CombatService:Init()
 		self:HandleRootReport(player, payload)
 	end)
 
+	self.ReportLunge:Connect(function(player, weaponId, comboIndex, payload)
+		self:HandleLungeReport(player, weaponId, comboIndex, payload)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		local prefix = tostring(player.UserId) .. "|"
 
@@ -194,6 +315,7 @@ function CombatService:Init()
 		end
 
 		lastRootReport[player] = nil
+		lastLungeReport[player] = nil
 
 		if player.Character then
 			GlobalFunctions.PositionService.Clear(player.Character)

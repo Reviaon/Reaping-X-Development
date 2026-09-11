@@ -456,7 +456,11 @@ local function swing(brain, config, weaponId, now)
 	end
 
 	scheduleHitbox(brain, weaponId, timing)
-	AttackService:ScheduleImpulse(brain, SWING, character, timing)
+	AttackService:ScheduleImpulse(brain, SWING, character, timing, {
+		onLunge = function(_, direction)
+			CombatService:BroadcastLunge(character, direction, weaponId, timing.combo_index)
+		end,
+	})
 
 	GlobalFunctions.StatusService:SetStatus(character, "IsAttacking", true, timing.duration)
 
