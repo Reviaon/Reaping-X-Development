@@ -193,12 +193,22 @@ function AttackService:ScheduleEaseOut(controller, key, track, timing)
 	end)
 end
 
-function AttackService:ScheduleImpulse(controller, key, character, timing)
+function AttackService:ReportLunge(controller, weaponId, comboIndex, direction)
+	local relay = controller[Settings.CombatRelayKey]
+	if not relay then return false end
+
+	relay.ReportLunge:Fire(weaponId, comboIndex, { direction.X, direction.Y, direction.Z })
+	return true
+end
+
+function AttackService:ScheduleImpulse(controller, key, character, timing, options)
 	key = part(key, "impulse")
 	self:Cancel(controller, key)
 
 	local impulse = timing.impulse
 	if not impulse then return end
+
+	options = options or {}
 
 	self:Schedule(controller, key, timing.impulse_delay, function()
 		if not character or not character.Parent then return end
@@ -206,7 +216,9 @@ function AttackService:ScheduleImpulse(controller, key, character, timing)
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if not root then return end
 
-		controller.KnockbackService.Lunge(character, root.CFrame.LookVector, {
+		local direction = root.CFrame.LookVector
+
+		local recipe = controller.KnockbackService.Lunge(character, direction, {
 			speed = impulse.speed,
 			duration = impulse.duration,
 			falloff = impulse.falloff,
@@ -215,6 +227,10 @@ function AttackService:ScheduleImpulse(controller, key, character, timing)
 			influence = impulse.influence,
 			priority = timing.impulse_priority,
 		})
+
+		if recipe and options.onLunge then
+			options.onLunge(recipe, direction)
+		end
 	end)
 end
 
