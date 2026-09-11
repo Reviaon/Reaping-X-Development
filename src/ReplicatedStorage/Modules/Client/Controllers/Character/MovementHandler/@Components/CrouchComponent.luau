@@ -4,11 +4,22 @@ local CrouchComponent = {}
 function CrouchComponent:Init()
 end
 
+function CrouchComponent:CanActivate(controller)
+	local Character = controller.Character
+	if not Character then return false end
+
+	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true, IsStunned = true }) then
+		return false
+	end
+
+	return true
+end
+
 function CrouchComponent:Activate(controller)
 	local Character = controller.Character
 	if not Character then return end
 
-	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true }) then return end
+	if not CrouchComponent:CanActivate(controller) then return end
 
 	controller.StatusService:SetStatus(Character, "IsCrouching", true)
 
