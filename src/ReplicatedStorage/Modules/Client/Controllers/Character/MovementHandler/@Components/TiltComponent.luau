@@ -26,7 +26,7 @@ function TiltComponent:Update(controller, dt: number)
 	local xAxis, zAxis = 0, 0
 
 	if Force.Magnitude > 2
-		and not Impulse
+		and not (Impulse and Impulse.Enabled)
 		and not state.rootPart.Anchored
 		and state.humanoid.WalkSpeed > 0
 	then
