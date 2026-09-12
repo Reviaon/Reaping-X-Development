@@ -18,8 +18,12 @@ RagdollService.Settings = {
 	--@ Degrees a limb may twist about its own length, each way.
 	TwistAngle = 40,
 
-	--@ Size of each limb's ragdoll collider relative to the limb.
-	ColliderScale = 0.85,
+	--@ Size of each limb's ragdoll collider relative to the limb. Under 1 keeps it clear of the torso at
+	--@ rest, so a hanging limb never starts in contact and locks the way a flush limb part does.
+	ColliderScale = 0.5,
+
+	--@ Surface of the limb colliders: low friction so a limb resting on the body slides rather than sticks.
+	ColliderProperties = PhysicalProperties.new(0.7, 0.2, 0.2),
 
 	--@ Name given to every instance the rig adds.
 	RigName = "@ragdoll",
@@ -51,6 +55,7 @@ local function collider(limb: BasePart, parent: Instance): BasePart
 	part.Size = limb.Size * settings.ColliderScale
 	part.Transparency = 1
 	part.Massless = true
+	part.CustomPhysicalProperties = settings.ColliderProperties
 	part.CanCollide = false
 	part.CanQuery = false
 	part.CanTouch = false
@@ -84,9 +89,12 @@ local function enable(rig)
 	rig.rootJoint.Enabled = false
 	rig.root.CanCollide = false
 
+	--@ In the Physics state the Humanoid stops forcing limbs non-colliding, so they would lock against
+	--@ the torso they hang flush with on contact friction; the colliders do their colliding instead.
 	for _, joint in rig.joints do
 		joint.socket.Enabled = true
 		joint.collider.CanCollide = true
+		joint.limb.CanCollide = false
 		joint.motor.Enabled = false
 	end
 
@@ -99,6 +107,16 @@ local function enable(rig)
 
 	claimLimbs(rig, owner)
 
+	--@ The Humanoid re-enables limb collision on its way into the Physics state, after this ran, so
+	--@ it is held off every frame for as long as the ragdoll lasts.
+	rig.enforcer = RunService.Heartbeat:Connect(function()
+		for _, joint in rig.joints do
+			if joint.limb.CanCollide then
+				joint.limb.CanCollide = false
+			end
+		end
+	end)
+
 	RunService.Heartbeat:Once(function()
 		if rig.active then
 			claimLimbs(rig, owner)
@@ -109,6 +127,11 @@ end
 local function disable(rig)
 	if not rig.active then return end
 	rig.active = false
+
+	if rig.enforcer then
+		rig.enforcer:Disconnect()
+		rig.enforcer = nil
+	end
 
 	for _, joint in rig.joints do
 		joint.motor.Enabled = true
@@ -155,12 +178,6 @@ function RagdollService.Setup(character: Model)
 	rootWeld.Parent = folder
 
 	local joints = {}
-	local solids = { torso }
-	local head = character:FindFirstChild("Head")
-
-	if head and head:IsA("BasePart") then
-		table.insert(solids, head)
-	end
 
 	for name, limitKey in LIMB_JOINTS do
 		local motor = torso:FindFirstChild(name)
@@ -183,17 +200,6 @@ function RagdollService.Setup(character: Model)
 		local part = collider(limb, folder)
 
 		table.insert(joints, { motor = motor, socket = socket, collider = part, limb = limb })
-		table.insert(solids, part)
-	end
-
-	for first = 1, #solids do
-		for second = first + 1, #solids do
-			local ignore = Instance.new("NoCollisionConstraint")
-			ignore.Name = settings.RigName
-			ignore.Part0 = solids[first]
-			ignore.Part1 = solids[second]
-			ignore.Parent = folder
-		end
 	end
 
 	folder.Parent = character
@@ -238,9 +244,24 @@ function RagdollService.IsRagdolled(character: Model): boolean
 	return character:GetAttribute(RagdollService.Settings.Status) == true
 end
 
-function RagdollService.Launch(character: Model, velocity: Vector3): boolean
+local LIMBS = { "Right Arm", "Left Arm", "Right Leg", "Left Leg" }
+
+local random = Random.new()
+
+--@ motion.spin is degrees per second of backward tumble about the axis across the throw;
+--@ motion.twist adds that much of it again as a random angular velocity so no two launches turn the
+--@ same way; motion.flail is studs per second of random velocity given to each loose limb, plus a
+--@ random spin, so the arms and legs leave the torso moving instead of hanging along it. The whole
+--@ body still shares the launch velocity, so the tumble reads in the air and not only on landing.
+function RagdollService.Launch(character: Model, velocity: Vector3, motion): boolean
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return false end
+
+	motion = typeof(motion) == "table" and motion or {}
+
+	local spin = math.rad(typeof(motion.spin) == "number" and motion.spin or 0)
+	local twist = typeof(motion.twist) == "number" and motion.twist or 0
+	local flail = typeof(motion.flail) == "number" and motion.flail or 0
 
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
@@ -248,6 +269,26 @@ function RagdollService.Launch(character: Model, velocity: Vector3): boolean
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") and not part.Anchored then
 			part.AssemblyLinearVelocity = velocity
+		end
+	end
+
+	local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+
+	if torso and spin ~= 0 and horizontal.Magnitude > 1e-3 then
+		torso.AssemblyAngularVelocity = Vector3.new(0, 1, 0):Cross(horizontal.Unit) * spin
+			+ random:NextUnitVector() * spin * twist
+	end
+
+	for _, name in LIMBS do
+		local limb = character:FindFirstChild(name)
+		if not limb or not limb:IsA("BasePart") then continue end
+
+		limb.CanCollide = false
+
+		if flail > 0 then
+			limb.AssemblyLinearVelocity = velocity + random:NextUnitVector() * flail
+			limb.AssemblyAngularVelocity = random:NextUnitVector() * math.max(spin, math.rad(flail * 20))
 		end
 	end
 
@@ -261,6 +302,7 @@ function RagdollService.Watch(character: Model)
 	if not humanoid then return nil end
 
 	local status = RagdollService.Settings.Status
+	local enforcer = nil
 
 	local function apply()
 		if character:GetAttribute(status) == true then
@@ -268,7 +310,23 @@ function RagdollService.Watch(character: Model)
 
 			humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
 			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+			enforcer = enforcer or RunService.Heartbeat:Connect(function()
+				for _, name in LIMBS do
+					local limb = character:FindFirstChild(name)
+
+					if limb and limb:IsA("BasePart") and limb.CanCollide then
+						limb.CanCollide = false
+					end
+				end
+			end)
+
 			return
+		end
+
+		if enforcer then
+			enforcer:Disconnect()
+			enforcer = nil
 		end
 
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)

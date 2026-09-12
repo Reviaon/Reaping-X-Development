@@ -39,6 +39,7 @@ function CharacterHandler.new(player)
 	end))
 
 	self.Trove:Add(self.Character.AncestryChanged:Connect(function()
+		if self.Character:IsDescendantOf(game) then return end
 		self:OnCharacterRemoved()
 	end))
 
@@ -115,8 +116,14 @@ function GameService:Initialize()
 		if not live:FindFirstChild("Humanoid") then return end
 		if GlobalFunctions.ServerController:GetProfile(live) then return end
 
-		GlobalFunctions.AnimatorService:EnsureAnimator(live)
+		local humanoid = live:FindFirstChildOfClass("Humanoid")
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
 
+		if humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+
+		GlobalFunctions.AnimatorService:EnsureAnimator(live)
 		GlobalFunctions.ServerController:SetCharacter(live)
 	end
 
@@ -126,6 +133,18 @@ function GameService:Initialize()
 
 	Live.ChildAdded:Connect(function(child)
 		task.defer(adoptCharacter, child)
+	end)
+
+	RunService.Heartbeat:Connect(function()
+		for _, live in Live:GetChildren() do
+			if not live:IsA("Model") or Players:GetPlayerFromCharacter(live) then continue end
+
+			local root = live:FindFirstChild("HumanoidRootPart")
+
+			if root and root:CanSetNetworkOwnership() and root:GetNetworkOwnershipAuto() then
+				root:SetNetworkOwner(nil)
+			end
+		end
 	end)
 
 	game:BindToClose(function()
