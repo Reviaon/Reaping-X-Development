@@ -11,7 +11,7 @@ return{
 		},
 		
 		IsStunned = {
-			WalkSpeed = 6,
+			WalkSpeed = 4,
 			JumpPower = 0,
 			Priority = 10;
 		};
@@ -19,6 +19,7 @@ return{
 		IsRagdolled = {
 			WalkSpeed = 0,
 			JumpPower = 0,
+			AutoRotate = false,
 			Priority = 11;
 		};
 

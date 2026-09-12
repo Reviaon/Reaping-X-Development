@@ -345,7 +345,7 @@ return {
         max_targets = -1,
         effect = "BladeHit",       --@ Impact particle under CombatVFX.Hit
         hitbox = {                 --@ Per-combo overrides, inheriting anything not restated
-            [4] = { size = Vector3.new(9, 6, 9) },
+            [4] = { size = Vector3.new(9, 6, 9), hitbox_delay = 0.8 },
         },
     },
 }
@@ -357,7 +357,9 @@ Notes that are not obvious:
   takes radius from X and height from Y); `Sphere` uses X as the radius.
   `CombatConfig:BuildHitboxData` does the translation, so a weapon can change shape without changing
   which key it authors.
-- **The hitbox fires on the impulse cue** unless the block sets its own `hitbox_delay`.
+- **The hitbox fires on the impulse cue** unless the block sets its own `hitbox_delay` — a number or
+  a table keyed by combo at the top level, or a number inside a per-combo entry, which wins for that
+  hit.
 - **Keep `offset.Z` at roughly half of `size.Z`** so the near edge stays on the character and reach
   reads off `size.Z` alone.
 - **Timings are authored at 1x.** `attack_speed` divides `attack_duration`, the cooldowns, the
@@ -425,10 +427,18 @@ replication structurally cannot do.
 - **`Evaluate`** is the pure function: recipe + time → horizontal position and how far through the
   facing turn it is. The curve is integrated at a fixed `CurveSamples` on every machine, so every
   machine lands on identical numbers.
-- **`Apply`** records the recipe and, where this machine should write, drives the root's CFrame
-  every frame. Every client draws every victim. The server drives only NPCs, which it owns.
-  A client writing a character it does not own is local and wins the frame; the owner writing the
-  same trajectory is what replication carries. They agree where it ends, so nothing snaps.
+- **`Apply`** records the recipe and, where this machine should drive, moves the character every
+  frame. Every client draws every victim. The server drives only NPCs, so it must own them: left to
+  Roblox, a nearby player's client owns them and fights the server's writes. A one-time
+  `SetNetworkOwner(nil)` does not hold. **Welding any part onto an assembly resets it to
+  automatic**, and the nearest player takes the NPC a frame later. The ragdoll colliders built
+  during adoption do this, and so does every weapon Tool equip. So `GameService` runs a Heartbeat
+  guard that re-claims every NPC root in `Live` whose ownership has fallen back to automatic. Without
+  it a fresh dummy "warms up": its first knockbacks come up short and wander off the path until its
+  first ragdoll happens to re-claim it. Adoption also disables the Humanoid's `FallingDown` state
+  on NPCs. A freshly cloned Humanoid often trips into it on its first frame and then won't walk for
+  3 seconds. Nothing in the game uses that state, since the ragdoll uses `Physics`. How each side
+  moves the character is the whole trick, below.
 
 Three details are what make it hold together:
 
@@ -445,22 +455,60 @@ Three details are what make it hold together:
   The rig's standing height (`groundOffset`) is measured once in `Build` and shipped in the recipe,
   so every client follows the slope by the same amount; a victim hit while airborne gets no
   `groundOffset` and Y is left alone for that knockback. `FollowGround` turns it off.
-- **The owner must not move themselves.** Hitstun zeroes `WalkSpeed`, the drive zeroes horizontal
-  `AssemblyLinearVelocity` each frame, and `AutoRotate` is held off for the turn. If the owner's
-  real position diverged from the shared trajectory, every non-owner would snap at the end.
-  Non-owners ease over `HandoffBlend` onto replicated position regardless, to cover the residual.
+- **The owner moves; everyone else tops up replication.** The owner steps the curve on top of
+  wherever it actually is through a `LinearVelocity` constraint (`DriveForce`), with its own walk
+  folded in by `VictimInfluence`, so a stunned victim can still shuffle at the stun's `WalkSpeed`,
+  a push never yanks them back to the server's slightly stale start, and — because velocity is what
+  replicates — other clients receive a smoothly moving body rather than CFrame snaps. Each step is
+  blockcast like the lunge's; rising ground lends the constraint its Y axis for the lifting frame;
+  the facing turn is an `AlignOrientation` (`FacingResponsiveness`) for the same replication reason.
+  A non-owner **never writes the root**: a root a client writes stops receiving replication until
+  the writes stop, which is what produced every release pop. It leaves the physical root to
+  replication and offsets the *body* through the root `Motor6D` by
+  `curve(t) − curve(t − ReplicationLag)`: before the push reaches the replicated stream that is the
+  whole push so far, while it runs it is exactly the slice replication has not delivered, and once
+  the push has fully arrived it is zero — so the owner's walking arrives through replication
+  underneath, the push is drawn current, and there is no handoff to blend and nothing to pop at
+  release. The only error is `ReplicationLag` being wrong for a pair of clients, which shows as a
+  slight over- or under-draw *during* the push, never a jump at the end. The facing turn is drawn
+  the same way, as a yaw offset that shrinks as the replicated rotation catches up.
+- **Nothing welded onto a character may carry mass.** The attacker's replication was observed to
+  stall for ~0.1s and then jump on every other client, only on swings whose weapon visual had a
+  non-massless part: the visual is welded to the root, so the character's assembly mass changed
+  mid-lunge. `EffectService:Weld` now forces every part of an effect it attaches to be massless,
+  unanchored and non-colliding, so an authoring slip in an asset cannot do this again.
+- **The owner's constraints persist.** The `LinearVelocity` (tagged `DriveAttribute`) and the
+  facing `AlignOrientation` are created once per root, re-aimed by each recipe, and parked
+  (`Enabled = false`, priority cleared) between drives rather than rebuilt, so a chained combo
+  changes nothing about the assembly. Anything that reads `PhysicsService.GetImpulse` must check
+  `Enabled`, as `TiltComponent` does. A foreign mover on the root — the dive's — is still cleared.
 
 The facing turn is part of the recipe: yaw slerps toward the attacker over the first
 `FacingPortion` of the duration. Arbitration survives — the drive stamps `knockback_priority` and
 `knockback_until` on the root, and `ApplyImpulse` refuses an impulse at or below that priority
-while they are live, so a dash cannot fight a knockback.
+while they are live. The dive builds its own mover rather than going through `ApplyImpulse`, so it
+asks `KnockbackService.Active` itself: it will not start while a knockback at or above its priority
+runs, and a stun or knockback landing during its wind-up or dash ends it. `CombatConfig:ClearImpulse`
+cancels only the character's own steered lunge, never a server knockback, so neither a dive nor a
+weapon swap can escape one.
 
 ### The attacker's lunge is the same recipe
 
-The forward step a light attack takes is no longer a physics impulse either. `AttackService`
-schedules `KnockbackService.Lunge`, which composes a recipe from the weapon's impulse config and
-drives it on the attacker's own client. Nobody else is told: the attacker owns their character, and
-their CFrame writes are what replication already carries.
+The forward step a light attack takes is the same recipe. `AttackService` schedules
+`KnockbackService.Lunge`, which composes one from the weapon's impulse config and drives it on the
+attacker's own client (or on the server, for an NPC it owns) through a `LinearVelocity` constraint
+fed the curve's per-frame velocity.
+
+**Everyone else is told too.** Physics replication of a client-owned character — 20Hz snapshots
+through an interpolation buffer — cannot carry a 0.2–0.8s burst without stepping, however the
+owner produces it; observers saw the attacker stand still and pop to where the step ended. So at the
+cue the attacker's client reports `(weaponId, comboIndex, direction)` over `ReportLunge`;
+`CombatService` rebuilds the impulse from the weapon config (identifiers only, never the client's
+numbers), composes a **non-steered projection** from the attacker's reference position, and
+`FireExcept`s it to every other client on the same `Knockback` channel a shove uses. Observers draw
+it exactly as they draw a victim — the un-replicated slice of the projection on top of the
+replicated position — so whatever steering the attacker actually did arrives through replication
+underneath it. An NPC's lunge is broadcast by the server the same way.
 
 The point is stud alignment. A knockback that names no curve of its own takes the attacker's
 impulse curve wholesale — `speed`, `duration`, `falloff`, `rampIn`, `distance` — so the shove and
@@ -558,13 +606,138 @@ higher one as a snap.
 still standing. Overlapping hits would otherwise each save what the previous one left behind and
 restore `false` forever.
 
-`PhysicsService.ApplyImpulse` is what the **dive dash** uses. Neither knockback nor the light-attack
-lunge goes through it any more. It drives its falloff on
+Nothing calls `PhysicsService.ApplyImpulse` any more: knockback and the light-attack lunge are
+recipes, and the **dive dash** builds its own `LinearVelocity`. It drives its falloff on
 `RenderStepped` on a client and `Heartbeat` on the server, so it works on either side. It reads nothing off the controller but `.Character`, which
 is why the client handler can pass a plain `{ Character = victim }` for a character it does not own
 a controller for.
 
 Damage and hit validation do not exist yet — `CombatService` is where they go.
+
+### The attacking dummy
+
+`Server/Services/DummyService.luau` gives any non-player model in `World.Live` a melee brain, so
+stun, knockback and impulse numbers can be tuned against a victim that hits back without a second
+person. It is off until asked for: set the model's `Aggressive` attribute (tick it in Explorer during
+a playtest, or `aggro on` in the console), or author `combat.aggressive = true` in its NPCLibrary
+entry.
+
+The brain runs on the server and reuses the player pipeline end to end. The nearest player inside
+`aggro_range` is chased with `MoveTo` (Humanoid `AutoRotate` steering); inside `attack_range` it
+stops, turns onto them through an `AlignOrientation` on the root — never a CFrame write, which
+replicates as a snap — and swings light attacks on `CombatConfig:ResolveAttackTiming`: same
+animation, `AttackService` ease-out, weapon visuals broadcast, `HitboxService` volume and
+`CombatService:ApplyKnockback` a player swing goes through. Hits chain at the player's own pace,
+`max(duration, cooldown)`, through the weapon's full combo, then rest `attack_interval` after the
+finisher; `ComboTimeout` resets it exactly as it resets a player. A stun or knockback on the dummy
+interrupts its swing and holds it still, and its `WalkSpeed` follows `StatusLibrary` through
+`StatusService:ResolveProperties`, so a stunned dummy slows exactly as a stunned player does.
+
+**Weapons.** `combat.weapon` (or the `Weapon` attribute, swappable mid-fight) names a WeaponsLibrary
+entry. The brain parents a Tool of that name into the character, so `ServerController` rigs it the
+same way it rigs a player — the rigs are authored against R6 limbs, which is what the dummy is — and
+`EquippedWeapon` resolves the animation set: `<Weapon>Attack<N>` per hit and `<Weapon>Idle` as its
+stance between swings. Melee is unarmed, so it has no stance. A weapon missing an attack track warns
+once and skips that hit rather than erroring.
+
+Tuning lives in `Libraries/NPCLibrary/<Name>.luau` under `combat` (`weapon`, `aggro_range`,
+`attack_range`, `attack_interval`, `chase`, `aggressive`). Each has a model attribute override —
+`Weapon`, `AggroRange`, `AttackRange`, `AttackInterval` — read every frame, so a value can be
+changed live in Explorer mid-fight. Left unset, `attack_range` is **derived from the next hit's
+hitbox**: `|offset.Z| + half-depth` (radius for Sphere/Cylinder) minus `ReachMargin`, resolved per
+combo index, so a wider finisher swings from further out and a per-weapon number never has to be
+kept in step with the hitbox. Set it only to force a distance. It lunges with each swing
+exactly as a player does — `KnockbackService.Lunge` runs on the server for a character it owns — so
+the step and the shove cover the same studs and the target stays in reach through the combo.
+
+### Finishers
+
+The final hit of every combo (`timing.is_final`) is a finisher: instead of a knockback recipe it
+**launches and ragdolls** the victim, player or NPC. `CombatConfig` gives every weapon
+`DEFAULT_FINISHER` — `ragdoll` 1.5s, `getup` 0.6s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
+`flail` 16 — and a weapon's `finisher = { ... }` overrides any key, while `finisher = false` turns
+it off. `spin` is degrees per second of backward tumble on the torso assembly; `twist` adds that
+share of it again as a random angular velocity so no two launches turn the same way; `flail` is
+studs per second of random velocity (and a random spin) given to each loose limb, so arms and legs
+leave the torso moving instead of hanging along it. The whole body still shares the launch velocity.
+
+**Limbs must not collide while ragdolled.** The Humanoid forces limb parts non-colliding every
+frame in its normal states and re-enables them on the way into `Physics` — after which an arm
+hanging flush against the torso locks on contact friction and a 40 studs/s kick moves it 5°. Both
+`RagdollService.enable` (server) and `RagdollService.Watch` (owner client) hold the four limbs'
+`CanCollide` off every Heartbeat for as long as the ragdoll lasts; the massless colliders do the
+colliding. With that, the same kick reaches the 110° cone limit.
+
+**The colliders do collide with the body.** Each is `ColliderScale` (0.85) of its limb, so at rest
+it sits clear of the torso and never starts in contact, and it carries `ColliderProperties` (low
+friction) so a limb lying against the body slides rather than sticks. That is what keeps arms and
+legs from sinking through the torso and head mid-tumble; there are no `NoCollisionConstraint`s
+between them any more.
+
+`CombatService:ApplyFinisher` cancels any push still running on the victim, applies `IsRagdolled`
+for `ragdoll` seconds and `IsStunned` for `ragdoll + getup` (so every existing stun gate holds
+through the get-up), and broadcasts `Launch(victim, velocity)` with `direction × speed + up × lift`.
+A ragdoll is real physics, so only its physics owner can move it: the server launches an NPC itself
+and the victim's own client applies the launch to a player (`KnockbackHandler:Launch`); everyone
+else sees it through replication. A ragdolled victim ignores ordinary knockback; another finisher
+re-launches them and the ragdoll time stacks.
+
+`RagdollService` (GlobalFunctions) builds the rig once per R6 character from its own joints — no
+template instances — when `ServerController` loads it: a ball socket at each shoulder and hip,
+positioned from the `Motor6D` C0/C1 with limits in `Settings`, a massless collider per limb,
+no-collision pairs between them, and a disabled weld from root to torso. Enabling it (the server,
+reacting to the `IsRagdolled` attribute) swaps the limb motors and `RootJoint` for those and claims
+the loose limbs for the character's owner, so they are simulated where the rest of the body is. The
+Humanoid goes to `Physics` and back through `GettingUp` — on the server for an NPC, through
+`RagdollService.Watch` on the player's own client. Shift-lock's per-frame root rotation stands down
+while ragdolled.
+
+### Trajectory debug and landing prediction
+
+`TrajectoryService` (GlobalFunctions) does two jobs.
+
+**Landing prediction.** `TrajectoryService.Arc(origin, velocity, size)` steps a launch under
+`workspace.Gravity` every `Step` seconds and blockcasts each step with a root-sized box against
+everything collidable except `World.Live` and `World.Visuals` — what the ragdoll will physically hit,
+terrain and loose world parts outside `World.Map` included. The first hit becomes a landing:
+`Position`, `Center` (where the root is at
+contact), `Normal`, `Instance`, `Material` (by name, terrain included), `Surface` (`Floor`, `Wall` or
+`Ceiling`, split at `FloorSlope`), `Slope`, `ImpactAngle` (90 is head-on), `Speed`, `Velocity` and
+`Time` of flight. A finisher predicts on the server before launching, stamps `At` (the server time of
+contact), sends it with `Launch`, and `TrajectoryService.Landed:Fire(victim, landing)` runs at that
+moment on the server and on every client — on a client, `ObserverLag` later for anyone but its own
+character, because that is when replication shows them arriving. That signal is the hook for impact visuals — craters, dust
+by material, wall slams by surface — so they play on contact with no extra networking. It is a
+prediction: a ragdoll tumbles, so the real body can settle slightly off the point, and the debug
+label reports by how much.
+
+**Debug ray** (client only, behind the `debug` toggle). Every knockback, lunge and launch a client
+sees is drawn as **one part per character**, `workspace.@trajectory_debug.@trajectory_ray`, read like
+a raycast debug line: it starts at the body's root and reaches to where the planned path puts the
+body `RayLookAhead` (0.2) seconds from now. So it points the way they are heading, and its length is
+their speed times the look-ahead. Knockbacks (red) and lunges (yellow) are planned with
+`KnockbackService.Evaluate`, which `KnockbackService.Apply` passes in. A launch (red) is planned on
+the ballistic arc from the server's launch time, pushed back `ObserverLag` for anyone but your own
+character so it lines up with what replication shows.
+
+The look-ahead is clamped to the path's end, so the ray shrinks to nothing as the body arrives. For
+`DebugLifetime` after the path ends it keeps pointing at the end point: any leftover length is how
+far the body finished from the plan (for a launch, the landing error). Then the ray is removed. A new
+path on the same character reuses its ray. `RayLookAhead = math.huge` makes it a ray to the path's
+end instead.
+
+**Landing marker.** Where a hit lands the victim, a ball (`@trajectory_landing`, `MarkerSize`) marks
+the spot. For a knockback it sits at the recipe's finish, in the knockback colour. For a launch it
+sits at the predicted contact point on the surface, in `Colors.Landing`, with a stick along the
+surface normal (`NormalLength`). Lunges get none. Each marker lasts until its path ends plus
+`DebugLifetime`. With `DebugHud`, the landing label hangs off a launch's marker: surface, material,
+slope, impact angle, speed and flight time, then `landed Δ`.
+
+A launched body touches down within 1–2 studs of its marker, but it still carries the launch's
+horizontal speed (around 40 studs/s), so it skids another 2–10 studs past it. That's momentum, not
+friction: setting the limb colliders to 0.2, plastic or 1.0 friction changed the skid less than the
+variation between runs. To stop a body near the marker, bleed its horizontal velocity on touchdown
+from the owner's `Landed` hook.
 
 ---
 
@@ -602,10 +775,14 @@ Konsole is vendored at `ReplicatedStorage/Utilities/Konsole` and is **not edited
 through its public API from `Server/Services/KonsoleService.luau`. Open it in game with `;` or `F2`.
 
 ```
-give <weapon> [target]     spawn [npc] [count]
+give <weapon> [target]     spawn [npc] [weapon] [count]
 clearweapons [target]      clearnpcs
-debug [on|off|toggle]
+debug [on|off|toggle]      aggro [on|off|toggle]
+arm <weapon>
 ```
+
+`spawn Dummy Sword 2` drops two sword dummies; `arm` re-equips every NPC in `World.Live` (Melee
+disarms) and `aggro` flips their `Aggressive` attribute — see "The attacking dummy".
 
 `debug` drives everything debug-gated at once — hitbox volumes, the per-swing hit report and the
 status UI — through `DebugService`, which is a replicated attribute on `ReplicatedStorage`. Unset it
