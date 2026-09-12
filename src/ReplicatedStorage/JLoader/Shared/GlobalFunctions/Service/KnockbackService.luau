@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 
 local PhysicsService = require(script.Parent:WaitForChild("PhysicsService"))
 local PositionService = require(script.Parent:WaitForChild("PositionService"))
+local TrajectoryService = require(script.Parent:WaitForChild("TrajectoryService"))
 local WorldConstants = require(script.Parent.Parent:WaitForChild("WorldConstants"))
 
 KnockbackService.Settings = {
@@ -12,8 +13,9 @@ KnockbackService.Settings = {
 	--@ machine lands on the same numbers.
 	CurveSamples = 64,
 
-	--@ Seconds a non-owning client eases from its finished drive onto the replicated position.
-	HandoffBlend = 0.1,
+	--@ Seconds a non-owning client assumes the replicated position trails the owner by. It draws only
+	--@ the slice of the push younger than this on top of what replication already shows.
+	ReplicationLag = 0.15,
 
 	--@ Studs kept between a wall the blockcast hit and the clamped finish.
 	WallPadding = 0.5,
@@ -23,6 +25,26 @@ KnockbackService.Settings = {
 
 	--@ Impulse priority the drive claims on the root, so a dash cannot take over mid-knockback.
 	Priority = 5,
+
+	--@ Per-axis force (× assembly mass) the owner's velocity constraint may use to hold the curve.
+	DriveForce = 4e4,
+
+	--@ Share of the owner's own walk (MoveDirection × WalkSpeed) folded into a knockback they own.
+	VictimInfluence = 1,
+
+	--@ Multiple of a knockback's peak speed its owner may move at to make up the part of the curve
+	--@ that elapsed before the recipe arrived. A late recipe blends in over a few frames at a
+	--@ bounded speed and still covers its full distance, instead of arriving as one frame's lurch.
+	CatchUp = 3,
+
+	--@ How sharply the owner's AlignOrientation turns them to face the attacker.
+	FacingResponsiveness = 40,
+	FacingName = "@knockback_facing",
+
+	--@ Marks the mover this service owns, so it is parked between drives rather than destroyed:
+	--@ destroying a constraint on a moving client-owned character stalls its replication for a
+	--@ tenth of a second and every observer sees it freeze and jump.
+	DriveAttribute = "knockback_drive",
 
 	--@ Whether the drive lifts the victim over ground that rises under the push. Off leaves Y to
 	--@ physics entirely, which clips into slopes at WalkSpeed 0.
@@ -236,7 +258,7 @@ function KnockbackService.Build(victim, direction: Vector3, knockback, facing: V
 	return recipe
 end
 
---@ Client side, own character only. A lunge is the same recipe a knockback is, built from the same
+--@ Own character only: a client for its player, the server for an NPC it owns. A lunge is the same recipe a knockback is, built from the same
 --@ curve, so with no input an attacker's forward step and their victim's shove cover the same
 --@ studs by construction. It is steered: the curve's speed is spent along the character's look
 --@ each frame, and their own walking is folded in by `influence`, so an attacker who moves during
@@ -244,8 +266,11 @@ end
 --@ telling: the attacker owns their character, and their CFrame writes are what replication
 --@ carries, which is also why the lunge is free to be non-deterministic when the shove is not.
 function KnockbackService.Lunge(character, direction: Vector3, impulse)
-	if not RunService:IsClient() then return nil end
-	if character ~= Players.LocalPlayer.Character then return nil end
+	if RunService:IsClient() then
+		if character ~= Players.LocalPlayer.Character then return nil end
+	elseif Players:GetPlayerFromCharacter(character) then
+		return nil
+	end
 
 	local recipe = KnockbackService.Compose(character, direction, impulse, nil, KnockbackService.Active(character), {
 		steer = true,
@@ -267,12 +292,14 @@ local function shouldDrive(victim): (boolean, boolean)
 	return true, owner ~= nil and owner == Players.LocalPlayer
 end
 
-local function finish(victim, drive)
+--@ handoff: a new drive for the same character is about to take over the constraints, so they are
+--@ left running for it to re-aim instead of being parked.
+local function finish(victim, drive, handoff: boolean?)
 	drives[victim] = nil
 
 	local root = drive.root
 
-	if root.Parent then
+	if root.Parent and not handoff then
 		root:SetAttribute(KnockbackService.Settings.PriorityAttribute, nil)
 		root:SetAttribute(KnockbackService.Settings.UntilAttribute, nil)
 	end
@@ -283,10 +310,94 @@ local function finish(victim, drive)
 		humanoid.AutoRotate = drive.autoRotate
 	end
 
+	if not handoff then
+		if drive.velocity and drive.velocity.Parent then
+			drive.velocity.VectorVelocity = Vector3.zero
+			drive.velocity.Enabled = false
+			drive.velocity:SetAttribute(PhysicsService.ImpulsePriorityAttribute, nil)
+		end
+
+		if drive.facing and drive.facing.Parent then
+			drive.facing.Enabled = false
+		end
+	end
+
+	if drive.joint and drive.joint.Parent then
+		drive.joint.C0 = drive.jointRest
+	end
+
 	if next(drives) == nil and connection then
 		connection:Disconnect()
 		connection = nil
 	end
+end
+
+--@ The one mover this service keeps on a root. A foreign mover (the dive's) is cleared the way
+--@ ClearExistingImpulse always did; our own parked one is re-armed in place.
+local function moverOf(root: BasePart, attachment: Attachment, priority: number): LinearVelocity
+	local settings = KnockbackService.Settings
+	local existing = PhysicsService.GetImpulse(root)
+
+	if existing and not (existing:IsA("LinearVelocity") and existing:GetAttribute(settings.DriveAttribute)) then
+		existing:Destroy()
+		existing = nil
+	end
+
+	local foreignFacing = PhysicsService.GetFacing(root)
+	if foreignFacing then
+		foreignFacing:Destroy()
+	end
+
+	local mass = root.AssemblyMass
+	local velocity = existing
+
+	if not velocity then
+		velocity = Instance.new("LinearVelocity")
+		velocity.Name = PhysicsService.ImpulseName
+		velocity.Attachment0 = attachment
+		velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+		velocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+		velocity.ForceLimitMode = Enum.ForceLimitMode.PerAxis
+		velocity:SetAttribute(settings.DriveAttribute, true)
+		velocity.Parent = root
+	end
+
+	velocity.MaxAxesForce = Vector3.new(mass, 0, mass) * settings.DriveForce
+	velocity.VectorVelocity = Vector3.zero
+	velocity:SetAttribute(PhysicsService.ImpulsePriorityAttribute, priority)
+	velocity.Enabled = true
+
+	return velocity
+end
+
+local function facingOf(root: BasePart, attachment: Attachment, facing: Vector3?): AlignOrientation?
+	local settings = KnockbackService.Settings
+	local existing = root:FindFirstChild(settings.FacingName)
+
+	if not facing then
+		if existing then
+			existing.Enabled = false
+		end
+
+		return nil
+	end
+
+	local orientation = existing
+
+	if not orientation then
+		orientation = Instance.new("AlignOrientation")
+		orientation.Name = settings.FacingName
+		orientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		orientation.Attachment0 = attachment
+		orientation.MaxTorque = math.huge
+		orientation.Parent = root
+	end
+
+	orientation.Responsiveness = settings.FacingResponsiveness
+	orientation.CFrame = CFrame.lookAt(Vector3.zero, facing)
+	orientation.Enabled = true
+
+	return orientation
 end
 
 --@ Y the root should sit at over the ground under (x, z), or nil to leave it alone. Only ever
@@ -335,8 +446,78 @@ local function write(drive, position: Vector3, turn: number)
 	end
 end
 
-local function step()
+local function clampStep(root: BasePart, stepVector: Vector3): Vector3
+	if stepVector.Magnitude <= 0 then return stepVector end
+
+	local hit = workspace:Blockcast(root.CFrame, root.Size, stepVector, WorldConstants.world_ray_params)
+
+	if hit then
+		return stepVector.Unit * math.max(hit.Distance - KnockbackService.Settings.WallPadding, 0)
+	end
+
+	return stepVector
+end
+
+--@ Owner: the curve's step for this frame becomes the velocity the constraint holds, with the
+--@ owner's own walking folded in, so what replicates is a moving body rather than CFrame snaps.
+--@ Rising ground is followed by lending the constraint its Y axis for the frame that lifts.
+local function driveOwner(drive, stepVector: Vector3, dt: number)
+	local root = drive.root
+	local velocity = drive.velocity
+	if not velocity or not velocity.Parent or dt <= 0 then return end
+
+	local humanoid = drive.humanoid
+	local walk = Vector3.zero
+
+	if humanoid then
+		local move = flat(humanoid.MoveDirection)
+
+		if move.Magnitude > 0 then
+			walk = move.Unit * humanoid.WalkSpeed * KnockbackService.Settings.VictimInfluence
+		end
+	end
+
+	local target = flat(root.Position) + stepVector
+	local lifted = groundLift(drive, target.X, target.Z, root.Position.Y)
+	local mass = root.AssemblyMass
+	local force = KnockbackService.Settings.DriveForce
+	local vertical = 0
+
+	if lifted then
+		vertical = (lifted - root.Position.Y) / dt
+	end
+
+	velocity.MaxAxesForce = Vector3.new(mass, lifted and mass or 0, mass) * force
+	velocity.VectorVelocity = stepVector / dt + walk + Vector3.new(0, vertical, 0)
+end
+
+--@ Non-owner: the physical root is left to replication, which is the only way to keep reading it,
+--@ and the slice of the curve replication has not delivered yet is drawn as a visual offset through
+--@ the root joint. The correction decays to nothing as the push arrives underneath it.
+local function driveObserver(drive, position: Vector3, turn: number, at: number)
+	local root = drive.root
+	local recipe = drive.recipe
+	local lag = KnockbackService.Settings.ReplicationLag
+	local delivered = KnockbackService.Evaluate(recipe, math.max(at - lag, recipe.startTime))
+	local correction = position - delivered
+	local yaw = 0
+
+	if recipe.facing then
+		local current = flat(root.CFrame.LookVector)
+
+		if current.Magnitude > 0 then
+			current = current.Unit
+			yaw = math.atan2(current:Cross(recipe.facing).Y, current:Dot(recipe.facing)) * turn
+		end
+	end
+
+	local offset = root.CFrame:VectorToObjectSpace(correction)
+	drive.joint.C0 = CFrame.new(offset) * CFrame.Angles(0, yaw, 0) * drive.jointRest
+end
+
+local function step(frameDt: number)
 	local at = now()
+	frameDt = math.max(frameDt or 0, 1 / 240)
 
 	for victim, drive in drives do
 		local root = drive.root
@@ -369,15 +550,15 @@ local function step()
 				end
 			end
 
-			if stepVector.Magnitude > 0 then
-				local hit = workspace:Blockcast(root.CFrame, root.Size, stepVector, WorldConstants.world_ray_params)
+			stepVector = clampStep(root, stepVector)
 
-				if hit then
-					stepVector = stepVector.Unit * math.max(hit.Distance - KnockbackService.Settings.WallPadding, 0)
+			if drive.velocity then
+				if drive.velocity.Parent and dt > 0 then
+					drive.velocity.VectorVelocity = stepVector / dt
 				end
+			else
+				write(drive, flat(root.Position) + stepVector, 1)
 			end
-
-			write(drive, flat(root.Position) + stepVector, 1)
 
 			if alpha >= 1 then
 				finish(victim, drive)
@@ -388,38 +569,49 @@ local function step()
 
 		local position, turn, done = KnockbackService.Evaluate(recipe, at)
 
-		if not done then
-			write(drive, position, turn)
-			continue
-		end
-
 		if drive.isOwner then
-			write(drive, position, 1)
-			finish(victim, drive)
+			local owed = position - drive.lastPosition
+			local limit = math.max(recipe.curve.speed or 0, 1) * KnockbackService.Settings.CatchUp * frameDt
+
+			if owed.Magnitude > limit then
+				owed = owed.Unit * limit
+			end
+
+			drive.lastPosition += owed
+
+			local stepVector = clampStep(root, owed)
+
+			if drive.velocity then
+				driveOwner(drive, stepVector, frameDt)
+			else
+				write(drive, flat(root.Position) + stepVector, turn)
+			end
+
+			if done and (position - drive.lastPosition).Magnitude < 1e-3 then
+				finish(victim, drive)
+			end
+
 			continue
 		end
 
-		if not drive.finishedAt then
-			drive.finishedAt = at
+		if drive.joint then
+			driveObserver(drive, position, turn, at)
+		else
+			write(drive, position, turn)
 		end
 
-		local blend = (at - drive.finishedAt) / math.max(KnockbackService.Settings.HandoffBlend, 1e-3)
-
-		if blend >= 1 then
+		if done and at - recipe.startTime >= recipe.curve.duration + KnockbackService.Settings.ReplicationLag then
 			finish(victim, drive)
-			continue
 		end
-
-		local live = root.Position
-		local target = Vector3.new(recipe.finish.X, live.Y, recipe.finish.Z)
-		write(drive, target:Lerp(live, blend), 1)
 	end
 end
 
---@ Both sides. Records the recipe as the victim's current knockback, and drives the root if this
---@ machine is the one that should: every client draws every victim, the server draws only what it
---@ owns. A client writing a character it does not own is local and wins the frame; the owner
---@ writing the same trajectory is what replication carries, so the two agree where it ends.
+--@ Both sides. Records the recipe as the victim's current knockback, and drives the character if
+--@ this machine is the one that should: every client draws every victim, the server draws only what
+--@ it owns. The owner moves its root through a velocity constraint stepping the curve on top of
+--@ wherever it is; a non-owner never touches the root — a written root stops receiving replication —
+--@ and instead offsets the body through the root joint by the slice of the curve replication has not
+--@ delivered yet, which decays to nothing once the push has fully arrived.
 function KnockbackService.Apply(victim, recipe)
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return false end
 	if typeof(recipe) ~= "table" or typeof(recipe.start) ~= "Vector3" then return false end
@@ -441,6 +633,10 @@ function KnockbackService.Apply(victim, recipe)
 
 	active[victim] = recipe
 
+	if RunService:IsClient() then
+		TrajectoryService.DrawRecipe(victim, recipe, KnockbackService.Evaluate)
+	end
+
 	local drive, isOwner = shouldDrive(victim)
 	if not drive then return true end
 
@@ -450,10 +646,31 @@ function KnockbackService.Apply(victim, recipe)
 
 	if existing then
 		existing.autoRotate = nil
-		finish(victim, existing)
+		finish(victim, existing, true)
 	end
 
-	PhysicsService.ClearExistingImpulse({ Character = victim })
+	--@ The owner moves through a velocity constraint rather than CFrame writes: velocity is what
+	--@ replicates, so observers get a moving body underneath their own drawing instead of a still one
+	--@ that pops to the finish. The facing turn is a constraint for the same reason. Both persist on
+	--@ the root across drives; see DriveAttribute.
+	local velocity, facingConstraint, joint, jointRest = nil, nil, nil, nil
+
+	if isOwner then
+		local attachment = PhysicsService.ImpulseAttachment(root)
+
+		if attachment then
+			velocity = moverOf(root, attachment, recipe.priority)
+			facingConstraint = facingOf(root, attachment, not recipe.steer and recipe.facing or nil)
+		end
+	else
+		for _, descendant in victim:GetDescendants() do
+			if descendant:IsA("Motor6D") and descendant.Part0 == root and descendant.Part1 then
+				joint = descendant
+				jointRest = descendant.C0
+				break
+			end
+		end
+	end
 
 	--@ A steered drive leaves AutoRotate alone: the Humanoid turning the root toward the move
 	--@ direction is exactly what steers it.
@@ -480,10 +697,14 @@ function KnockbackService.Apply(victim, recipe)
 		humanoid = humanoid,
 		recipe = recipe,
 		isOwner = isOwner,
+		velocity = velocity,
+		facing = facingConstraint,
+		joint = joint,
+		jointRest = jointRest,
 		autoRotate = autoRotate,
 		startRotation = startRotation,
 		targetRotation = targetRotation,
-		finishedAt = nil,
+		lastPosition = recipe.start,
 		lastAlpha = 0,
 		lastAt = now(),
 	}
