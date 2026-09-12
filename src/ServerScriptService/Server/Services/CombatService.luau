@@ -109,10 +109,12 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 		end)
 	end
 
-	self.Launch:FireAll(victim, velocity, landing)
+	local motion = { spin = finisher.spin, twist = finisher.twist, flail = finisher.flail }
+
+	self.Launch:FireAll(victim, velocity, landing, motion)
 
 	if not Players:GetPlayerFromCharacter(victim) then
-		RagdollService.Launch(victim, velocity)
+		RagdollService.Launch(victim, velocity, motion)
 	end
 
 	return true

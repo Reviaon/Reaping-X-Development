@@ -16,7 +16,7 @@ function KnockbackHandler:Apply(victim, recipe)
 	return KnockbackService.Apply(victim, recipe)
 end
 
-function KnockbackHandler:Launch(victim, velocity, landing)
+function KnockbackHandler:Launch(victim, velocity, landing, motion)
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return false end
 	if typeof(velocity) ~= "Vector3" then return false end
 
@@ -31,7 +31,7 @@ function KnockbackHandler:Launch(victim, velocity, landing)
 
 	if victim ~= Players.LocalPlayer.Character then return true end
 
-	return RagdollService.Launch(victim, velocity)
+	return RagdollService.Launch(victim, velocity, motion)
 end
 
 function KnockbackHandler:InitCharacter(controller, isLocal)
@@ -45,8 +45,8 @@ function KnockbackHandler:Init()
 		KnockbackHandler:Apply(victim, recipe)
 	end)
 
-	CombatService.Launch:Connect(function(victim, velocity, landing)
-		KnockbackHandler:Launch(victim, velocity, landing)
+	CombatService.Launch:Connect(function(victim, velocity, landing, motion)
+		KnockbackHandler:Launch(victim, velocity, landing, motion)
 	end)
 end
 
