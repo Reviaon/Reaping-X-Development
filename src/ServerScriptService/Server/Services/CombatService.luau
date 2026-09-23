@@ -31,7 +31,7 @@ CombatService.Settings = {
 	LungeReportCooldown = 0.1,
 
 	--@ Seconds a hit victim is stunned. 0 disables.
-	HitstunDuration = 0.25,
+	HitstunDuration = 0.65,
 }
 
 local lastReport = {}
@@ -99,7 +99,7 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 
 	if not RagdollService.Ragdoll(victim, finisher.ragdoll) then return false end
 
-	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll + finisher.getup)
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
 
 	if landing then
 		landing.At = workspace:GetServerTimeNow() + landing.Time
@@ -125,6 +125,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if not profile then return false end
 
 	if not rootOf(attacker) or not rootOf(victim) then return false end
+	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
 
 	local direction = knockbackDirection(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
@@ -134,8 +135,6 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if finisher then
 		return self:ApplyFinisher(victim, direction, finisher)
 	end
-
-	if GlobalFunctions.RagdollService.IsRagdolled(victim) then return false end
 
 	local knockback = self:ResolveKnockback(weaponId, comboIndex)
 	if not knockback then return false end
@@ -260,6 +259,7 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return end
 	if victim == attacker then return end
 	if not victim:FindFirstChildOfClass("Humanoid") then return end
+	if GlobalFunctions.StatusService:IsHitImmune(victim) then return end
 
 	local living = livingFolder()
 	if not living or not victim:IsDescendantOf(living) then return end
