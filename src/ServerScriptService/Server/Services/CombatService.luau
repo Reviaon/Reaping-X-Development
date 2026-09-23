@@ -8,14 +8,14 @@ local CombatService = Jloader.CreateService({
 	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "Launch" } },
 })
 
-local CombatConfig = require(
-	ReplicatedStorage:WaitForChild("Modules")
-		:WaitForChild("Client")
-		:WaitForChild("Controllers")
-		:WaitForChild("Character")
-		:WaitForChild("CombatHandler")
-		:WaitForChild("Config")
-)
+local CombatHandler = ReplicatedStorage:WaitForChild("Modules")
+	:WaitForChild("Client")
+	:WaitForChild("Controllers")
+	:WaitForChild("Character")
+	:WaitForChild("CombatHandler")
+
+local CombatConfig = require(CombatHandler:WaitForChild("Config"))
+local Hitstun = require(CombatHandler:WaitForChild("Hitstun"))
 
 CombatService.Settings = {
 	--@ Studs. A hit reported from further than this is dropped as implausible.
@@ -29,9 +29,6 @@ CombatService.Settings = {
 
 	--@ Seconds. Floor on how often one player's lunge report is relayed.
 	LungeReportCooldown = 0.1,
-
-	--@ Seconds a hit victim is stunned. 0 disables.
-	HitstunDuration = 0.65,
 }
 
 local lastReport = {}
@@ -155,9 +152,9 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	if not recipe then return false end
 
-	local hitstun = self.Settings.HitstunDuration
+	local hitstun = Hitstun.Resolve(weaponId, comboIndex)
 
-	if hitstun > 0 then
+	if hitstun and hitstun > 0 then
 		GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, hitstun)
 	end
 
