@@ -23,7 +23,7 @@ return{
 	},
 
 	light_impulse = {
-		speed = 8,
+		speed = 7,
 		duration = 0.8,
 		falloff = 0.5,
 		priority = 1, --@ Higher priority impulses cannot be stomped by lower ones (see PhysicsService.ApplyImpulse)
