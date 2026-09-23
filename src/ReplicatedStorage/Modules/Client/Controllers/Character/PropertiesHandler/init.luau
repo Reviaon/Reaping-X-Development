@@ -2,22 +2,14 @@
 local Jloader = require(game.ReplicatedStorage.JLoader)
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
-local BASE_WALK_SPEED = 10
-local BASE_JUMP_POWER = 50
-
-local JUMP_DECAY_STEP = 10
-local JUMP_RESET_COOLDOWN = 0.5
-local JUMP_MIN_POWER = 25
-local JUMP_IDLE_RESET = 2
-
-local SCOPE = "Properties"
+local Config = require(script.Config)
 
 local function stateOf(controller)
-	local state = controller:Scope(SCOPE)
+	local state = controller:Scope(Config.Scope)
 
 	if state.decayedJumpPower == nil then
-		state.decayedJumpPower = BASE_JUMP_POWER
-		state.jumpLimit = BASE_JUMP_POWER
+		state.decayedJumpPower = Config.BaseJumpPower
+		state.jumpLimit = Config.BaseJumpPower
 		state.jumpResetPending = false
 	end
 
@@ -27,7 +19,7 @@ end
 local function resolveJumpPower(controller)
 	local state = stateOf(controller)
 
-	if state.decayedJumpPower < JUMP_MIN_POWER then
+	if state.decayedJumpPower < Config.Jump.MinPower then
 		return 0
 	end
 
@@ -41,8 +33,8 @@ local function applyHumanoidProperties(controller)
 
 	local state = stateOf(controller)
 	local properties = controller.StatusService:ResolveProperties(Character, {
-		WalkSpeed = BASE_WALK_SPEED,
-		JumpPower = BASE_JUMP_POWER,
+		WalkSpeed = Config.BaseWalkSpeed,
+		JumpPower = Config.BaseJumpPower,
 	})
 	state.jumpLimit = math.max(0, properties.JumpPower)
 	local walkSpeed = math.max(0, properties.WalkSpeed)
@@ -55,7 +47,7 @@ local function applyHumanoidProperties(controller)
 	end
 end
 
---@ Restarted on every jump. Going JUMP_IDLE_RESET seconds without jumping wipes
+--@ Restarted on every jump. Going Jump.IdleReset seconds without jumping wipes
 --  the accumulated decay entirely, independent of the zeroed-out reset cooldown.
 local function cancelIdleReset(state)
 
@@ -71,13 +63,13 @@ local function scheduleIdleReset(controller)
 	local state = stateOf(controller)
 	local Character = controller.Character
 
-	state.idleThread = task.delay(JUMP_IDLE_RESET, function()
+	state.idleThread = task.delay(Config.Jump.IdleReset, function()
 		if controller.Character ~= Character then return end
 		state.idleThread = nil
 
-		if state.decayedJumpPower >= BASE_JUMP_POWER then return end
+		if state.decayedJumpPower >= Config.BaseJumpPower then return end
 
-		state.decayedJumpPower = BASE_JUMP_POWER
+		state.decayedJumpPower = Config.BaseJumpPower
 		applyHumanoidProperties(controller)
 	end)
 end
@@ -96,8 +88,8 @@ function PropertyHandler:InitCharacter(controller)
 		state.resetThread = nil
 	end
 	cancelIdleReset(stateOf(controller))
-	state.decayedJumpPower = BASE_JUMP_POWER
-	state.jumpLimit = BASE_JUMP_POWER
+	state.decayedJumpPower = Config.BaseJumpPower
+	state.jumpLimit = Config.BaseJumpPower
 	state.jumpResetPending = false
 
 	local trove = controller.Trove.new()
@@ -114,9 +106,9 @@ function PropertyHandler:InitCharacter(controller)
 	trove:Connect(controller.Humanoid.Jumping, function(active)
 		if controller.Character ~= Character or not active or state.jumpResetPending then return end
 
-		state.decayedJumpPower = math.max(0, state.decayedJumpPower - JUMP_DECAY_STEP)
+		state.decayedJumpPower = math.max(0, state.decayedJumpPower - Config.Jump.DecayStep)
 
-		if state.decayedJumpPower < JUMP_MIN_POWER then
+		if state.decayedJumpPower < Config.Jump.MinPower then
 			state.decayedJumpPower = 0
 		end
 
@@ -125,11 +117,11 @@ function PropertyHandler:InitCharacter(controller)
 			cancelIdleReset(stateOf(controller))
 
 			state.jumpResetPending = true
-			state.resetThread = task.delay(JUMP_RESET_COOLDOWN, function()
+			state.resetThread = task.delay(Config.Jump.ResetCooldown, function()
 				if controller.Character ~= Character then return end
 				state.resetThread = nil
 				state.jumpResetPending = false
-				state.decayedJumpPower = BASE_JUMP_POWER
+				state.decayedJumpPower = Config.BaseJumpPower
 				applyHumanoidProperties(controller)
 			end)
 		else
