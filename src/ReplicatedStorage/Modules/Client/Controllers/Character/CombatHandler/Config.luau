@@ -163,8 +163,7 @@ end
 
 --@ The final hit of a combo launches and ragdolls its victim; a weapon's `finisher` overrides any key, `false` turns it off.
 local DEFAULT_FINISHER = {
-	ragdoll = 1.5, --@ Seconds the victim stays ragdolled
-	getup = 0.6, --@ Seconds of stun after the ragdoll while they stand back up
+	ragdoll = 1.5, --@ Seconds the victim stays ragdolled and stunned
 	speed = 40, --@ Studs per second the victim is thrown away from the attacker
 	lift = 32, --@ Studs per second of upward launch; 32 peaks about 2.6 studs up
 	spin = 540, --@ Degrees per second the victim tumbles backward in the air; 0 flies rigid
@@ -200,12 +199,12 @@ local WEAPON_SCHEMA = {
 	hitbox = "table",
 	knockback = "table",
 	finisher = "table|boolean",
+	hitstun = "number|table",
 }
 
 local FINISHER_SCHEMA = {
 	enabled = "boolean",
 	ragdoll = "number",
-	getup = "number",
 	speed = "number",
 	lift = "number",
 	spin = "number",
