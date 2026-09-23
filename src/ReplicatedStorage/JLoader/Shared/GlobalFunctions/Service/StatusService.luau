@@ -2,12 +2,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatusLibrary = require(ReplicatedStorage.Libraries.CharacterLibrary.StatusLibrary)
 local StatusResolver = require(script.Parent.StatusResolver)
 
-local StatusService = { Registry = {} }
+local StatusService = {
+	Registry = {},
+	Settings = {
+		ExpirySuffix = "_Expires", --@ Attribute holding a status's server-time expiry
+	},
+}
 local Handle = {}
 Handle.__index = Handle
 
 local DEFAULT_SOURCE = {}
-local EXPIRY_SUFFIX = "_Expires"
 local NextId = 0
 
 local function Now()
@@ -52,8 +56,8 @@ local function Publish(Entity, Name, Entries)
 
 	--@ Server time, so every machine can count down a status another machine applied.
 	local Expires = Latest and Latest < math.huge and Latest or nil
-	if Entity:GetAttribute(Name .. EXPIRY_SUFFIX) ~= Expires then
-		Entity:SetAttribute(Name .. EXPIRY_SUFFIX, Expires)
+	if Entity:GetAttribute(Name .. StatusService.Settings.ExpirySuffix) ~= Expires then
+		Entity:SetAttribute(Name .. StatusService.Settings.ExpirySuffix, Expires)
 	end
 end
 
@@ -307,7 +311,7 @@ end
 function StatusService:GetRemainingTime(Entity, Name)
 	ValidateEntity(Entity)
 	ValidateName(Name)
-	local Expires = Entity:GetAttribute(Name .. EXPIRY_SUFFIX)
+	local Expires = Entity:GetAttribute(Name .. StatusService.Settings.ExpirySuffix)
 	if typeof(Expires) ~= "number" then return nil end
 	return math.max(0, Expires - Now())
 end
