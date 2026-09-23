@@ -133,7 +133,6 @@ local function getEffectPath(module: Instance): string
 	return table.concat(segments, PATH_SEPARATOR)
 end
 
---@ Require every effect module and index it by path (and bare name)
 function ClientEffects:LoadEffects()
 	table.clear(ByPath)
 	table.clear(ByName)
@@ -152,8 +151,6 @@ function ClientEffects:LoadEffects()
 	end
 end
 
---@ Resolve an effect by dotted path ("combat.effectfilename"),
---  falling back to a bare-name lookup ("effectfilename").
 function ClientEffects:Resolve(path)
 	if typeof(path) ~= "string" then return nil end
 
@@ -161,7 +158,6 @@ function ClientEffects:Resolve(path)
 	return ByPath[key] or ByName[key]
 end
 
---@ Run a resolved effect. Handles function-style and method-style modules.
 function ClientEffects:Play(path, Info, Method)
 	Info = WithTools(Info)
 
@@ -188,10 +184,6 @@ function ClientEffects:Play(path, Info, Method)
 	return EffectMod(Info)
 end
 
---@ Whether this payload is close enough to the viewer to be worth rendering. EffectService
---@ broadcasts with :FireAll, so this is the only thing standing between a client and every
---@ effect in the match. Decided once, on arrival - see CullingConfig for the tuning and for
---@ why this is independent of StreamingEnabled.
 function ClientEffects:PassesCulling(Data)
 	if not CullingConfig.Enabled then return true end
 
@@ -218,7 +210,6 @@ function ClientEffects:PassesCulling(Data)
 	return offset:Dot(offset) <= limit * limit
 end
 
---@ Dispatch a raw payload fired from the server (or locally)
 function ClientEffects:Fire(Data)
 	if typeof(Data) ~= "table" then return end
 	if not Data.Effect then warn("[ClientEffects]: Fire payload missing an 'Effect' path.") return end
@@ -231,8 +222,6 @@ end
 
 --@ Start Method
 function ClientEffects:Init()
-	--@ Every weapon visual emits through ForgeVFX, so its caches and services have to be
-	--@ up before any effect can play. init() is guarded, so calling it here is safe.
 	Jloader.GlobalFunctions.ForgeVFX.init()
 
 	self:LoadEffects()
