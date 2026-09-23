@@ -516,8 +516,6 @@ function CombatConfig:UpdateWeaponConfig(controller)
 
 	local equipped = self:ResolveEquippedWeapon(controller)
 
-	--@ nil when unarmed: there is no stance to hold, and publishing the default weapon's
-	--@ name would keep an idle playing with nothing in hand.
 	controller._idle_animation = equipped and (equipped .. "Idle") or nil
 end
 
@@ -547,8 +545,6 @@ function CombatConfig:ResolveEquippedWeapon(controller): string?
 	return equippedTool.Name
 end
 
---@ Same answer with the unarmed case folded onto the default weapon, which is what the
---@ attack path wants: an unarmed swing still needs a weapon id to build animation names.
 function CombatConfig:ResolveWeaponId(controller): string
 	local equipped = self:ResolveEquippedWeapon(controller)
 	if equipped then
@@ -564,8 +560,6 @@ function CombatConfig:ResolveWeaponConfig(controller)
 	return self.WeaponConfig[weaponId] or {}
 end
 
---@ Dotted ClientEffects path for a weapon's visual module, or nil when it has none, so a
---@ weapon without visuals is skipped instead of making every client warn about it.
 function CombatConfig:ResolveWeaponVisuals(weaponId: string): string?
 	if typeof(weaponId) ~= "string" or weaponId == "" then return nil end
 
@@ -598,17 +592,7 @@ function CombatConfig:BuildHitboxData(hitbox)
 	return data
 end
 
---========================================================================
---@ Attack timing resolution
---@ Weapon timings are authored at 1x; `attack_speed` retimes them here, so retuning a weapon
---@ is one number. Divided by attack_speed: attack_duration, impulse_delay, ease_out/pause/fade,
---@ attack_cooldown, impulse duration + falloff. Multiplied by it: impulse speed, so the step
---@ covers the same ground and just gets there sooner. Not scaled: light_impulse.influence
---@ (a ratio of walk speed) and priority (pure arbitration).
---========================================================================
 
---@ The playback multiplier for one hit. Accepts a number, or an array keyed by combo
---@ index for per-hit tuning; anything else falls back to the config-wide default.
 function CombatConfig:ResolveAttackSpeed(weaponConfig, comboIndex: number?): number
 	local fallback = self.DefaultAttackSpeed or 1
 	local speed = ResolveNumber(weaponConfig and weaponConfig.attack_speed, comboIndex, fallback)
@@ -616,17 +600,12 @@ function CombatConfig:ResolveAttackSpeed(weaponConfig, comboIndex: number?): num
 	return math.clamp(speed, MIN_ATTACK_SPEED, MAX_ATTACK_SPEED)
 end
 
---@ Resolves one swing into the numbers a component actually runs on, already divided by
---@ attack_speed. A component should never reach past this into the raw weapon table for a
---@ timing - that is how the animation and everything scheduled against it drift apart.
 function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weaponConfig)
 	weaponConfig = weaponConfig or self:ResolveWeaponConfig(controller)
 	comboIndex = comboIndex or 1
 
 	local speed = self:ResolveAttackSpeed(weaponConfig, comboIndex)
 
-	--@ Falls back to the config-wide default so a weapon that never declared MaxCombo still
-	--@ resolves a number here - comparing comboIndex against a nil MaxCombo used to throw.
 	local maxCombo = weaponConfig.MaxCombo or self.DefaultMaxCombo
 	local isFinal = comboIndex >= maxCombo
 
