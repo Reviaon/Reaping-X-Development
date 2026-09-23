@@ -125,6 +125,13 @@ function AttackService:BroadcastHit(controller, character, victim, effect, weapo
 		},
 	}
 
+	return self:BroadcastVisual(controller, payload)
+end
+
+--@ Plays on this client now and relays to every other client.
+function AttackService:BroadcastVisual(controller, payload)
+	payload.SkipSender = true
+
 	self:PlayLocal(payload)
 	return self:Broadcast(controller, payload)
 end
