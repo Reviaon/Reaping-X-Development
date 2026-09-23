@@ -7,6 +7,7 @@ local Handle = {}
 Handle.__index = Handle
 
 local DEFAULT_SOURCE = {}
+local EXPIRY_SUFFIX = "_Expires"
 local NextId = 0
 
 local function Now()
@@ -34,11 +35,12 @@ local function Invalidate(Entry)
 end
 
 local function Publish(Entity, Name, Entries)
-	local Newest
+	local Newest, Latest
 	for _, Entry in Entries or {} do
 		if not Newest or Entry.Id > Newest.Id then
 			Newest = Entry
 		end
+		Latest = math.max(Latest or 0, Entry.ExpiresAt)
 	end
 	local Value
 	if Newest then
@@ -46,6 +48,12 @@ local function Publish(Entity, Name, Entries)
 	end
 	if Entity:GetAttribute(Name) ~= Value then
 		Entity:SetAttribute(Name, Value)
+	end
+
+	--@ Server time, so every machine can count down a status another machine applied.
+	local Expires = Latest and Latest < math.huge and Latest or nil
+	if Entity:GetAttribute(Name .. EXPIRY_SUFFIX) ~= Expires then
+		Entity:SetAttribute(Name .. EXPIRY_SUFFIX, Expires)
 	end
 end
 
@@ -289,6 +297,19 @@ function StatusService:GetDominantStatus(Entity)
 		end
 	end
 	return Selected
+end
+
+function StatusService:IsHitImmune(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.HitImmune)
+end
+
+function StatusService:GetRemainingTime(Entity, Name)
+	ValidateEntity(Entity)
+	ValidateName(Name)
+	local Expires = Entity:GetAttribute(Name .. EXPIRY_SUFFIX)
+	if typeof(Expires) ~= "number" then return nil end
+	return math.max(0, Expires - Now())
 end
 
 function StatusService:IsAlive(Entity)

@@ -1,5 +1,6 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
+	HitImmune = { "IsRagdolled" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {

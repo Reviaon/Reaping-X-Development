@@ -2,9 +2,6 @@
 local Jloader = require(game.ReplicatedStorage.JLoader)
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-
 local BASE_WALK_SPEED = 10
 local BASE_JUMP_POWER = 50
 
@@ -85,63 +82,6 @@ local function scheduleIdleReset(controller)
 	end)
 end
 
---@ Displays the character's active status attribute in the debug UI's TextLabel.
---  Only the status with the highest Priority is shown when several are active.
---  The clone and its listener ride the character trove, so they tear down on respawn.
-local function setupDebugStatusUI(controller, trove)
-	local Character = controller.Character
-	if not Character then return end
-
-	local DebugUI = Character:FindFirstChild("DebugStatusUI", true)
-
-	if not DebugUI then
-		local Storage = ReplicatedStorage:FindFirstChild("Storage")
-		local UIFolder = Storage and Storage:FindFirstChild("UIFolder")
-		local DebugTemplate = UIFolder and UIFolder:FindFirstChild("DebugStatusUI")
-
-		if not DebugTemplate then
-			warn("[PropertiesHandler] Debug status UI is enabled but Storage.UIFolder.DebugStatusUI is missing.")
-			return
-		end
-
-		local Host = Character:FindFirstChild("Head")
-			or Character.PrimaryPart
-			or Character:FindFirstChildWhichIsA("BasePart")
-
-		if not Host then
-			warn("[PropertiesHandler] Debug status UI has nothing to parent to on " .. Character.Name .. ".")
-			return
-		end
-
-		DebugUI = DebugTemplate:Clone()
-		DebugUI.Parent = Host
-		trove:Add(DebugUI)
-	end
-
-	local StatusLabel = DebugUI:FindFirstChildWhichIsA("TextLabel", true)
-
-	if not StatusLabel then
-		warn("[PropertiesHandler] DebugStatusUI has no TextLabel to display statuses in.")
-		return
-	end
-
-	local function updateStatusLabel()
-		StatusLabel.Text = controller.StatusService:GetDominantStatus(Character) or "None"
-	end
-
-	updateStatusLabel()
-	trove:Connect(Character.AttributeChanged, updateStatusLabel)
-
-	local DebugService = controller.DebugService
-
-	local function applyVisibility()
-		DebugUI.Enabled = DebugService.IsEnabled()
-	end
-
-	applyVisibility()
-	trove:Add(DebugService.Changed(applyVisibility))
-end
-
 function PropertyHandler:InitCharacter(controller)
 	if self.CharacterTrove then
 		self.CharacterTrove:Destroy()
@@ -164,7 +104,6 @@ function PropertyHandler:InitCharacter(controller)
 	self.CharacterTrove = trove
 
 	applyHumanoidProperties(controller)
-	setupDebugStatusUI(controller, trove)
 
 	trove:Connect(Character.AttributeChanged, function()
 		if controller.Character == Character then
