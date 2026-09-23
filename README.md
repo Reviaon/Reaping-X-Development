@@ -654,7 +654,7 @@ the step and the shove cover the same studs and the target stays in reach throug
 
 The final hit of every combo (`timing.is_final`) is a finisher: instead of a knockback recipe it
 **launches and ragdolls** the victim, player or NPC. `CombatConfig` gives every weapon
-`DEFAULT_FINISHER` — `ragdoll` 1.5s, `getup` 0.6s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
+`DEFAULT_FINISHER` — `ragdoll` 1.5s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
 `flail` 16 — and a weapon's `finisher = { ... }` overrides any key, while `finisher = false` turns
 it off. `spin` is degrees per second of backward tumble on the torso assembly; `twist` adds that
 share of it again as a random angular velocity so no two launches turn the same way; `flail` is
@@ -675,12 +675,12 @@ legs from sinking through the torso and head mid-tumble; there are no `NoCollisi
 between them any more.
 
 `CombatService:ApplyFinisher` cancels any push still running on the victim, applies `IsRagdolled`
-for `ragdoll` seconds and `IsStunned` for `ragdoll + getup` (so every existing stun gate holds
-through the get-up), and broadcasts `Launch(victim, velocity)` with `direction × speed + up × lift`.
+for `ragdoll` seconds and `IsStunned` for the same `ragdoll` seconds (so every existing stun gate holds
+through the ragdoll), and broadcasts `Launch(victim, velocity)` with `direction × speed + up × lift`.
 A ragdoll is real physics, so only its physics owner can move it: the server launches an NPC itself
 and the victim's own client applies the launch to a player (`KnockbackHandler:Launch`); everyone
-else sees it through replication. A ragdolled victim ignores ordinary knockback; another finisher
-re-launches them and the ragdoll time stacks.
+else sees it through replication. A ragdolled victim cannot be hit at all — `StatusService:IsHitImmune`
+(`StatusLibrary.HitImmune`) is checked by both hitboxes, the server report and `ApplyKnockback`.
 
 `RagdollService` (GlobalFunctions) builds the rig once per R6 character from its own joints — no
 template instances — when `ServerController` loads it: a ball socket at each shoulder and hip,
