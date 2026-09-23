@@ -12,7 +12,7 @@ return{
 		},
 		
 		IsStunned = {
-			WalkSpeed = 4,
+			WalkSpeed = 2,
 			JumpPower = 0,
 			Priority = 10;
 		};
