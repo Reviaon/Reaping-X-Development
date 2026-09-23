@@ -279,6 +279,8 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 		local hits = {}
 
 		handle.onHit:Connect(function(target)
+			if controller.StatusService:IsHitImmune(target) then return end
+
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)
 
@@ -322,6 +324,28 @@ function AttackService:CancelSwing(controller, key, fade)
 	self:Cancel(controller, part(key, "impulse"))
 	self:CancelHitbox(controller, key)
 	self:StopTrack(controller, key, fade)
+end
+
+function AttackService:HitboxSpent(controller, key): boolean
+	key = part(key, "hitbox")
+	local scope = self:Scope(controller)
+
+	return scope.threads[key] == nil and scope.hitboxes[key] == nil
+end
+
+--@ Cancels every swing whose hitbox is spent; true if one is still before or inside its hitbox.
+function AttackService:ReleaseSpentSwings(controller, fade): boolean
+	local holding = false
+
+	for key in self:Scope(controller).tracks do
+		if self:HitboxSpent(controller, key) then
+			self:CancelSwing(controller, key, fade)
+		else
+			holding = true
+		end
+	end
+
+	return holding
 end
 
 return AttackService

@@ -353,6 +353,7 @@ local function onHit(brain, target, weaponId, timing)
 	if target == character then return end
 	if typeof(target) ~= "Instance" or not target:IsA("Model") then return end
 	if not target:FindFirstChildOfClass("Humanoid") then return end
+	if GlobalFunctions.StatusService:IsHitImmune(target) then return end
 
 	local settings = DummyService.Settings
 
