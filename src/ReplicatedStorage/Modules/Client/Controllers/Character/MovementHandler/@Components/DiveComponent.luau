@@ -1,8 +1,7 @@
 --@ Diving
-local DiveComponent = {}
+local DiveComponent = {} 
 
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 --@ TODO: Replace Cooldown Handling -> Avoid hardcoded cooldown
 local DIVE_COOLDOWN = 1.5 --@ Temporary
@@ -10,6 +9,11 @@ local DIVE_COOLDOWN = 1.5 --@ Temporary
 --@ Dash momentum outranks attack impulses, so a lower-priority impulse landing
 --  mid-dash is ignored instead of stomping it.
 local DIVE_IMPULSE_PRIORITY = 2
+
+local DIVE_RAMP_FLOOR = 0.15
+local DIVE_RAMP_CURVE = 4
+local DIVE_FALLOFF = 0.8
+local DIVE_CUTOFF_SPEED = 10
 
 local function isKnockedBack(controller, character)
 	local recipe = controller.KnockbackService.Active(character)
@@ -87,7 +91,9 @@ function DiveComponent:Activate(controller)
 
 		_divetracks[_heldbind].Priority = Enum.AnimationPriority.Action3
 
-		if not _isAttacking then
+		local _swingHolding = controller.AttackService:ReleaseSpentSwings(controller, 0.1)
+
+		if not (_isAttacking and _swingHolding) then
 			_divetracks[_heldbind]:Play()
 		end
 	end
@@ -136,12 +142,17 @@ function DiveComponent:Activate(controller)
 	).Unit
 
 	local _start = os.clock()
+	local _rampRange = math.exp(DIVE_RAMP_CURVE) - 1
 
-	local speedMultiplier = Instance.new("NumberValue")
-	speedMultiplier.Value = _dive_speed
+	local function _speedAt(elapsed)
+		if elapsed < _dive_start_time then
+			local climb = (math.exp(DIVE_RAMP_CURVE * elapsed / _dive_start_time) - 1) / _rampRange
+			return _dive_speed * (DIVE_RAMP_FLOOR + (1 - DIVE_RAMP_FLOOR) * climb)
+		end
 
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(speedMultiplier, tweenInfo, {Value = 0})
+		local alpha = math.clamp((elapsed - _dive_start_time) / DIVE_FALLOFF, 0, 1)
+		return _dive_speed * (1 - alpha)
+	end
 
 	local _velocity = Instance.new("LinearVelocity")
 	_velocity.Name = controller.PhysicsService.ImpulseName
@@ -167,27 +178,14 @@ function DiveComponent:Activate(controller)
 		DiveComponent:Deactivate(controller)
 	end
 
-	--@ The animation winds up immediately; the momentum follows through after
-	--  the direction's start time. Impulse clearing and the speed falloff both
-	--  happen at momentum start so the dash begins at full strength.
-	task.delay(_dive_start_time, function()
-		if not _trove or not _character.Parent then return end
+	if controller.CombatConfig then
+		controller.CombatConfig:ClearImpulse(controller)
+	else
+		controller.PhysicsService.ClearExistingImpulse(controller)
+	end
 
-		if isInterrupted(controller, _character) then
-			_interrupt()
-			return
-		end
-
-		if controller.CombatConfig then
-			controller.CombatConfig:ClearImpulse(controller)
-		else
-			controller.PhysicsService.ClearExistingImpulse(controller)
-		end
-
-		tween:Play()
-		_velocity.VectorVelocity = _lockedDirection * speedMultiplier.Value
-		_velocity.Parent = _humanoidRootPart
-	end)
+	_velocity.VectorVelocity = _lockedDirection * _speedAt(0)
+	_velocity.Parent = _humanoidRootPart
 
 	task.delay(_dive_start_time + _dive_duration, function()
 		if _velocity and _velocity.Parent then
@@ -195,12 +193,12 @@ function DiveComponent:Activate(controller)
 		end
 	end)
 
-
-	_trove:Add(tween)
 	_trove:Add(_velocity)
-	
+
 	_trove:Add(RunService.RenderStepped:Connect(function()
-		if os.clock() - _start > (_dive_start_time + _dive_duration + 0.5) then
+		local _elapsed = os.clock() - _start
+
+		if _elapsed > (_dive_start_time + _dive_duration + 0.5) then
 			if _trove then
 				_trove:Clean()
 				_trove = nil
@@ -213,7 +211,10 @@ function DiveComponent:Activate(controller)
 			return
 		end
 
-		if speedMultiplier.Value <= 10 then
+		local _speed = _speedAt(_elapsed)
+
+		--@ Only on the way down: the ramp itself starts below the cutoff.
+		if _elapsed >= _dive_start_time and _speed <= DIVE_CUTOFF_SPEED then
 			if _velocity and _velocity.Parent then
 				_velocity:Destroy()
 			end
@@ -238,7 +239,7 @@ function DiveComponent:Activate(controller)
 				currentOffsets[_diveDirection].Z
 			).Unit
 
-			_velocity.VectorVelocity = currentDirection * speedMultiplier.Value
+			_velocity.VectorVelocity = currentDirection * _speed
 		end
 	end))
 
