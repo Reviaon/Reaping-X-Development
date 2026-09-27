@@ -29,11 +29,21 @@ CombatService.Settings = {
 
 	--@ Seconds. Floor on how often one player's lunge report is relayed.
 	LungeReportCooldown = 0.1,
+
+	--@ Hit immunity after a ragdoll; the victim loses it once one of their own hits lands.
+	RecoveryStatus = "IsRecovering",
 }
 
 local lastReport = {}
 local lastRootReport = {}
 local lastLungeReport = {}
+
+local effectRelay = nil
+
+local function getEffectRelay()
+	effectRelay = effectRelay or Jloader.GetService("EffectService")
+	return effectRelay
+end
 
 local function livingFolder()
 	local world = workspace:FindFirstChild("World")
@@ -98,6 +108,14 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 
 	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
 
+	if finisher.recovery > 0 then
+		task.delay(finisher.ragdoll, function()
+			if not victim.Parent or not GlobalFunctions.StatusService:IsAlive(victim) then return end
+
+			GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, finisher.recovery)
+		end)
+	end
+
 	if landing then
 		landing.At = workspace:GetServerTimeNow() + landing.Time
 
@@ -123,6 +141,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	if not rootOf(attacker) or not rootOf(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
+	if GlobalFunctions.StatusService:IsHitYielded(attacker) then return false end
 
 	local direction = knockbackDirection(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
@@ -162,6 +181,33 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	--@ recipe is serialised exactly as built.
 	self.Knockback:FireAll(victim, recipe)
 	KnockbackService.Apply(victim, recipe)
+
+	return true
+end
+
+function CombatService:BroadcastHit(attacker: Model, victim: Model, weaponId: string, comboIndex: number, except: Player?)
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	local hitbox = weaponConfig and CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).hitbox
+	local payload = GlobalFunctions.AttackService:HitPayload(attacker, victim, hitbox and hitbox.effect, weaponId, comboIndex)
+	local relay = getEffectRelay()
+
+	if except then
+		relay.CreateVisual:FireExcept(except, payload)
+	else
+		relay.CreateVisual:FireAll(payload)
+	end
+end
+
+function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?)
+	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
+
+	local recovery = self.Settings.RecoveryStatus
+
+	if attacker:GetAttribute(recovery) ~= nil then
+		GlobalFunctions.StatusService:RemoveStatus(attacker, recovery)
+	end
+
+	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except)
 
 	return true
 end
@@ -288,7 +334,7 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 		GlobalFunctions.PositionService.Accept(attacker, attackerRoot)
 	end
 
-	self:ApplyKnockback(attacker, victim, profile, weaponId, math.floor(comboIndex))
+	self:LandHit(attacker, victim, profile, weaponId, math.floor(comboIndex), player)
 end
 
 function CombatService:Init()

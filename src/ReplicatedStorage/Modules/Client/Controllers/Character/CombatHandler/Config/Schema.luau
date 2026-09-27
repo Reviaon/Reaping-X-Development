@@ -24,6 +24,7 @@ Schema.Weapon = {
 Schema.Finisher = {
 	enabled = "boolean",
 	ragdoll = "number",
+	recovery = "number",
 	speed = "number",
 	lift = "number",
 	spin = "number",

@@ -1,5 +1,4 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Debris = game:GetService("Debris")
 
 local Storage = ReplicatedStorage:WaitForChild("Storage")
 local HitEffects = Storage:WaitForChild("Particles"):WaitForChild("CombatVFX"):WaitForChild("Hit")
@@ -9,6 +8,7 @@ local NPCLibrary = Libraries:WaitForChild("NPCLibrary")
 
 local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
 local AnimatorService = Jloader.GlobalFunctions.AnimatorService
+local EffectService = Jloader.GlobalFunctions.EffectService
 
 local Settings = {
 	DefaultEffect = "BluntHit", --@ Used when the swing names no effect
@@ -37,25 +37,6 @@ local function pivotOf(model)
 		or model:FindFirstChildWhichIsA("BasePart")
 end
 
-local function emitAll(root)
-	for _, emitter in root:GetDescendants() do
-		if not emitter:IsA("ParticleEmitter") then continue end
-
-		local count = emitter:GetAttribute("EmitCount") or 1
-		local wait_for = emitter:GetAttribute("EmitDelay") or 0
-
-		if wait_for > 0 then
-			task.delay(wait_for, function()
-				if emitter.Parent then
-					emitter:Emit(count)
-				end
-			end)
-		else
-			emitter:Emit(count)
-		end
-	end
-end
-
 local function reactionSet(Info, victim)
 	local entry = NPCLibrary:FindFirstChild(victim.Name)
 		or NPCLibrary:FindFirstChild(Settings.FallbackConfig)
@@ -81,9 +62,7 @@ function Hit.PlayReaction(Info, victim)
 	end
 
 	if #options == 0 then return nil end
-
-	--@ Not AnimatorService:LoadAnimation: these are randomised one-shots this function destroys
-	--@ itself, and registering them would leave destroyed tracks in the shared Registry.
+	
 	local animator = AnimatorService:GetAnimator(victim)
 	if not animator then return nil end
 
@@ -110,19 +89,13 @@ function Hit.SpawnParticles(victim, effectName)
 		return nil
 	end
 
-	local clone = template:Clone()
-	clone.Anchored = true
-	clone.CanCollide = false
-	clone.CanQuery = false
-	clone.CanTouch = false
-	clone.Massless = true
-	clone.CFrame = pivot.CFrame
-	clone.Parent = container()
+	local effect = EffectService.new({ Effect = template })
+	effect:SetCFrame(pivot.CFrame)
+	effect:SetParent(container())
+	effect:Play()
+	effect:SetRemoval(Settings.Lifetime)
 
-	emitAll(clone)
-	Debris:AddItem(clone, Settings.Lifetime)
-
-	return clone
+	return effect
 end
 
 function Hit.Emit(Info)

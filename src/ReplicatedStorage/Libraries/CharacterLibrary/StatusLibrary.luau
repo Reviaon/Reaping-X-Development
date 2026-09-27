@@ -1,6 +1,7 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
-	HitImmune = { "IsRagdolled" },
+	HitImmune = { "IsRagdolled", "IsRecovering" },
+	HitYield = { "IsStunned" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -22,6 +23,10 @@ return{
 			JumpPower = 0,
 			AutoRotate = false,
 			Priority = 11;
+		};
+
+		IsRecovering = {
+			Priority = 2;
 		};
 
 		IsSprinting = {
