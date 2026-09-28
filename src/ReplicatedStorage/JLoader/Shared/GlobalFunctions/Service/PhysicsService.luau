@@ -2,7 +2,6 @@
 local PhysicsService = {}
 
 -- @ Services
-local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
