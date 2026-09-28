@@ -1,6 +1,5 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local StatusLibrary = require(ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("CharacterLibrary"):WaitForChild("StatusLibrary"))
+local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
 
 local VisualsCore = {}
 

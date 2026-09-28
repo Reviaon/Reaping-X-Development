@@ -2,7 +2,7 @@
 -- Original Author: Jurian Vierbergen at <VoidedBlades (Rbx), @VoidedBlades (Twitter)> ( Shoutout my boy)
 
 local RunService = game:GetService("RunService")
-local Signal = require(script.Parent.Parent.Signal)
+local Signal = require("../Signal")
 
 local FORCE_DEBUG = RunService:IsStudio()
 

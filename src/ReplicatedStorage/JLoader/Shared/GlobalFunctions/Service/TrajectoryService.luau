@@ -2,8 +2,8 @@ local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Signal = require(script.Parent.Parent:WaitForChild("Signal"))
-local DebugService = require(script.Parent:WaitForChild("DebugService"))
+local Signal = require("../Signal")
+local DebugService = require("./DebugService")
 
 local TrajectoryService = {}
 

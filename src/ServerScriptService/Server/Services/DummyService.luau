@@ -2,19 +2,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 local DummyService = Jloader.CreateService({ Name = script.Name })
 
-local CombatConfig = require(
-	ReplicatedStorage:WaitForChild("Modules")
-		:WaitForChild("Client")
-		:WaitForChild("Controllers")
-		:WaitForChild("Character")
-		:WaitForChild("CombatHandler")
-		:WaitForChild("Config")
-)
+local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
 
 local NPCLibrary = ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("NPCLibrary")
 local Animations = ReplicatedStorage:WaitForChild("Storage"):WaitForChild("Animations")

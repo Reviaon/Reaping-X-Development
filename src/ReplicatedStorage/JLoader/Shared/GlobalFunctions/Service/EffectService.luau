@@ -6,7 +6,6 @@ EffectService.__index = EffectService
 EffectService.Util = {}
 
 --@ Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
@@ -15,7 +14,7 @@ local World = workspace:WaitForChild("World")
 local Visuals = World:WaitForChild("Visuals")
 
 --@ Imports
-local TableUtil = require(script.Parent.TableUtil)
+local TableUtil = require("./TableUtil")
 type Config = {[string]: any}
 
 local HiddenTransparencyCache = setmetatable({}, {__mode = "k"})

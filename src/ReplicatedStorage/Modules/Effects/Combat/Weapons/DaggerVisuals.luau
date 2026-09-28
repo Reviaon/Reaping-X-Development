@@ -1,6 +1,6 @@
 local DaggerVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.VisualsCore)
+local VisualsCore = require("../VisualsCore")
 
 DaggerVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Dagger",

@@ -1,6 +1,6 @@
 local SpearVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.VisualsCore)
+local VisualsCore = require("../VisualsCore")
 
 SpearVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Spear",

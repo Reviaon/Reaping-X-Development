@@ -1,6 +1,6 @@
 local SwordVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.VisualsCore)
+local VisualsCore = require("../VisualsCore")
 
 SwordVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Sword",

@@ -25,7 +25,7 @@
 ]]
 
 --@ Start
-local Jloader = require(game.ReplicatedStorage.JLoader)
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local EffectService = Jloader.GetService("EffectService")
 
 local ClientEffects = Jloader.CreateHandler({
@@ -44,7 +44,7 @@ local Effects = Modules:WaitForChild("Effects")
 local PATH_SEPARATOR = "."
 
 --@ Distance culling. Tuning lives in the sibling config, not here.
-local CullingConfig = require(script.CullingConfig)
+local CullingConfig = require("@self/CullingConfig")
 local LocalPlayer = Players.LocalPlayer
 
 --@ Payloads arrive as plain tables (ByteNet drops metatables), so give them the same

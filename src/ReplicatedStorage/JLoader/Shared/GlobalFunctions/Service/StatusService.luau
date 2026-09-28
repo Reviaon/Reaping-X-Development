@@ -1,6 +1,5 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StatusLibrary = require(ReplicatedStorage.Libraries.CharacterLibrary.StatusLibrary)
-local StatusResolver = require(script.Parent.StatusResolver)
+local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
+local StatusResolver = require("./StatusResolver")
 
 local StatusService = {
 	Registry = {},

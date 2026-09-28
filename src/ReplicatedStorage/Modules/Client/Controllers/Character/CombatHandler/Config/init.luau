@@ -2,9 +2,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local WeaponsLibrary = ReplicatedStorage:WaitForChild("Libraries"):WaitForChild("WeaponsLibrary")
 
-local Defaults = require(script.Defaults)
-local Scaling = require(script.Scaling)
-local Schema = require(script.Schema)
+local Defaults = require("@self/Defaults")
+local Scaling = require("@self/Scaling")
+local Schema = require("@self/Schema")
 
 local ResolveIndexed = Scaling.ResolveIndexed
 local ResolveNumber = Scaling.ResolveNumber

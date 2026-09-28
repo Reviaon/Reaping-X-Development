@@ -3,11 +3,10 @@ local Utils = {}
 
 --@ Services
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 --@ Imports
-local Jloader = require(ReplicatedStorage.JLoader)
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 local Signal = GlobalFunctions.Signal

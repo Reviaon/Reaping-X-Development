@@ -1,7 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local StatusService = require(script.Parent:WaitForChild("StatusService"))
+local StatusService = require("./StatusService")
 
 local RagdollService = {}
 

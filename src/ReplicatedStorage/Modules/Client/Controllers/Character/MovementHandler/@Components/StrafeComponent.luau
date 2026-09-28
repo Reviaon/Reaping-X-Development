@@ -3,7 +3,7 @@ local StrafeComponent = {}
 
 local RunService = game:GetService("RunService")
 
-local CameraHandler = require(game:GetService("ReplicatedStorage"):WaitForChild("JLoader")).GetHandler("CameraHandler")
+local CameraHandler = require("@game/ReplicatedStorage/JLoader").GetHandler("CameraHandler")
 
 local DOT_THRESHOLD = 0.9
 

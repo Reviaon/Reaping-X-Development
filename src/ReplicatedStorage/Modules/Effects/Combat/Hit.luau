@@ -6,7 +6,7 @@ local HitEffects = Storage:WaitForChild("Particles"):WaitForChild("CombatVFX"):W
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 local NPCLibrary = Libraries:WaitForChild("NPCLibrary")
 
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local AnimatorService = Jloader.GlobalFunctions.AnimatorService
 local EffectService = Jloader.GlobalFunctions.EffectService
 

@@ -3,13 +3,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local StatusDisplayHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local GlobalFunctions = Jloader.GlobalFunctions
 local StatusService = GlobalFunctions.StatusService
 local DebugService = GlobalFunctions.DebugService
-local Config = require(script.Config)
+local Config = require("@self/Config")
 
 local displays = {}
 local localCharacter = nil

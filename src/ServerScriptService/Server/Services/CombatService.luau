@@ -1,6 +1,5 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
@@ -8,19 +7,9 @@ local CombatService = Jloader.CreateService({
 	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "Launch" } },
 })
 
-local CharacterControllers = ReplicatedStorage:WaitForChild("Modules")
-	:WaitForChild("Client")
-	:WaitForChild("Controllers")
-	:WaitForChild("Character")
-
-local CombatHandler = CharacterControllers:WaitForChild("CombatHandler")
-
-local CombatConfig = require(CombatHandler:WaitForChild("Config"))
-local Hitstun = require(CombatHandler:WaitForChild("Hitstun"))
-local DiveConfig = require(CharacterControllers:WaitForChild("MovementHandler")
-	:WaitForChild("@Components")
-	:WaitForChild("DiveComponent")
-	:WaitForChild("Config"))
+local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
+local Hitstun = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Hitstun")
+local DiveConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/MovementHandler/@Components/DiveComponent/Config")
 
 CombatService.Settings = {
 	--@ Studs. A hit reported from further than this is dropped as implausible.

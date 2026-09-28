@@ -3,10 +3,10 @@ local KnockbackService = {}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local PhysicsService = require(script.Parent:WaitForChild("PhysicsService"))
-local PositionService = require(script.Parent:WaitForChild("PositionService"))
-local TrajectoryService = require(script.Parent:WaitForChild("TrajectoryService"))
-local WorldConstants = require(script.Parent.Parent:WaitForChild("WorldConstants"))
+local PhysicsService = require("./PhysicsService")
+local PositionService = require("./PositionService")
+local TrajectoryService = require("./TrajectoryService")
+local WorldConstants = require("../WorldConstants")
 
 KnockbackService.Settings = {
 	--@ Fixed integration steps for the displacement curve. Same count on every machine, so every

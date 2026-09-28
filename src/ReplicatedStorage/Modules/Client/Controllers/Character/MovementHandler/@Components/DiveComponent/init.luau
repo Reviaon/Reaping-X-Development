@@ -1,7 +1,7 @@
 --@ Diving
 local RunService = game:GetService("RunService")
 
-local Config = require(script.Config)
+local Config = require("@self/Config")
 
 local DiveComponent = {}
 

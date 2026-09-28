@@ -1,5 +1,5 @@
 --@ Hitstun
-local CombatConfig = require(script.Parent.Config)
+local CombatConfig = require("./Config")
 
 local Hitstun = {}
 

@@ -1,5 +1,5 @@
 --@ Start
-local Jloader = require(game.ReplicatedStorage.JLoader)
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 local EffectService = Jloader.CreateService({
@@ -8,7 +8,6 @@ local EffectService = Jloader.CreateService({
 })
 
 --@ Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Runservice = game:GetService("RunService")
 

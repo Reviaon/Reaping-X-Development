@@ -1,6 +1,5 @@
 --@ Combat Handler
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local CombatHandler = Jloader.CreateHandler({ Name = script.Name })
 
 --@ Services
@@ -11,7 +10,7 @@ local GlobalFunctions = Jloader.GlobalFunctions
 local InputHandler = GlobalFunctions.InputHandler
 local GarbageCollection = GlobalFunctions.Trove
 local ClientController = GlobalFunctions.ClientController
-local CombatConfig = require(script:WaitForChild("Config"))
+local CombatConfig = require("@self/Config")
 
 --@ Visuals are built and played on clients only; the relay hands one request to the
 --@ server, which fans it back out so every client renders the same hit.

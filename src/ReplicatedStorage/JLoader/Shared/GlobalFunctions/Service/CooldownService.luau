@@ -1,4 +1,4 @@
-local StatusService = require(script.Parent.StatusService)
+local StatusService = require("./StatusService")
 local CooldownService = { Registry = setmetatable({}, { __mode = "k" }) }
 local SUFFIX = "_Timer"
 

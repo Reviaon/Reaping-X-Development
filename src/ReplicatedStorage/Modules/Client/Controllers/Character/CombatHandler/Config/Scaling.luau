@@ -1,5 +1,5 @@
 --@ Resolves one combo entry of a weapon table and retimes it by attack speed
-local Defaults = require(script.Parent.Defaults)
+local Defaults = require("./Defaults")
 
 local Scaling = {}
 

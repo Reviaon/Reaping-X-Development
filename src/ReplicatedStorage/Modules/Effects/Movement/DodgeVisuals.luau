@@ -1,6 +1,6 @@
 local DodgeVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.Combat.VisualsCore)
+local VisualsCore = require("../Combat/VisualsCore")
 
 DodgeVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/MovementVFX/Dodge",

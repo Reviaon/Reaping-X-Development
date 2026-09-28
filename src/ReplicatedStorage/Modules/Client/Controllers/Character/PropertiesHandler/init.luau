@@ -1,8 +1,8 @@
 --@ Property Handler
-local Jloader = require(game.ReplicatedStorage.JLoader)
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
-local Config = require(script.Config)
+local Config = require("@self/Config")
 
 local function stateOf(controller)
 	local state = controller:Scope(Config.Scope)
