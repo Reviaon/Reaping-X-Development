@@ -111,11 +111,10 @@ function AttackService:PlayLocal(payload)
 	return true
 end
 
-function AttackService:BroadcastHit(controller, character, victim, effect, weaponId, comboIndex)
-	local payload = {
+function AttackService:HitPayload(character, victim, effect, weaponId, comboIndex)
+	return {
 		Effect = Settings.HitEffectPath,
 		Method = Settings.HitEffectMethod,
-		SkipSender = true,
 		Info = {
 			Target = victim,
 			Attacker = character,
@@ -124,8 +123,10 @@ function AttackService:BroadcastHit(controller, character, victim, effect, weapo
 			ComboIndex = comboIndex,
 		},
 	}
+end
 
-	return self:BroadcastVisual(controller, payload)
+function AttackService:PlayHit(character, victim, effect, weaponId, comboIndex)
+	return self:PlayLocal(self:HitPayload(character, victim, effect, weaponId, comboIndex))
 end
 
 --@ Plays on this client now and relays to every other client.
@@ -208,6 +209,14 @@ function AttackService:ReportLunge(controller, weaponId, comboIndex, direction)
 	return true
 end
 
+function AttackService:ReportDive(controller)
+	local relay = controller[Settings.CombatRelayKey]
+	if not relay then return false end
+
+	relay.ReportDive:Fire()
+	return true
+end
+
 function AttackService:ScheduleImpulse(controller, key, character, timing, options)
 	key = part(key, "impulse")
 	self:Cancel(controller, key)
@@ -273,6 +282,7 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 
 	self:Schedule(controller, key, timing.hitbox_delay, function()
 		if not character or not character.Parent then return end
+		if controller.StatusService:IsHitYielded(character) then return end
 
 		local data = controller.CombatConfig:BuildHitboxData(hitbox)
 		data.Attacker = character
@@ -286,12 +296,13 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 		local hits = {}
 
 		handle.onHit:Connect(function(target)
+			if controller.StatusService:IsHitYielded(character) then return end
 			if controller.StatusService:IsHitImmune(target) then return end
 
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)
 
-			self:BroadcastHit(controller, character, target, hitbox.effect, options.weaponId, timing.combo_index)
+			self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index)
 			self:ReportHit(controller, target, options.weaponId, timing.combo_index)
 
 			if options.onHit then
