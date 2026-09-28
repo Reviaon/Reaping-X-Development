@@ -12,16 +12,64 @@ local function planarDirection(cframe: CFrame, key: string): Vector3
 	return (Vector3.new(axis.X, 0, axis.Z) * sign).Unit
 end
 
-local function speedAt(startTime: number, elapsed: number): number
+local function speedAt(startTime: number, elapsed: number, carry: number, falloff: number): number
 	local ramp = Config.Ramp
+	local peak = math.max(Config.Speed, carry)
 
 	if elapsed < startTime then
+		local floor = math.max(peak * ramp.Floor, carry)
 		local climb = (math.exp(ramp.Curve * elapsed / startTime) - 1) / (math.exp(ramp.Curve) - 1)
-		return Config.Speed * (ramp.Floor + (1 - ramp.Floor) * climb)
+		return floor + (peak - floor) * climb
 	end
 
-	local alpha = math.clamp((elapsed - startTime) / Config.Falloff, 0, 1)
-	return Config.Speed * (1 - alpha)
+	local alpha = math.clamp((elapsed - startTime) / falloff, 0, 1)
+	return carry + (peak - carry) * (1 - alpha)
+end
+
+local function rampDistance(startTime: number, carry: number): number
+	local ramp = Config.Ramp
+	local peak = math.max(Config.Speed, carry)
+	local floor = math.max(peak * ramp.Floor, carry)
+	local share = ((math.exp(ramp.Curve) - 1) / ramp.Curve - 1) / (math.exp(ramp.Curve) - 1)
+
+	return startTime * (floor + (peak - floor) * share)
+end
+
+local function falloffDistance(falloff: number, carry: number): number
+	local peak = math.max(Config.Speed, carry)
+	local cutoff = math.max(Config.CutoffSpeed, carry)
+	if peak <= cutoff then return 0 end
+
+	return falloff * (peak - cutoff) / (peak - carry) * (peak + cutoff) / 2
+end
+
+--@ Shortens the falloff so a dive carrying momentum covers the standing dive's distance plus bonus
+local function falloffFor(startTime: number, carry: number, bonus: number): number
+	if carry <= 0 and bonus <= 0 then return Config.Falloff end
+
+	local peak = math.max(Config.Speed, carry)
+	local cutoff = math.max(Config.CutoffSpeed, carry)
+	if peak <= cutoff then return Config.Falloff end
+
+	local target = rampDistance(startTime, 0) + falloffDistance(Config.Falloff, 0) + bonus
+	local remaining = target - rampDistance(startTime, carry)
+	local falloff = 2 * remaining / (peak + cutoff) * (peak - carry) / (peak - cutoff)
+
+	return math.clamp(falloff, Config.Momentum.MinFalloff, Config.Falloff)
+end
+
+local function carriedSpeed(root: BasePart, direction: Vector3): number
+	local planar = root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
+	return math.max(0, planar:Dot(direction)) * Config.Momentum.Carry
+end
+
+local function turnToward(current: Vector3, target: Vector3, dt: number): Vector3
+	local alpha = 1 - math.exp(-Config.SprintTurnRate * dt)
+	local from = CFrame.lookAt(Vector3.zero, current)
+	local to = CFrame.lookAt(Vector3.zero, target)
+	local turned = from:Lerp(to, alpha).LookVector * Vector3.new(1, 0, 1)
+
+	return turned.Magnitude > 1e-3 and turned.Unit or target
 end
 
 local function faceCamera(root: BasePart): CFrame
@@ -29,6 +77,24 @@ local function faceCamera(root: BasePart): CFrame
 	root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
 
 	return root.CFrame
+end
+
+local function faceDirection(root: BasePart, direction: Vector3): CFrame
+	root.CFrame = CFrame.lookAt(root.Position, root.Position + direction)
+
+	return root.CFrame
+end
+
+local function runDirection(character: Model, root: BasePart): Vector3
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local moving = humanoid and humanoid.MoveDirection * Vector3.new(1, 0, 1)
+
+	if moving and moving.Magnitude > 1e-3 then
+		return moving.Unit
+	end
+
+	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+	return look.Magnitude > 1e-3 and look.Unit or Vector3.zAxis
 end
 
 local function createVelocity(controller, root: BasePart): LinearVelocity
@@ -109,7 +175,8 @@ function DiveComponent:Activate(controller)
 	local _heldbind = controller.InputHandler:GetKeysDown(Config.Binds)
 	if not _heldbind then return end
 
-	local _direction = Config.BindAliases[_heldbind] or _heldbind
+	local _isSprinting = controller.StatusService:CheckStatuses(_character, { IsSprinting = true })
+	local _direction = _isSprinting and Config.SprintDirection or Config.BindAliases[_heldbind] or _heldbind
 	local _settings = Config.Directions[_direction]
 	local _startTime = _settings.StartTime
 
@@ -126,15 +193,34 @@ function DiveComponent:Activate(controller)
 	end
 
 	local _trove = controller.Trove.new()
-	local _lockedDirection = planarDirection(faceCamera(_root), _direction)
+	local _runDirection = _isSprinting and runDirection(_character, _root) or nil
+	local _facing = if _runDirection then faceDirection(_root, _runDirection) else faceCamera(_root)
+	local _lockedDirection = planarDirection(_facing, _direction)
+	local _carry = carriedSpeed(_root, _lockedDirection)
+	local _falloff = falloffFor(_startTime, _carry, _isSprinting and Config.Momentum.SprintBonus or 0)
+	local _sprintDive = _runDirection ~= nil
+	local _steering = _sprintDive
 	local _velocity = createVelocity(controller, _root)
 	local _start = os.clock()
 
+	local function _releaseFacing()
+		if _runDirection then
+			_runDirection = nil
+			controller.StatusService:RemoveStatus(_character, "NoRotate", Config.FacingSource)
+		end
+	end
+
 	local function _clean()
+		_releaseFacing()
+
 		if _trove then
 			_trove:Clean()
 			_trove = nil
 		end
+	end
+
+	if _runDirection then
+		controller.StatusService:SetStatus(_character, "NoRotate", true, nil, Config.FacingSource)
 	end
 
 	local function _interrupt()
@@ -146,7 +232,7 @@ function DiveComponent:Activate(controller)
 	clearImpulses(controller)
 	controller.AttackService:ReportDive(controller)
 
-	_velocity.VectorVelocity = _lockedDirection * speedAt(_startTime, 0)
+	_velocity.VectorVelocity = _lockedDirection * speedAt(_startTime, 0, _carry, _falloff)
 	_velocity.Parent = _root
 
 	playVisual(controller, _character, _direction)
@@ -159,7 +245,7 @@ function DiveComponent:Activate(controller)
 
 	_trove:Add(_velocity)
 
-	_trove:Add(RunService.RenderStepped:Connect(function()
+	_trove:Add(RunService.RenderStepped:Connect(function(dt)
 		local _elapsed = os.clock() - _start
 
 		if _elapsed > _startTime + Config.Duration + Config.CleanupGrace then
@@ -172,14 +258,25 @@ function DiveComponent:Activate(controller)
 			return
 		end
 
-		local _speed = speedAt(_startTime, _elapsed)
+		local _speed = speedAt(_startTime, _elapsed, _carry, _falloff)
 
 		--@ Only on the way down: the ramp itself starts below the cutoff
-		if _elapsed >= _startTime and _speed <= Config.CutoffSpeed and _velocity.Parent then
+		if _elapsed >= _startTime and _speed <= math.max(Config.CutoffSpeed, _carry) and _velocity.Parent then
 			_velocity:Destroy()
+			_releaseFacing()
 		end
 
-		if not _isShiftLock or controller.StatusService:CheckStatuses(_character, { IsSprinting = true }) then
+		if _sprintDive then
+			if _runDirection then
+				_steering = _steering and controller.StatusService:CheckStatuses(_character, { IsSprinting = true })
+
+				if _steering then
+					_runDirection = turnToward(_runDirection, runDirection(_character, _root), dt)
+				end
+
+				faceDirection(_root, _runDirection)
+			end
+		elseif not _isShiftLock or controller.StatusService:CheckStatuses(_character, { IsSprinting = true }) then
 			faceCamera(_root)
 		end
 

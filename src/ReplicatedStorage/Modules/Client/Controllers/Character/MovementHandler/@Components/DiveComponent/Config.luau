@@ -23,6 +23,23 @@ return {
 	Binds = { "W", "A", "S", "D", "Q" },
 	BindAliases = { Q = "W" },
 
+	--@ A dive out of a sprint goes along the run and keeps the character facing it, whatever key is held
+	SprintDirection = "W",
+	--@ How fast a sprint dive turns toward a new run direction (exponential, per second); steering ends for good once the sprint does
+	SprintTurnRate = 10,
+	--@ Status source for the NoRotate a sprint dive holds so shift lock can't turn it toward the camera
+	FacingSource = "Dive",
+
+	--@ Share of the entry speed along the dive that the ramp starts from and the falloff settles on,
+	--@ so a dive out of a run keeps its momentum and hands back at running speed. The falloff is then
+	--@ shortened so the dive still covers only the standing dive's distance, plus SprintBonus studs
+	--@ out of a sprint.
+	Momentum = {
+		Carry = 1,
+		SprintBonus = 3,
+		MinFalloff = 0.15,
+	},
+
 	Directions = {
 		W = { Track = "DiveForward", StartTime = 0.125 },
 		A = { Track = "DiveLeft", StartTime = 0.125 },
