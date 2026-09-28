@@ -127,6 +127,18 @@ function CombatHandler:InitCharacter(controller)
 		end
 	end)
 
+	local interrupted = false
+
+	CombatHandler.Trove:Connect(Character.AttributeChanged, function()
+		local yielded = controller.StatusService:IsHitYielded(Character)
+
+		if yielded and not interrupted then
+			CombatHandler:Interrupt(controller)
+		end
+
+		interrupted = yielded
+	end)
+
 	CombatConfig:WeaponListener(controller, CombatHandler.Trove, function(weaponId)
 		CombatConfig:ClearImpulse(controller)
 
@@ -201,6 +213,25 @@ function CombatHandler:BeginBranch(controller, branchName: string)
 	if typeof(component.Activate) == "function" then
 		component:Activate(controller, state)
 	end
+end
+
+function CombatHandler:Interrupt(controller)
+	local state = CombatHandler:StateFor(controller)
+	local component = CombatHandler.components[state.CurrentBranch .. "AttackComponent"]
+
+	if component and typeof(component.Deactivate) == "function" then
+		component:Deactivate(controller, state)
+	end
+
+	CombatConfig:ClearImpulse(controller)
+
+	if controller.Character then
+		controller.StatusService:RemoveStatus(controller.Character, "IsAttacking")
+	end
+
+	state.QueuedBranch = nil
+	state.ComboIndex = 0
+	state.CurrentBranch = "Neutral"
 end
 
 function CombatHandler:QueueBranch(controller, branchName: string)
