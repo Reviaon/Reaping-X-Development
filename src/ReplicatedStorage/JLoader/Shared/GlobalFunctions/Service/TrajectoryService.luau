@@ -184,8 +184,11 @@ local function marker(color: Color3, position: Vector3, normal: Vector3?, lifeti
 		local tip = position + normal.Unit * settings.NormalLength
 		part(ball, color, Vector3.new(width, width, settings.NormalLength), CFrame.lookAt((position + tip) / 2, tip))
 	end
+	
+	task.delay(math.max(lifetime, 0) + settings.DebugLifetime, function()
+		ball:Destroy()
+	end)
 
-	Debris:AddItem(ball, math.max(lifetime, 0) + settings.DebugLifetime)
 	return ball
 end
 
