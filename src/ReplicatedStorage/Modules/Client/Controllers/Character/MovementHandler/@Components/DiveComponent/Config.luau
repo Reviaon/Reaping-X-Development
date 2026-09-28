@@ -3,6 +3,9 @@ return {
 	Duration = 1,
 	Cooldown = 1.5,
 
+	--@ Seconds of server-side hit immunity from activation; after it the dash can be hit and interrupted
+	IFrames = 0.2,
+
 	--@ Outranks attack impulses, so a lunge landing mid-dash is ignored instead of stomping it
 	ImpulsePriority = 2,
 
