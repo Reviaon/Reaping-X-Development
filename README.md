@@ -681,6 +681,32 @@ A ragdoll is real physics, so only its physics owner can move it: the server lau
 and the victim's own client applies the launch to a player (`KnockbackHandler:Launch`); everyone
 else sees it through replication. A ragdolled victim cannot be hit at all — `StatusService:IsHitImmune`
 (`StatusLibrary.HitImmune`) is checked by both hitboxes, the server report and `ApplyKnockback`.
+Once the ragdoll ends the victim gets `IsRecovering` for the finisher's `recovery` seconds, also in
+`HitImmune`: they can swing or dive but nobody can hit them, so they act first and the finisher can't
+be chained straight into another combo. The immunity ends early the moment one of their own hits is
+accepted (`CombatService:LandHit` removes `Settings.RecoveryStatus`), so it can't cover a whole
+counter-combo, or the moment they dive.
+
+**`IFrames` is the universal i-frame status.** It is in `HitImmune`, carries no movement overrides,
+and anything that needs brief hit immunity applies it on the server with
+`StatusService:ApplyStatus(character, "IFrames", true, seconds)` (`CombatService.Settings.IFrameStatus`)
+instead of adding a status of its own. Applications stack, so overlapping sources keep the longest.
+
+**Dive i-frames.** `DiveComponent:Activate` reports the dive (`AttackService:ReportDive` →
+`CombatService:HandleDiveReport`). The server refuses a dead or yielded diver and anything faster than
+the dive's `Cooldown` minus `Settings.DiveReportLeniency`, then removes `IsRecovering` and applies
+`IFrames` for the dive config's `IFrames` seconds. After that the dash can be hit
+like anything else, and a stun ends it through the dive's own interrupt. The window starts when the
+server receives the report, so a hit the server processes first still lands.
+
+The attacker's side is `StatusLibrary.HitYield` (`IsStunned`) through `StatusService:IsHitYielded`: a
+yielded attacker spawns no hitbox, a live hitbox ignores contacts, and `ApplyKnockback` refuses the
+hit, so in a trade whichever report the server takes first wins. The same moment interrupts the
+swing (`CombatHandler:Interrupt` — track, lunge, `IsAttacking`, combo) and deletes the attacker's
+swing and dodge visuals on every client: `VisualsCore.SpawnEffect` builds them as cancellable
+EffectService objects on the `HitYield` list (`CancelOn` in a visual's settings or spec overrides it,
+`false` opts out), and `VisualsCore.WatchInterrupt` stops the rest of that swing's timeline and clears
+its afterimages.
 
 `RagdollService` (GlobalFunctions) builds the rig once per R6 character from its own joints — no
 template instances — when `ServerController` loads it: a ball socket at each shoulder and hip,
@@ -762,10 +788,15 @@ The decision is made once, on arrival: a long-lived effect started while a viewe
 does not begin playing if they walk into range.
 
 **A payload may carry `SkipSender = true`.** `EffectService` then broadcasts with `FireExcept` rather
-than `FireAll`, and the firing client is expected to have played it locally already — that is what
-`AttackService:PlayLocal` does for hit effects, so an attacker sees the impact on the frame it lands
-instead of after a round trip. Set it only when the sender has genuinely played it itself, or that
-client sees nothing at all.
+than `FireAll`, and the firing client is expected to have played it locally already. Set it only when
+the sender has genuinely played it itself, or that client sees nothing at all.
+
+**Hit effects are server-relayed on acceptance, not client-relayed.** The attacker's client plays its
+own hit at once (`AttackService:PlayHit`), and only reports it. `CombatService:LandHit` sends
+`Combat.Hit` to everyone else (`FireExcept` the reporting player; `FireAll` for a dummy) only after
+`ApplyKnockback` accepts it, with the effect name resolved from weapon config rather than taken from
+the client. A hit refused as immune or yielded therefore shows nowhere but, at most, the attacker's
+own screen.
 
 ---
 

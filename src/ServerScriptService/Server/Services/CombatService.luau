@@ -5,17 +5,22 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "Launch" } },
+	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "Launch" } },
 })
 
-local CombatHandler = ReplicatedStorage:WaitForChild("Modules")
+local CharacterControllers = ReplicatedStorage:WaitForChild("Modules")
 	:WaitForChild("Client")
 	:WaitForChild("Controllers")
 	:WaitForChild("Character")
-	:WaitForChild("CombatHandler")
+
+local CombatHandler = CharacterControllers:WaitForChild("CombatHandler")
 
 local CombatConfig = require(CombatHandler:WaitForChild("Config"))
 local Hitstun = require(CombatHandler:WaitForChild("Hitstun"))
+local DiveConfig = require(CharacterControllers:WaitForChild("MovementHandler")
+	:WaitForChild("@Components")
+	:WaitForChild("DiveComponent")
+	:WaitForChild("Config"))
 
 CombatService.Settings = {
 	--@ Studs. A hit reported from further than this is dropped as implausible.
@@ -30,13 +35,20 @@ CombatService.Settings = {
 	--@ Seconds. Floor on how often one player's lunge report is relayed.
 	LungeReportCooldown = 0.1,
 
-	--@ Hit immunity after a ragdoll; the victim loses it once one of their own hits lands.
+	--@ Hit immunity after a ragdoll; the victim loses it once one of their own hits lands or they dive.
 	RecoveryStatus = "IsRecovering",
+
+	--@ Universal hit immunity; a dive applies it for its first DiveConfig.IFrames seconds.
+	IFrameStatus = "IFrames",
+
+	--@ Seconds. A dive report is accepted this much sooner than the dive's own cooldown, for jitter.
+	DiveReportLeniency = 0.2,
 }
 
 local lastReport = {}
 local lastRootReport = {}
 local lastLungeReport = {}
+local lastDiveReport = {}
 
 local effectRelay = nil
 
@@ -279,6 +291,30 @@ function CombatService:HandleLungeReport(player: Player, weaponId, comboIndex, p
 	self:BroadcastLunge(character, direction.Unit, weaponId, math.floor(comboIndex), player)
 end
 
+function CombatService:HandleDiveReport(player: Player)
+	local settings = self.Settings
+	local StatusService = GlobalFunctions.StatusService
+
+	local character = player and player.Character
+	if not character or not rootOf(character) then return end
+	if not StatusService:IsAlive(character) or StatusService:IsHitYielded(character) then return end
+
+	local now = os.clock()
+	local last = lastDiveReport[player]
+
+	if last and now - last < DiveConfig.Cooldown - settings.DiveReportLeniency then return end
+
+	lastDiveReport[player] = now
+
+	if character:GetAttribute(settings.RecoveryStatus) ~= nil then
+		StatusService:RemoveStatus(character, settings.RecoveryStatus)
+	end
+
+	if DiveConfig.IFrames > 0 then
+		StatusService:ApplyStatus(character, settings.IFrameStatus, true, DiveConfig.IFrames)
+	end
+end
+
 function CombatService:HandleRootReport(player: Player, payload)
 	local character = player and player.Character
 	if not character then return end
@@ -350,6 +386,10 @@ function CombatService:Init()
 		self:HandleLungeReport(player, weaponId, comboIndex, payload)
 	end)
 
+	self.ReportDive:Connect(function(player)
+		self:HandleDiveReport(player)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		local prefix = tostring(player.UserId) .. "|"
 
@@ -361,6 +401,7 @@ function CombatService:Init()
 
 		lastRootReport[player] = nil
 		lastLungeReport[player] = nil
+		lastDiveReport[player] = nil
 
 		if player.Character then
 			GlobalFunctions.PositionService.Clear(player.Character)
