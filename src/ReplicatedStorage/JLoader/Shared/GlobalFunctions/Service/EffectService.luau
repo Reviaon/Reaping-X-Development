@@ -168,7 +168,7 @@ function EffectService.new(config, cached_vfx)
 		CancellableCallback = config.CancelBack,
 		CancellableWhitelist = config.CancellableWhitelist,
 		CancelWindow = config.CancelWindow or 1,
-		CancelFade = config.CancelFade or true,
+		CancelFade = config.CancelFade ~= false,
 
 		_Offset = relativeOffset, 
 	}, EffectService)
@@ -206,69 +206,44 @@ function EffectService:_BindCancellable()
 		return
 	end
 
+	local function cancel(reason)
+		if self._isCancelled then return end
+		if os.clock() > self._cancelExpireTime then return end
+
+		self._isCancelled = true
+
+		--@ Destroy clears the callback, so it is read first.
+		local callback = self.CancellableCallback
+
+		if self.CancelFade then
+			if self.Effect then
+				self:FadeOutAll(0.1, {})
+			end
+		else
+			self:Destroy()
+		end
+
+		if typeof(callback) == "function" then
+			pcall(callback, self, reason)
+		end
+
+		self:_CleanupCancellable()
+	end
+
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 
 	if humanoid then
-		local deathConnection
-		deathConnection = humanoid.Died:Connect(function()
-			if self._isCancelled then return end
-			if os.clock() > self._cancelExpireTime then return end
-
-			self._isCancelled = true
-
-			if self.CancelFade then
-				if self.Effect then
-					self:FadeOutAll(0.1, {})
-				end
-			else
-				self:Destroy()
-			end
-
-			if typeof(self.CancellableCallback) == "function" then
-				pcall(self.CancellableCallback, self, "Died")
-			end
-
-			self:_CleanupCancellable()
-		end)
-
-		table.insert(self._cancelConnections, deathConnection)
+		table.insert(self._cancelConnections, humanoid.Died:Connect(function()
+			cancel("Died")
+		end))
 	end
 
 	for _, attributeName in ipairs(self.CancellableWhitelist) do
-		local connection
+		table.insert(self._cancelConnections, character:GetAttributeChangedSignal(attributeName):Connect(function()
+			if not character:GetAttribute(attributeName) then return end
 
-		connection = character:GetAttributeChangedSignal(attributeName):Connect(function()
-			if self._isCancelled then
-				return
-			end
-
-			if os.clock() > self._cancelExpireTime then
-				return
-			end
-
-			local value = character:GetAttribute(attributeName)
-			if not value then
-				return
-			end
-
-			self._isCancelled = true
-
-			if self.CancelFade then
-				if self.Effect then
-					self:FadeOutAll(0.1,{})
-				end
-			else
-				self:Destroy()
-			end
-
-			if typeof(self.CancellableCallback) == "function" then
-				pcall(self.CancellableCallback, self, attributeName)
-			end
-
-			self:_CleanupCancellable()
-		end)
-
-		table.insert(self._cancelConnections, connection)
+			cancel(attributeName)
+		end))
 	end
 
 end
