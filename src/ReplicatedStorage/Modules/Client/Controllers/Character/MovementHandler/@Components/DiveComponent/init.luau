@@ -73,7 +73,15 @@ end
 function DiveComponent:CanActivate(controller)
 	local _character = controller.Character
 
-	if controller.StatusService:CheckStatuses(_character, { IsDiving = true, IsStunned = true }) then
+	if not _character then
+		return false
+	end
+
+	if controller.StatusService:CheckStatuses(_character, { 
+		IsDiving = true, 
+		IsStunned = true,
+		IsRagdolled = true,
+		}) then
 		return false
 	end
 
@@ -90,7 +98,10 @@ end
 
 function DiveComponent:Activate(controller)
 	local _character = controller.Character
-	if not _character or not DiveComponent:CanActivate(controller) then return end
+	
+	if not DiveComponent:CanActivate(controller) then 
+		return 
+	end
 
 	local _root = _character:FindFirstChild("HumanoidRootPart")
 	if not _root then return end
@@ -133,6 +144,7 @@ function DiveComponent:Activate(controller)
 	end
 
 	clearImpulses(controller)
+	controller.AttackService:ReportDive(controller)
 
 	_velocity.VectorVelocity = _lockedDirection * speedAt(_startTime, 0)
 	_velocity.Parent = _root
