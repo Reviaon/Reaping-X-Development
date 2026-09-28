@@ -57,9 +57,6 @@ DummyService.Settings = {
 
 	--@ NPCLibrary entry for an NPC with none of its own.
 	FallbackConfig = "Template",
-
-	HitEffectPath = "Combat.Hit",
-	HitEffectMethod = "Emit",
 }
 
 local SWING = "DummySwing"
@@ -354,22 +351,9 @@ local function onHit(brain, target, weaponId, timing)
 	if typeof(target) ~= "Instance" or not target:IsA("Model") then return end
 	if not target:FindFirstChildOfClass("Humanoid") then return end
 	if GlobalFunctions.StatusService:IsHitImmune(target) then return end
+	if GlobalFunctions.StatusService:IsHitYielded(character) then return end
 
-	local settings = DummyService.Settings
-
-	EffectService.CreateVisual:FireAll({
-		Effect = settings.HitEffectPath,
-		Method = settings.HitEffectMethod,
-		Info = {
-			Target = target,
-			Attacker = character,
-			Effect = timing.hitbox.effect,
-			WeaponId = weaponId,
-			ComboIndex = timing.combo_index,
-		},
-	})
-
-	CombatService:ApplyKnockback(character, target, nil, weaponId, timing.combo_index)
+	CombatService:LandHit(character, target, nil, weaponId, timing.combo_index)
 end
 
 local function scheduleHitbox(brain, weaponId, timing)
@@ -473,7 +457,13 @@ end
 local function interrupt(brain)
 	GlobalFunctions.AttackService:CancelSwing(brain, SWING)
 	disposeHitbox(brain)
+
+	if brain.Swinging then
+		GlobalFunctions.StatusService:RemoveStatus(brain.Character, "IsAttacking")
+	end
+
 	brain.Swinging = false
+	brain.Combo = 0
 end
 
 local function step(brain, now)
