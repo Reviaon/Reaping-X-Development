@@ -1,7 +1,8 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
 	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames" },
-	HitYield = { "IsStunned" },
+	HitYield = { "IsStunned", "GuardBroken" },
+	HitGuard = { "IsGuarding" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -55,6 +56,15 @@ return{
 			WalkSpeed = 8,
 			JumpPower = 0,
 			Priority = 3;
+		};
+
+		IsGuarding = {
+			Priority = 3;
+		};
+
+		GuardBroken = {
+			JumpPower = 0,
+			Priority = 2;
 		};
 
 		IsCrouching = {
