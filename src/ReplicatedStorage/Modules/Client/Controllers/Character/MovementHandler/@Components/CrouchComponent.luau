@@ -8,7 +8,9 @@ function CrouchComponent:CanActivate(controller)
 	local Character = controller.Character
 	if not Character then return false end
 
-	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true, IsStunned = true }) then
+	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true })
+		or controller.StatusService:IsHitYielded(Character)
+	then
 		return false
 	end
 

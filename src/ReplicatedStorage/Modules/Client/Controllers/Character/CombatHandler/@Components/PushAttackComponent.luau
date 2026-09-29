@@ -8,7 +8,7 @@ function PushComponent:CanActivate(controller, _combatState): boolean
 	local Character = controller.Character
 	if not Character then return false end
 
-	if controller.StatusService:CheckStatuses(Character, { IsStunned = true }) then
+	if controller.StatusService:IsHitYielded(Character) then
 		return false
 	end
 

@@ -18,7 +18,7 @@ function SprintComponent:CanActivate(controller, _combatState): boolean
 	local Character = controller.Character
 	if not Character then return false end
 
-	if controller.StatusService:CheckStatuses(Character, { IsStunned = true }) then
+	if controller.StatusService:IsHitYielded(Character) then
 		return false
 	end
 
@@ -39,7 +39,8 @@ function SprintComponent:Activate(controller)
 
 	if Humanoid.MoveDirection.Magnitude <= 0 then return end
 
-	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true, IsBlocking = true, IsStunned = true }) then return end
+	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true, IsBlocking = true }) then return end
+	if controller.StatusService:IsHitYielded(Character) then return end
 
 	controller.StatusService:SetStatus(Character, "IsSprinting", true)
 

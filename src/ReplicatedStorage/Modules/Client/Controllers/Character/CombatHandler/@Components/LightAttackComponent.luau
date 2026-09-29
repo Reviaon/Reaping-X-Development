@@ -30,10 +30,9 @@ function LightAttackComponent:CanActivate(controller, combatState): boolean
 	end
 
 	if controller.StatusService:CheckStatuses(Character, {
-		IsStunned = true,
 		IsBlocking = true,
 		IsRagdolled = true,
-	}) then
+	}) or controller.StatusService:IsHitYielded(Character) then
 		return false
 	end
 
@@ -70,6 +69,7 @@ function LightAttackComponent:Activate(controller, combatState)
 	})
 
 	AttackService:ScheduleEaseOut(controller, SWING, track, timing)
+	AttackService:ReportSwing(controller, weaponId, comboIndex)
 	broadcastVisual(controller, weaponId, comboIndex, timing.speed)
 	AttackService:ScheduleHitbox(controller, SWING, Character, timing, { weaponId = weaponId })
 
