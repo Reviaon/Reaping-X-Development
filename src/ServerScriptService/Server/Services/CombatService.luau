@@ -4,7 +4,7 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "Launch" } },
+	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch" } },
 })
 
 local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
@@ -44,6 +44,13 @@ local effectRelay = nil
 local function getEffectRelay()
 	effectRelay = effectRelay or Jloader.GetService("EffectService")
 	return effectRelay
+end
+
+local blockService = nil
+
+local function getBlockService()
+	blockService = blockService or Jloader.GetService("BlockService")
+	return blockService
 end
 
 local function livingFolder()
@@ -143,6 +150,14 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if not rootOf(attacker) or not rootOf(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitYielded(attacker) then return false end
+	if getBlockService():HasPriority(victim, attacker) then
+		if GlobalFunctions.DebugService.IsEnabled() then
+			warn(`[Block] {victim.Name}'s counter outranks {attacker.Name}: hit refused`)
+		end
+
+		return false
+	end
+	if getBlockService():Absorb(attacker, victim) then return false end
 
 	local direction = knockbackDirection(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
@@ -304,6 +319,22 @@ function CombatService:HandleDiveReport(player: Player)
 	end
 end
 
+function CombatService:HandleSwingReport(player: Player, weaponId, comboIndex)
+	local character = player and player.Character
+	if not character or not rootOf(character) then return end
+
+	if typeof(weaponId) ~= "string" then return end
+	if typeof(comboIndex) ~= "number" or comboIndex < 1 then return end
+	if GlobalFunctions.StatusService:IsHitYielded(character) then return end
+
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	if not weaponConfig then return end
+
+	local timing = CombatConfig:ResolveAttackTiming(nil, math.floor(comboIndex), weaponConfig)
+
+	getBlockService():BeginSwing(character, timing.duration)
+end
+
 function CombatService:HandleRootReport(player: Player, payload)
 	local character = player and player.Character
 	if not character then return end
@@ -377,6 +408,10 @@ function CombatService:Init()
 
 	self.ReportDive:Connect(function(player)
 		self:HandleDiveReport(player)
+	end)
+
+	self.ReportSwing:Connect(function(player, weaponId, comboIndex)
+		self:HandleSwingReport(player, weaponId, comboIndex)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

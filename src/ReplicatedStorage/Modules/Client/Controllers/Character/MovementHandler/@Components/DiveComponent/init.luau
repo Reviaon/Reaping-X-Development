@@ -143,11 +143,10 @@ function DiveComponent:CanActivate(controller)
 		return false
 	end
 
-	if controller.StatusService:CheckStatuses(_character, { 
-		IsDiving = true, 
-		IsStunned = true,
+	if controller.StatusService:CheckStatuses(_character, {
+		IsDiving = true,
 		IsRagdolled = true,
-		}) then
+		}) or controller.StatusService:IsHitYielded(_character) then
 		return false
 	end
 
@@ -177,6 +176,11 @@ function DiveComponent:Activate(controller)
 
 	local _isSprinting = controller.StatusService:CheckStatuses(_character, { IsSprinting = true })
 	local _direction = _isSprinting and Config.SprintDirection or Config.BindAliases[_heldbind] or _heldbind
+
+	if controller.StatusService:CheckStatuses(_character, { IsBlocking = true }) and not Config.BlockingDirections[_direction] then
+		return
+	end
+
 	local _settings = Config.Directions[_direction]
 	local _startTime = _settings.StartTime
 

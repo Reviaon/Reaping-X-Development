@@ -28,6 +28,14 @@ local function getCombatRelay()
 	return combatRelay
 end
 
+local blockRelay = nil
+local guardConnection = nil
+
+local function getBlockRelay()
+	blockRelay = blockRelay or Jloader.GetService("BlockService")
+	return blockRelay
+end
+
 --@ Components
 CombatHandler.components = {}
 CombatHandler.Trove = GarbageCollection.new()
@@ -114,6 +122,15 @@ function CombatHandler:InitCharacter(controller)
 
 	controller.VisualRelay = getVisualRelay()
 	controller.CombatRelay = getCombatRelay()
+	controller.BlockRelay = getBlockRelay()
+
+	--@ Once, here rather than in Init: the service lookup can come back empty while the server is
+	--@ still starting, and a nil there aborted the whole client load.
+	if not guardConnection and controller.BlockRelay then
+		guardConnection = controller.BlockRelay.Guard:Connect(function(event)
+			CombatHandler:OnGuard(ClientController, event)
+		end)
+	end
 
 	CombatHandler.Trove:Connect(RunService.Heartbeat, function()
 		CombatHandler:UpdateComboTimeout(controller)
@@ -133,6 +150,7 @@ function CombatHandler:InitCharacter(controller)
 
 		if yielded and not interrupted then
 			CombatHandler:Interrupt(controller)
+			CombatHandler:StopBlock(controller)
 		end
 
 		interrupted = yielded
@@ -147,6 +165,7 @@ function CombatHandler:InitCharacter(controller)
 		)
 
 		CombatHandler:StateFor(controller).ActiveWeapon = weaponId
+		CombatHandler:RefreshBlock(controller)
 
 		warn("Active weapon changed to:", weaponId)
 	end)
@@ -182,7 +201,7 @@ function CombatHandler:CanBeginBranch(controller, branchName: string): boolean
 
 	CombatHandler:StateFor(controller).ActiveWeapon = CombatHandler:ResolveActiveWeapon(controller)
 
-	if controller.StatusService:CheckStatuses(Character, { IsStunned = true }) then
+	if controller.StatusService:IsHitYielded(Character) then
 		return false
 	end
 
@@ -309,6 +328,20 @@ function CombatHandler:StopBlock(controller)
 	local blockComponent = CombatHandler.components["BlockComponent"]
 	if blockComponent and typeof(blockComponent.Deactivate) == "function" then
 		blockComponent:Deactivate(controller, CombatHandler:StateFor(controller))
+	end
+end
+
+function CombatHandler:RefreshBlock(controller)
+	local blockComponent = CombatHandler.components["BlockComponent"]
+	if blockComponent and typeof(blockComponent.Refresh) == "function" then
+		blockComponent:Refresh(controller)
+	end
+end
+
+function CombatHandler:OnGuard(controller, event)
+	local blockComponent = CombatHandler.components["BlockComponent"]
+	if blockComponent and typeof(blockComponent.OnGuard) == "function" then
+		blockComponent:OnGuard(controller, event)
 	end
 end
 

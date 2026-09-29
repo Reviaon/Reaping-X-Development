@@ -23,6 +23,9 @@ return {
 	Binds = { "W", "A", "S", "D", "Q" },
 	BindAliases = { Q = "W" },
 
+	--@ The only directions a dive may take while blocking; the guard stays up through it
+	BlockingDirections = { S = true },
+
 	--@ A dive out of a sprint goes along the run and keeps the character facing it, whatever key is held
 	SprintDirection = "W",
 	--@ How fast a sprint dive turns toward a new run direction (exponential, per second); steering ends for good once the sprint does

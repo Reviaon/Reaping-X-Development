@@ -266,6 +266,7 @@ end
 function StatusService:CheckStatuses(Entity, Statuses)
 	ValidateEntity(Entity)
 	assert(typeof(Statuses) == "table", "Expected status checks")
+	
 	for Key, Value in Statuses do
 		if typeof(Key) == "number" then
 			ValidateName(Value)
@@ -274,11 +275,13 @@ function StatusService:CheckStatuses(Entity, Statuses)
 			if Entity:GetAttribute(Key) == Value then return true end
 		end
 	end
+
 	if Statuses.Default == true then
 		for _, Name in StatusLibrary.DefaultChecks do
 			if Statuses[Name] == nil and Entity:GetAttribute(Name) == true then return true end
 		end
 	end
+	
 	return false
 end
 

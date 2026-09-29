@@ -718,6 +718,58 @@ Humanoid goes to `Physics` and back through `GettingUp` — on the server for an
 `RagdollService.Watch` on the player's own client. Shift-lock's per-frame root rotation stands down
 while ragdolled.
 
+### Blocking
+
+Holding **F** raises a guard. The numbers live in `Libraries/CharacterLibrary/BlockLibrary`, which
+both sides require.
+
+**The server owns the guard.** `IsBlocking` is set on the client, so it never reaches the server.
+It still gates the local client (walk speed, no sprinting or attacking) the moment F goes down.
+`BlockComponent` reports raise and lower to `BlockService` (`ReportBlock`), which applies the
+replicated `IsGuarding` status (`StatusLibrary.HitGuard`, read through `StatusService:IsGuarding`).
+A dead or yielded character can't raise it, and neither can one under `GuardBroken`.
+
+**Block health.** Characters spawn with `BlockHealth` and `MaxBlockHealth` attributes (100, seeded
+from `AttributesLibrary`). `CombatService:ApplyKnockback` asks `BlockService:Absorb` right after the
+immunity and yield checks. A guarded victim takes no knockback, stun or finisher, and
+loses `HitCost` (20) block health instead, so the fifth blocked hit breaks the guard: `IsGuarding`
+is removed and `GuardBroken` applied for `BreakLockout` seconds, after which block health is full
+again. Otherwise block health refills at `RegenRate` per second, starting `RegenDelay` seconds
+after the last blocked hit. The server keeps the unrounded value and publishes the rounded one, so
+a UI only has to read `BlockHealth`.
+
+**Animations.** The guard holds `{Weapon}BlockIdle` at Action2, or `UniversalBlock` for a weapon
+without one. The server tells the blocker's own client about each blocked hit through `Guard`
+(`Absorbed`, `Broken`, `Refused`), and that client plays `{Weapon}BlockReaction1..n` in turn at
+Action3 (1 → 2 → 1 …), starting at 1 each time the guard goes up. A weapon without reactions plays
+none. Because the owner plays them, everyone sees them through replication. `Broken` lets the last
+reaction finish while the guard drops; `Refused` drops it straight away. An attacker's hitbox doesn't
+play its predicted hit effect on a target that's guarding.
+
+A stun drops the guard on the client (`CombatHandler`'s yield watch), and changing weapon while
+guarding swaps the idle. While blocking, `IdleComponent` suspends the weapon's `{Weapon}Idle` so
+the block idle plays alone; the weapon idle comes back once the character is idle and not
+blocking. `BlockComponent` keeps its tracks in its own scope, not AttackService's, so a dive's
+`ReleaseSpentSwings` can't stop them. While blocking, the only dive allowed is a back dive
+(`DiveComponent/Config.BlockingDirections`); the guard stays up through it, and the block idle
+shows again as the dive track ends.
+
+**A broken guard can't act.** `GuardBroken` is in `StatusLibrary.HitYield` with `IsStunned`, so for
+`BreakLockout` it gets everything a stun does: the swing is interrupted, no hitbox spawns, the server
+refuses its hits and its dive i-frames, and the guard can't go back up. It also has `JumpPower` 0,
+and attacks, sprint, crouch, dive and block all gate on `StatusService:IsHitYielded` rather than
+`IsStunned` alone. The server relays `Combat.Daze` (`Effects/Combat/Daze`) to every client. That
+holds `Storage.Particles.CombatVFX.Hit.Daze` on the victim's head, spinning, until `GuardBroken`
+clears, then fades it out (`FadeOutAll` + `SetRemoval`). `Info.Until` is the lockout's end in
+server time, because the relay can arrive before the attribute replicates.
+
+**Counter priority.** A guard remembers who it last absorbed a hit from. Lowering that guard
+(not a break) opens a `CounterWindow` (0.5s). A swing started inside it (`LightAttackComponent` →
+`AttackService:ReportSwing` → `CombatService:HandleSwingReport` → `BlockService:BeginSwing`)
+outranks that attacker for the swing's duration: `ApplyKnockback` refuses their hits on the
+blocker (`BlockService:HasPriority`, logged in debug mode). It covers only the first swing, and
+only against that attacker. Raising the guard again clears it.
+
 ### Trajectory debug and landing prediction
 
 `TrajectoryService` (GlobalFunctions) does two jobs.
