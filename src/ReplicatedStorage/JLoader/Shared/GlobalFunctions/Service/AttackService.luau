@@ -209,6 +209,14 @@ function AttackService:ReportLunge(controller, weaponId, comboIndex, direction)
 	return true
 end
 
+function AttackService:ReportSwing(controller, weaponId, comboIndex)
+	local relay = controller[Settings.CombatRelayKey]
+	if not relay then return false end
+
+	relay.ReportSwing:Fire(weaponId, comboIndex)
+	return true
+end
+
 function AttackService:ReportDive(controller)
 	local relay = controller[Settings.CombatRelayKey]
 	if not relay then return false end
@@ -302,7 +310,10 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)
 
-			self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index)
+			if not controller.StatusService:IsGuarding(target) then
+				self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index)
+			end
+
 			self:ReportHit(controller, target, options.weaponId, timing.combo_index)
 
 			if options.onHit then
