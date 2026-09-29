@@ -312,6 +312,11 @@ function StatusService:IsHitYielded(Entity)
 	return self:CheckStatuses(Entity, StatusLibrary.HitYield)
 end
 
+function StatusService:IsGuarding(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.HitGuard)
+end
+
 function StatusService:GetRemainingTime(Entity, Name)
 	ValidateEntity(Entity)
 	ValidateName(Name)
