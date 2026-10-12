@@ -73,8 +73,9 @@ local inputActions = {
 				CombatHandler:TryHeavyAttack(controller)
 			end,
 		},
+		--@ Held: the guard goes back up by itself once whatever dropped or refused it has passed.
 		[Enum.KeyCode.F] = {
-			canHold = false,
+			canHold = true,
 			action = function(controller)
 				CombatHandler:StartBlock(controller)
 			end,
