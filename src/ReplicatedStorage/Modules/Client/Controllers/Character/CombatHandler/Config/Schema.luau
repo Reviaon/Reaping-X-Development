@@ -7,6 +7,7 @@ Schema.Weapon = {
 	Rig = "string",
 	RigAttachments = "table",
 	MaxCombo = "number",
+	base_damage = "number|table",
 	attack_speed = "number|table",
 	attack_cooldown = "number|table",
 	attack_cooldown_final = "number|table",
