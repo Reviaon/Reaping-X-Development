@@ -1,4 +1,5 @@
 --@ Block Component
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local BlockLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/BlockLibrary")
 
 local BlockComponent = {}
@@ -201,6 +202,13 @@ end
 --@ The server's word on the guard: Absorbed and Broken are blocked hits, Refused a raise it
 --@ turned down.
 function BlockComponent:OnGuard(controller, event)
+	local shape = BlockLibrary.Shakes[event]
+	local camera = shape and Jloader.GetHandler("CameraHandler")
+
+	if camera then
+		camera:Shake(shape)
+	end
+
 	if event == "Absorbed" then
 		react(controller)
 	elseif event == "Broken" then

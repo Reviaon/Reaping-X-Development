@@ -3,6 +3,8 @@ return {
 	AttackCooldown = 0.3,
 	ImpulseDelay = 0.2,
 
+	BaseDamage = 4, --@ Health a landed hit takes when the weapon authors no base_damage
+
 	ImpulseSpeed = 30,
 	ImpulseDuration = 0.2,
 	ImpulseFalloff = 0.2,

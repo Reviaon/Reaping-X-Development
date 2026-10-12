@@ -244,6 +244,8 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 		duration = ResolveNumber(weaponConfig.attack_duration, comboIndex, Defaults.AttackDuration) / speed,
 		cooldown = ResolveNumber(cooldown, comboIndex, Defaults.AttackCooldown) / speed,
 
+		damage = ResolveNumber(weaponConfig.base_damage, comboIndex, Defaults.BaseDamage),
+
 		ease_out = ResolveNumber(weaponConfig.ease_out, comboIndex, Defaults.EaseOut) / speed,
 		ease_pause = ResolveNumber(weaponConfig.ease_pause, comboIndex, Defaults.EasePause) / speed,
 		ease_fade = ResolveNumber(weaponConfig.ease_fade, comboIndex, Defaults.EaseFade) / speed,
