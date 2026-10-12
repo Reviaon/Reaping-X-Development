@@ -89,6 +89,32 @@ local function react(controller, force)
 	})
 end
 
+--@ False when there is no break animation, so the caller falls back to a reaction.
+local function playBreak(controller): boolean
+	local Character = controller.Character
+
+	if not Character or not controller.AnimatorService:HasAnimation(Animations.Break) then
+		return false
+	end
+
+	local state = controller:Scope(SCOPE)
+
+	stopTrack(state, "reactionTrack")
+
+	local track = controller.AnimatorService:GetTrack(Character, Animations.Break)
+	local remaining = controller.StatusService:GetRemainingTime(Character, BlockLibrary.BrokenStatus)
+		or BlockLibrary.BreakLockout
+
+	state.breakTrack = controller.AnimatorService:PlayTrack(Character, Animations.Break, {
+		Speed = (track.Length > 0 and remaining > 0) and track.Length / remaining or 1,
+		Priority = Animations.BreakPriority,
+		FadeTime = Animations.BreakFade,
+		Loop = false,
+	})
+
+	return true
+end
+
 --@ True if the guard was up. A broken guard keeps its last reaction playing out.
 local function lower(controller, keepReaction)
 	local Character = controller.Character
@@ -127,7 +153,9 @@ function BlockComponent:CanActivate(controller, _combatState): boolean
 		return false
 	end
 
-	if controller:Scope(SCOPE).raised then
+	local state = controller:Scope(SCOPE)
+
+	if state.raised or os.clock() < (state.retryAt or 0) then
 		return false
 	end
 
@@ -176,10 +204,15 @@ function BlockComponent:OnGuard(controller, event)
 	if event == "Absorbed" then
 		react(controller)
 	elseif event == "Broken" then
-		react(controller, true)
+		if not playBreak(controller) then
+			react(controller, true)
+		end
+
 		lower(controller, true)
+		controller:Scope(SCOPE).retryAt = os.clock() + BlockLibrary.RetryDelay
 	elseif event == "Refused" then
 		lower(controller, false)
+		controller:Scope(SCOPE).retryAt = os.clock() + BlockLibrary.RetryDelay
 	end
 end
 
