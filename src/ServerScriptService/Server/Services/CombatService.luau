@@ -9,6 +9,7 @@ local CombatService = Jloader.CreateService({
 
 local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
 local Hitstun = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Hitstun")
+local WeaponTiers = require("@game/ReplicatedStorage/Libraries/TierLibrary/WeaponTiers")
 local DiveConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/MovementHandler/@Components/DiveComponent/Config")
 
 CombatService.Settings = {
@@ -148,6 +149,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if not profile then return false end
 
 	if not rootOf(attacker) or not rootOf(victim) then return false end
+	if not GlobalFunctions.StatusService:IsAlive(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitYielded(attacker) then return false end
 	if getBlockService():HasPriority(victim, attacker) then
@@ -214,8 +216,28 @@ function CombatService:BroadcastHit(attacker: Model, victim: Model, weaponId: st
 	end
 end
 
+--@ The weapon's base damage, multiplied by the tier of what the attacker is holding. The tier is the
+--@ attribute the server set on equip, so a client can't claim a better one.
+function CombatService:ApplyDamage(attacker: Model, victim: Model, weaponId: string, comboIndex: number): number
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	local humanoid = victim:FindFirstChildOfClass("Humanoid")
+
+	if not weaponConfig or not humanoid then return 0 end
+
+	local tier = WeaponTiers.Tiers[attacker:GetAttribute(WeaponTiers.EquippedAttribute)]
+	local damage = CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).damage * (tier and tier.Damage or 1)
+
+	if damage > 0 then
+		humanoid:TakeDamage(damage)
+	end
+
+	return damage
+end
+
 function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?)
 	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
+
+	self:ApplyDamage(attacker, victim, weaponId, comboIndex)
 
 	local recovery = self.Settings.RecoveryStatus
 
