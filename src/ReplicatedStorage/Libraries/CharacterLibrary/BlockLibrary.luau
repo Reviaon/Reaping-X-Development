@@ -14,6 +14,9 @@ return {
 	--@ whoever threw that hit: their hits are refused until the swing ends.
 	CounterWindow = 0.5,
 
+	--@ Seconds a held block waits before asking again after the server refuses a raise.
+	RetryDelay = 0.25,
+
 	HealthAttribute = "BlockHealth",
 	MaxHealthAttribute = "MaxBlockHealth",
 	GuardStatus = "IsGuarding",
@@ -32,5 +35,11 @@ return {
 		ReactionPriority = Enum.AnimationPriority.Action3,
 		IdleFade = 0.15,
 		ReactionFade = 0.05,
+
+		--@ Played on a broken guard in place of the last reaction, sped or slowed so it ends with
+		--@ the lockout.
+		Break = "UniversalGaurdBreak",
+		BreakPriority = Enum.AnimationPriority.Action4,
+		BreakFade = 0.1,
 	},
 }
