@@ -66,12 +66,13 @@ function MovementHandler:InitCharacter(controller)
 	MovementHandler.Trove:Destroy()
 	MovementHandler.Trove = GarbageCollection.new()
 
-	MovementHandler.components["TiltComponent"]:Init(controller)
+	MovementHandler.components["LeanComponent"]:Init(controller)
 	MovementHandler.components["StrafeComponent"]:Init(controller)
 	MovementHandler.components["RunJumpComponent"]:Init(controller)
+	MovementHandler.components["LandComponent"]:Init(controller)
 
 	MovementHandler.Trove:Connect(RunService.RenderStepped, function(DeltaTime)
-		MovementHandler.components["TiltComponent"]:Update(controller, DeltaTime)
+		MovementHandler.components["LeanComponent"]:Update(controller, DeltaTime)
 	end)
 
 	local Character = controller.Character
