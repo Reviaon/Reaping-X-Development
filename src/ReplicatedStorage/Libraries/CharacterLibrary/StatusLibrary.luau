@@ -63,8 +63,15 @@ return{
 		};
 
 		GuardBroken = {
+			WalkSpeed = 4,
 			JumpPower = 0,
 			Priority = 2;
+		};
+
+		IsLanding = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			Priority = 5;
 		};
 
 		IsCrouching = {
