@@ -12,11 +12,13 @@ local Spring = GlobalFunctions.Spring
 local InputHandler = GlobalFunctions.InputHandler
 local MouseModule = GlobalFunctions.MouseModule
 local ClientController = GlobalFunctions.ClientController
+local ShakeLibrary = require("@game/ReplicatedStorage/Libraries/CameraLibrary/ShakeLibrary")
 
 --@ Constants
 local Camera = Workspace.CurrentCamera
 
 local SHIFT_LOCK_OFFSET = Vector3.new(2, 0, 0)
+local SHIFT_LOCK_ON_SPAWN = true --@ Every spawn starts in this state; LeftControl still toggles it
 local MOUSE_OBJECT = nil
 
 local TRANSITION_IN_SPEED = 60
@@ -132,7 +134,8 @@ function CameraHandler:InitCharacter(controller)
 	CameraHandler:Cleanup(controller)
 
 	local _humanoid = Character:WaitForChild("Humanoid")
-	
+	Character:WaitForChild("HumanoidRootPart")
+
 	local _trove = controller.Trove.new()
 	controller._camera_trove = _trove
 
@@ -141,7 +144,7 @@ function CameraHandler:InitCharacter(controller)
 	MOUSE_OBJECT = _mouse
 	MOUSE_OBJECT.filterDescendants = {Character, workspace.World.Visuals, workspace.World.Live}
 
-	CameraHandler:ToggleShiftLock(shiftLockEnabled, controller)
+	CameraHandler:ToggleShiftLock(SHIFT_LOCK_ON_SPAWN, controller)
 	CameraHandler:CreateCameraObject(controller)
 
 	_trove:Add(_humanoid.Died:Connect(function()
@@ -182,15 +185,29 @@ function CameraHandler:OnCharacterRemoved(controller)
 	CameraHandler:Cleanup(controller)
 end
 
---@ TODO: Refractor this for screen shake capabilities, utilize camera shaker.
 function CameraHandler:ShakeCamera(power, decay, amplifier)
+	power = math.max(math.floor(tonumber(power) or 1), 1)
+	amplifier = tonumber(amplifier) or 1
+
 	shakeSpring.Position += Vector3.new(
 		math.random(-power, power) * amplifier,
 		math.random(-power, power) * amplifier,
-		math.random(-power, power)
+		math.random(-power, power) * amplifier
 	)
-	
+
 	shakeSpring.Damper = decay or 0.8
+end
+
+--@ A named shape from ShakeLibrary; scale multiplies its Amplifier for a one-off stronger or weaker knock.
+function CameraHandler:Shake(name: string, scale: number?)
+	local shape = ShakeLibrary.Enabled and ShakeLibrary.Shapes[name]
+	if not shape then return end
+
+	CameraHandler:ShakeCamera(
+		ShakeLibrary.Steps,
+		tonumber(shape.Damper) or 0.8,
+		(tonumber(shape.Amplifier) or 0) * (scale or 1)
+	)
 end
 
 function CameraHandler:ToggleShiftLock(state, controller)
