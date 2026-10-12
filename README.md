@@ -481,7 +481,7 @@ Three details are what make it hold together:
   facing `AlignOrientation` are created once per root, re-aimed by each recipe, and parked
   (`Enabled = false`, priority cleared) between drives rather than rebuilt, so a chained combo
   changes nothing about the assembly. Anything that reads `PhysicsService.GetImpulse` must check
-  `Enabled`, as `TiltComponent` does. A foreign mover on the root — the dive's — is still cleared.
+  `Enabled`, as `LeanComponent` does. A foreign mover on the root — the dive's — is still cleared.
 
 The facing turn is part of the recipe: yaw slerps toward the attacker over the first
 `FacingPortion` of the duration. Arbitration survives — the drive stamps `knockback_priority` and
@@ -747,7 +747,9 @@ reaction finish while the guard drops; `Refused` drops it straight away. An atta
 play its predicted hit effect on a target that's guarding.
 
 A stun drops the guard on the client (`CombatHandler`'s yield watch), and changing weapon while
-guarding swaps the idle. While blocking, `IdleComponent` suspends the weapon's `{Weapon}Idle` so
+guarding swaps the idle. **F is a held input**: while it stays down the raise is retried every
+frame, so the guard comes back by itself after a stun, a break's lockout or a swing that was still
+running when F went down. A raise the server refuses waits `RetryDelay` before asking again. While blocking, `IdleComponent` suspends the weapon's `{Weapon}Idle` so
 the block idle plays alone; the weapon idle comes back once the character is idle and not
 blocking. `BlockComponent` keeps its tracks in its own scope, not AttackService's, so a dive's
 `ReleaseSpentSwings` can't stop them. While blocking, the only dive allowed is a back dive
@@ -756,8 +758,9 @@ shows again as the dive track ends.
 
 **A broken guard can't act.** `GuardBroken` is in `StatusLibrary.HitYield` with `IsStunned`, so for
 `BreakLockout` it gets everything a stun does: the swing is interrupted, no hitbox spawns, the server
-refuses its hits and its dive i-frames, and the guard can't go back up. It also has `JumpPower` 0,
-and attacks, sprint, crouch, dive and block all gate on `StatusService:IsHitYielded` rather than
+refuses its hits and its dive i-frames, and the guard can't go back up. It also has `JumpPower` 0
+and `WalkSpeed` 4, and its own client plays `BlockLibrary.Animations.Break` (`UniversalGaurdBreak`)
+in place of the last reaction, at whatever speed makes the track end with the lockout. Attacks, sprint, crouch, dive and block all gate on `StatusService:IsHitYielded` rather than
 `IsStunned` alone. The server relays `Combat.Daze` (`Effects/Combat/Daze`) to every client. That
 holds `Storage.Particles.CombatVFX.Hit.Daze` on the victim's head, spinning, until `GuardBroken`
 clears, then fades it out (`FadeOutAll` + `SetRemoval`). `Info.Until` is the lockout's end in
