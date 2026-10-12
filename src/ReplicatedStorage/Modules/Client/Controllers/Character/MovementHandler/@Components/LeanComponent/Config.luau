@@ -3,8 +3,8 @@ return {
 	Joint = "RootJoint",
 
 	--@ Radians at full lean: pitched forward, pitched back, banked to either side
-	Forward = math.rad(10),
-	Back = math.rad(10),
+	Forward = math.rad(12),
+	Back = math.rad(12),
 	Side = math.rad(12),
 
 	--@ Studs per second that give the full directional lean; a walk gets its share of it
