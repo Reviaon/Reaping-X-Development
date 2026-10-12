@@ -40,5 +40,6 @@ return {
 		Speed = 1,
 		Status = "IsLanding",
 		StatusFallback = 1,
+		Shake = "HeavyLand", --@ ShakeLibrary shape played on touchdown
 	},
 }
