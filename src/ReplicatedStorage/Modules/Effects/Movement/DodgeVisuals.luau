@@ -1,6 +1,7 @@
 local DodgeVisuals = {}
 
 local VisualsCore = require("../Combat/VisualsCore")
+local DashDebris = require("./DashDebris")
 
 DodgeVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/MovementVFX/Dodge",
@@ -26,6 +27,8 @@ DodgeVisuals.Dodge = function(Info)
 	local assetName = settings.Directions[Info.Direction]
 
 	if not root or not assetName then return end
+
+	DashDebris.Trail(Info)
 
 	local assets = Info.GetPath:ReadPath(settings.Assets)
 	local asset = assets and assets:FindFirstChild(assetName)
