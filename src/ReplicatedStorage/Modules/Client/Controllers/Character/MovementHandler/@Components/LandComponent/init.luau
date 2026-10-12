@@ -1,4 +1,5 @@
 --@ Landing
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local Config = require("@self/Config")
 local PropertiesConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/PropertiesHandler/Config")
 
@@ -76,6 +77,12 @@ local function land(controller, state, airtime: number)
 	})
 
 	state.track = track
+
+	local camera = landing.Shake and Jloader.GetHandler("CameraHandler")
+
+	if camera then
+		camera:Shake(landing.Shake)
+	end
 
 	local length = track.Length / landing.Speed
 
