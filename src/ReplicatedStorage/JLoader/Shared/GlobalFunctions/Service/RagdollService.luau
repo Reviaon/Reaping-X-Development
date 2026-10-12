@@ -124,8 +124,9 @@ local function enable(rig)
 	end)
 end
 
+--@ A dead character stays ragdolled: its statuses are cleared as it dies, which would stand it back up.
 local function disable(rig)
-	if not rig.active then return end
+	if not rig.active or rig.humanoid.Health <= 0 then return end
 	rig.active = false
 
 	if rig.enforcer then
@@ -216,6 +217,20 @@ function RagdollService.Setup(character: Model)
 	}
 
 	rigs[character] = rig
+
+	--@ The rig hangs off the limb motors, so death must not break them.
+	humanoid.BreakJointsOnDeath = false
+
+	humanoid.Died:Once(function()
+		enable(rig)
+
+		character.Destroying:Once(function()
+			if rig.enforcer then
+				rig.enforcer:Disconnect()
+				rig.enforcer = nil
+			end
+		end)
+	end)
 
 	character:GetAttributeChangedSignal(settings.Status):Connect(function()
 		if character:GetAttribute(settings.Status) == true then
