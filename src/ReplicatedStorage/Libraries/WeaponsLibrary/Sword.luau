@@ -1,6 +1,7 @@
 return{
 	Rig = "SwordRig",
 	MaxCombo = 4,
+	base_damage = 4, --@ Health taken per hit that lands; a table keyed by combo index varies it per hit
 
 	attack_cooldown = .5,
 	attack_cooldown_final = 2,

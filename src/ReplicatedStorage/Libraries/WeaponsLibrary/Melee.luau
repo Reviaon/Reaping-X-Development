@@ -1,6 +1,7 @@
 return{
 	Rig = nil,
 	MaxCombo = 6,
+	base_damage = 4, --@ Health taken per hit that lands; a table keyed by combo index varies it per hit
 
 	--@ Primary tuning knob: animation playback multiplier (1 = as authored). Every timing
 	--@ in this file is written at 1x and divided by this at runtime - see

@@ -1,6 +1,7 @@
 return{
 	Rig = "ScytheRig",
 	MaxCombo = 4,
+	base_damage = 4, --@ Health taken per hit that lands; a table keyed by combo index varies it per hit
 	
 	attack_speed = 1.2,
 
@@ -32,10 +33,6 @@ return{
 		}
 	},
 
-	--@ Attack hitbox. shape is Box, Sphere or Cylinder. size is one Vector3 whatever the shape:
-	--@ Box uses all three axes, Cylinder takes radius from X and height from Y, Sphere takes
-	--@ radius from X. offset is from the root, -Z forward. duration is how long the volume stays
-	--@ live. Omit hitbox_delay and the cue rides impulse_delay above.
 	hitbox = {
 		shape = "Box",
 		size = Vector3.new(9, 5, 7),
@@ -44,13 +41,11 @@ return{
 		max_targets = -1,
 		effect = "BladeHit", --@ Impact particle under CombatVFX.Hit
 
-		--@ The finisher is a spin, so it reads as a radius around the character rather than a
-		--@ box in front of it. Shape may vary per combo; only size.X is used by Sphere.
 		hitbox = {
 			[4] = {
 				shape = "Sphere",
-				size = Vector3.new(9, 9, 9),
-				offset = Vector3.new(0, 0, -1),
+				size = Vector3.new(6, 6, 6),
+				offset = Vector3.new(0, 0, -3.5),
 			},
 		},
 	},

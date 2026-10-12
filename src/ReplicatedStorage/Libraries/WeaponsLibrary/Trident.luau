@@ -1,6 +1,7 @@
 return{
 	Rig = "TridentRig",
 	MaxCombo = 3,
+	base_damage = 4, --@ Health taken per hit that lands; a table keyed by combo index varies it per hit
 	
 	attack_speed = 1.2,
 
