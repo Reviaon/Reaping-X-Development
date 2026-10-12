@@ -22,6 +22,12 @@ return {
 	GuardStatus = "IsGuarding",
 	BrokenStatus = "GuardBroken",
 
+	--@ ShakeLibrary shape the blocker's own screen takes for each Guard event.
+	Shakes = {
+		Absorbed = "Blocked",
+		Broken = "GuardBroken",
+	},
+
 	--@ ClientEffects path held on a broken guard's head for the lockout.
 	DazeEffect = "Combat.Daze",
 
