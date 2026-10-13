@@ -58,6 +58,15 @@ local function falloffFor(startTime: number, carry: number, bonus: number): numb
 	return math.clamp(falloff, Config.Momentum.MinFalloff, Config.Falloff)
 end
 
+--@ Seconds from activation until the dash has slowed to Visual.SustainSpeed of its peak
+local function sustainLength(startTime: number, carry: number, falloff: number): number
+	local peak = math.max(Config.Speed, carry)
+	local cutoff = math.max(Config.CutoffSpeed, carry, peak * Config.Visual.SustainSpeed)
+	if peak <= cutoff then return startTime end
+
+	return math.min(startTime + falloff * (peak - cutoff) / (peak - carry), startTime + Config.Duration)
+end
+
 local function carriedSpeed(root: BasePart, direction: Vector3): number
 	local planar = root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
 	return math.max(0, planar:Dot(direction)) * Config.Momentum.Carry
@@ -72,9 +81,14 @@ local function turnToward(current: Vector3, target: Vector3, dt: number): Vector
 	return turned.Magnitude > 1e-3 and turned.Unit or target
 end
 
-local function faceCamera(root: BasePart): CFrame
+local function cameraYaw(): CFrame
 	local _, yaw = workspace.CurrentCamera.CFrame:ToOrientation()
-	root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+
+	return CFrame.Angles(0, yaw, 0)
+end
+
+local function faceCamera(root: BasePart): CFrame
+	root.CFrame = CFrame.new(root.Position) * cameraYaw()
 
 	return root.CFrame
 end
@@ -85,12 +99,28 @@ local function faceDirection(root: BasePart, direction: Vector3): CFrame
 	return root.CFrame
 end
 
-local function runDirection(character: Model, root: BasePart): Vector3
+--@ The held movement keys as a world direction; nil with none held
+local function moveDirection(character: Model): Vector3?
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local moving = humanoid and humanoid.MoveDirection * Vector3.new(1, 0, 1)
 
-	if moving and moving.Magnitude > 1e-3 then
-		return moving.Unit
+	return if moving and moving.Magnitude > 1e-3 then moving.Unit else nil
+end
+
+--@ The dive direction a camera-relative heading is closest to
+local function cardinalOf(offset: Vector3): string
+	if math.abs(offset.X) > math.abs(offset.Z) then
+		return offset.X > 0 and "D" or "A"
+	end
+
+	return offset.Z > 0 and "S" or "W"
+end
+
+local function runDirection(character: Model, root: BasePart): Vector3
+	local moving = moveDirection(character)
+
+	if moving then
+		return moving
 	end
 
 	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
@@ -128,11 +158,11 @@ local function clearImpulses(controller)
 	end
 end
 
-local function playVisual(controller, character, direction: string)
+local function playVisual(controller, character, direction: string, duration: number, redirect: boolean?)
 	controller.AttackService:BroadcastVisual(controller, {
 		Effect = Config.Visual.Effect,
 		Method = Config.Visual.Method,
-		Info = { Character = character, Direction = direction },
+		Info = { Character = character, Direction = direction, Duration = duration, Redirect = redirect },
 	})
 end
 
@@ -146,7 +176,7 @@ function DiveComponent:CanActivate(controller)
 	if controller.StatusService:CheckStatuses(_character, {
 		IsDiving = true,
 		IsRagdolled = true,
-		}) or controller.StatusService:IsHitYielded(_character) then
+		}) or controller.StatusService:IsHitYielded(_character) or controller.StatusService:IsActionLocked(_character) then
 		return false
 	end
 
@@ -203,9 +233,9 @@ function DiveComponent:Activate(controller)
 	local _carry = carriedSpeed(_root, _lockedDirection)
 	local _falloff = falloffFor(_startTime, _carry, _isSprinting and Config.Momentum.SprintBonus or 0)
 	local _sprintDive = _runDirection ~= nil
-	local _steering = _sprintDive
 	local _velocity = createVelocity(controller, _root)
 	local _start = os.clock()
+	local _travel: Vector3? = nil
 
 	local function _releaseFacing()
 		if _runDirection then
@@ -233,13 +263,42 @@ function DiveComponent:Activate(controller)
 		DiveComponent:Deactivate(controller)
 	end
 
+	--@ A swing turns a sprint dive into a standing one for the rest of the dash: it faces the camera
+	--@ and keeps the direction it was going, held relative to the camera as a standing dive's is
+	local function _convert()
+		_travel = cameraYaw():VectorToObjectSpace(planarDirection(_root.CFrame, _direction))
+		_sprintDive = false
+		_releaseFacing()
+
+		local _matching = Config.Directions[cardinalOf(_travel)].Track
+
+		if _matching ~= _settings.Track and _track.IsPlaying then
+			local _position = _track.TimePosition
+
+			_track:Stop(Config.StopFade)
+			_track = controller.AnimatorService:GetTrack(_character, _matching)
+			_track.Priority = Config.TrackPriority
+			_track:Play(Config.StopFade)
+			_track.TimePosition = _position
+		end
+	end
+
 	clearImpulses(controller)
 	controller.AttackService:ReportDive(controller)
 
 	_velocity.VectorVelocity = _lockedDirection * speedAt(_startTime, 0, _carry, _falloff)
 	_velocity.Parent = _root
 
-	playVisual(controller, _character, _direction)
+	--@ Already swinging: converted before the visual is sent, so it is drawn for the side it goes
+	if _sprintDive and _isAttacking then
+		_convert()
+		faceCamera(_root)
+	end
+
+	local _sustain = sustainLength(_startTime, _carry, _falloff)
+	local _drawn = if _travel then cardinalOf(_travel) else _direction
+
+	playVisual(controller, _character, _drawn, _sustain)
 
 	task.delay(_startTime + Config.Duration, function()
 		if _velocity.Parent then
@@ -263,20 +322,54 @@ function DiveComponent:Activate(controller)
 		end
 
 		local _speed = speedAt(_startTime, _elapsed, _carry, _falloff)
+		local _settle = math.max(Config.CutoffSpeed, _carry)
+
+		--@ A dive out of a run hands back at the run's speed, which only suits someone still running.
+		--@ With the movement keys let go, or a swing holding the walk speed down, it coasts on down
+		--@ to the cutoff at the standing dive's rate instead of stopping dead
+		local _running = moveDirection(_character) ~= nil
+			and not controller.StatusService:CheckStatuses(_character, { IsAttacking = true })
+
+		if _carry > Config.CutoffSpeed and not _running then
+			local _over = _elapsed - _startTime - _falloff
+
+			if _over > 0 then
+				_speed = _carry - Config.Speed / Config.Falloff * _over
+			end
+
+			_settle = Config.CutoffSpeed
+		end
 
 		--@ Only on the way down: the ramp itself starts below the cutoff
-		if _elapsed >= _startTime and _speed <= math.max(Config.CutoffSpeed, _carry) and _velocity.Parent then
+		if _elapsed >= _startTime and _speed <= _settle and _velocity.Parent then
 			_velocity:Destroy()
 			_releaseFacing()
 		end
 
+		if _sprintDive and controller.StatusService:CheckStatuses(_character, { IsAttacking = true }) then
+			_convert()
+
+			--@ The effect was sent for a forward dive; redraw it for the side this one now goes
+			local _side = cardinalOf(_travel)
+
+			if _side ~= _drawn and _velocity.Parent then
+				_drawn = _side
+				playVisual(controller, _character, _side, _sustain - _elapsed, true)
+			end
+		end
+
+		--@ Still steered by the movement keys after the swing, as the sprint dive was
+		if _travel and _velocity.Parent then
+			local _moving = moveDirection(_character)
+
+			if _moving then
+				_travel = turnToward(_travel, cameraYaw():VectorToObjectSpace(_moving), dt)
+			end
+		end
+
 		if _sprintDive then
 			if _runDirection then
-				_steering = _steering and controller.StatusService:CheckStatuses(_character, { IsSprinting = true })
-
-				if _steering then
-					_runDirection = turnToward(_runDirection, runDirection(_character, _root), dt)
-				end
+				_runDirection = turnToward(_runDirection, runDirection(_character, _root), dt)
 
 				faceDirection(_root, _runDirection)
 			end
@@ -285,7 +378,9 @@ function DiveComponent:Activate(controller)
 		end
 
 		if _velocity.Parent then
-			_velocity.VectorVelocity = planarDirection(_root.CFrame, _direction) * _speed
+			local _heading = if _travel then cameraYaw():VectorToWorldSpace(_travel) else planarDirection(_root.CFrame, _direction)
+
+			_velocity.VectorVelocity = _heading * _speed
 		end
 	end))
 
