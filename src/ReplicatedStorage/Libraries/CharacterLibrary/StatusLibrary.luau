@@ -69,6 +69,10 @@ return{
 			Priority = 2;
 		};
 
+		GuardLocked = {
+			Priority = 2;
+		};
+
 		IsPushing = {
 			WalkSpeed = 4,
 			JumpPower = 0,
