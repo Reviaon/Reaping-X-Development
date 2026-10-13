@@ -245,6 +245,8 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 	end)
 
 	attack_vfx:SetRemoval(lifetime)
+
+	return attack_vfx, emission
 end
 
 function VisualsCore.SpawnAttack(controller, settings, comboIndex, root)
