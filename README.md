@@ -596,9 +596,11 @@ as the impulse. It is flattened to horizontal, so it is yaw only and never tips 
 suppresses `Humanoid.AutoRotate` while it runs — otherwise the Humanoid turns the character back the
 moment they have any move input.
 
-`CombatService` passes `-direction`. The knockback direction runs attacker → victim, so negating it
-looks back down the same line: the victim slides backwards while facing the attacker, which is what
-the hit reactions are animated against. Per weapon and per combo, `face` turns it off and
+`PositionService.Aim` gives `CombatService` two directions. The throw follows the attacker's look, so
+a hit goes where the swing was aimed however far off its centre the victim stood (a victim behind the
+attacker is thrown along the attacker → victim line instead). The facing is the negated attacker →
+victim line: the victim slides back while facing the attacker, which is what the hit reactions are
+animated against. Per weapon and per combo, `face` turns it off and
 `faceResponsiveness` controls how sharply the turn is taken — a lower number reads as a stagger, a
 higher one as a snap.
 
