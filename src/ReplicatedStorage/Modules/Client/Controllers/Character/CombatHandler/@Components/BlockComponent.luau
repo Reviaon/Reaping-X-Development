@@ -143,6 +143,7 @@ function BlockComponent:Init(controller)
 	local state = controller:Scope(SCOPE)
 
 	state.raised = false
+	state.repress = false
 	state.reaction = 0
 	state.idle = nil
 	state.reactionTrack = nil
@@ -156,14 +157,14 @@ function BlockComponent:CanActivate(controller, _combatState): boolean
 
 	local state = controller:Scope(SCOPE)
 
-	if state.raised or os.clock() < (state.retryAt or 0) then
+	if state.raised or state.repress or os.clock() < (state.retryAt or 0) then
 		return false
 	end
 
 	if controller.StatusService:CheckStatuses(Character, {
 		IsAttacking = true,
 		IsCrouching = true,
-	}) or controller.StatusService:IsHitYielded(Character) then
+	}) or controller.StatusService:IsHitYielded(Character) or controller.StatusService:IsActionLocked(Character) then
 		return false
 	end
 
@@ -185,11 +186,26 @@ function BlockComponent:Activate(controller, combatState)
 	report(controller, true)
 end
 
-function BlockComponent:Deactivate(controller, _combatState)
-	local yielded = controller.Character ~= nil and controller.StatusService:IsHitYielded(controller.Character)
+--@ released is true when the block input itself was let go. A guard a stun knocked down stays down
+--@ through a held input until that input is released and pressed again.
+function BlockComponent:Deactivate(controller, _combatState, released: boolean?)
+	local Character = controller.Character
+	local StatusService = controller.StatusService
+	local state = controller:Scope(SCOPE)
+
+	local yielded = Character ~= nil and StatusService:IsHitYielded(Character)
+	local stunned = Character ~= nil and StatusService:CheckStatuses(Character, { IsStunned = true })
 
 	if lower(controller, yielded) then
 		report(controller, false)
+
+		if stunned then
+			state.repress = true
+		end
+	end
+
+	if released then
+		state.repress = false
 	end
 end
 
