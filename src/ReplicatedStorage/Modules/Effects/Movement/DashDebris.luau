@@ -25,16 +25,7 @@ DashDebris.Settings = {
 	Side = 1.6,
 	Jitter = 0.5,
 
-	--@ The root axis each dash direction's pair is spread along, so the pieces flank the travel:
-	--@ left and right of a forward or back dash, front and back of a sideways one
-	Across = {
-		W = "RightVector",
-		S = "RightVector",
-		A = "LookVector",
-		D = "LookVector",
-	},
-
-	Scale = NumberRange.new(0.4, 1.4),
+	Scale = NumberRange.new(0.8, 1.8),
 	Tilt = math.rad(25), --@ Most a piece leans off the floor's normal; its yaw is fully random
 
 	--@ Share of the block left under the floor once it has risen
@@ -102,8 +93,7 @@ local function floorColor(result: RaycastResult): Color3?
 	return instance.Color
 end
 
-local function spawnPiece(settings, pieces, root: BasePart, axis: string, side: number, params: RaycastParams)
-	local across = root.CFrame[axis]
+local function spawnPiece(settings, pieces, root: BasePart, across: Vector3, side: number, params: RaycastParams)
 	local jitter = settings.Jitter
 
 	local origin = root.Position
@@ -188,10 +178,10 @@ DashDebris.Trail = function(Info)
 	params.RespectCanCollide = true
 	params.IgnoreWater = true
 
-	local axis = settings.Across[Info.Direction] or "RightVector"
 	local began = os.clock()
 	local last = root.Position
 	local travelled = settings.Spacing
+	local across = nil
 	local connection
 
 	connection = RunService.Heartbeat:Connect(function()
@@ -201,16 +191,22 @@ DashDebris.Trail = function(Info)
 		end
 
 		local position = root.Position
+		local step = (position - last) * Vector3.new(1, 0, 1)
 
-		travelled += ((position - last) * Vector3.new(1, 0, 1)).Magnitude
+		travelled += step.Magnitude
 		last = position
 
-		if travelled < settings.Spacing then return end
+		--@ Flanks the way the root is actually moving, whichever way it faces
+		if step.Magnitude > 1e-3 then
+			across = step.Unit:Cross(Vector3.yAxis)
+		end
+
+		if travelled < settings.Spacing or not across then return end
 
 		travelled = 0
 
 		for _, side in SIDES do
-			spawnPiece(settings, pieces, root, axis, side, params)
+			spawnPiece(settings, pieces, root, across, side, params)
 		end
 	end)
 end
