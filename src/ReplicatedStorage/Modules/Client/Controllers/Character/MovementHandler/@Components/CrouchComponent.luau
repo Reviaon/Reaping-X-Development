@@ -10,6 +10,7 @@ function CrouchComponent:CanActivate(controller)
 
 	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true, IsBlocking = true })
 		or controller.StatusService:IsHitYielded(Character)
+		or controller.StatusService:IsActionLocked(Character)
 	then
 		return false
 	end
