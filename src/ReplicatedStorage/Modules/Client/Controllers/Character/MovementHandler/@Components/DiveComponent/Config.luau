@@ -24,11 +24,11 @@ return {
 	BindAliases = { Q = "W" },
 
 	--@ The only directions a dive may take while blocking; the guard stays up through it
-	BlockingDirections = { S = true },
+	BlockingDirections = { S = true, W = true, A = true, D = true },
 
 	--@ A dive out of a sprint goes along the run and keeps the character facing it, whatever key is held
 	SprintDirection = "W",
-	--@ How fast a sprint dive turns toward a new run direction (exponential, per second); steering ends for good once the sprint does
+	--@ How fast a sprint dive turns toward the held movement keys (exponential, per second). It follows them for the whole dash, sprint held or not, and keeps its heading with none held
 	SprintTurnRate = 10,
 	--@ Status source for the NoRotate a sprint dive holds so shift lock can't turn it toward the camera
 	FacingSource = "Dive",
@@ -60,5 +60,10 @@ return {
 	Visual = {
 		Effect = "Movement.DodgeVisuals",
 		Method = "Dodge",
+
+		--@ The afterimages switch off once the dash has slowed to this share of its peak speed, so they
+		--@ end while it is still moving fast. Their own particle Lifetime (0.5s) fades out after that.
+		--@ Lower keeps them longer; 0 runs them until the dash's velocity is let go
+		SustainSpeed = 0.65,
 	},
 }
