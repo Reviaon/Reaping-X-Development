@@ -85,7 +85,15 @@ end
 function BlockService:CanGuard(character)
 	local StatusService = GlobalFunctions.StatusService
 
-	return StatusService:IsAlive(character) and not StatusService:IsHitYielded(character)
+	return StatusService:IsAlive(character)
+		and not StatusService:IsHitYielded(character)
+		and not StatusService:CheckStatuses(character, { [BlockLibrary.LockStatus] = true })
+end
+
+--@ Called for a hit that landed with hitstun seconds of stun: the guard stays down through the
+--@ stun and ComboLockout past it, renewed by every further hit of the combo.
+function BlockService:Lock(character, hitstun: number)
+	GlobalFunctions.StatusService:ApplyStatus(character, BlockLibrary.LockStatus, true, hitstun + BlockLibrary.ComboLockout)
 end
 
 function BlockService:SetGuard(character, raised)
@@ -133,10 +141,18 @@ end
 --@ True when the victim's guard took the hit; the caller then applies nothing else. A hit from
 --@ outside the guard's arc is not the guard's to take.
 function BlockService:Absorb(attacker, victim)
-	local attackerRoot = attacker:FindFirstChild("HumanoidRootPart")
+	--@ The position the attacker reported with the hit, which is the one their client judged the arc from
+	local attackerPosition = GlobalFunctions.PositionService.Reference(attacker)
 
-	if not attackerRoot then return false end
-	if not GlobalFunctions.StatusService:IsGuardingFrom(victim, attackerRoot.Position) then return false end
+	if not attackerPosition then return false end
+	if not GlobalFunctions.StatusService:IsGuardingFrom(victim, attackerPosition) then return false end
+
+	--@ The attacker draws a hit before the server answers; one that met a guard they hadn't seen is undone
+	local attackerPlayer = Players:GetPlayerFromCharacter(attacker)
+
+	if attackerPlayer then
+		getEffectRelay().CreateVisual:Fire(attackerPlayer, GlobalFunctions.AttackService:RetractPayload(victim))
+	end
 
 	local health = healthOf(victim) - BlockLibrary.HitCost
 
