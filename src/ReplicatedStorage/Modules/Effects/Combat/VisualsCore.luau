@@ -89,6 +89,17 @@ local function ApplySyncPosition(effect: Instance, enabled: boolean)
 	end
 end
 
+--@ ForgeVFX keeps an emitter Enabled for its EmitDuration, then switches it off and lets it fade
+local function ApplySustain(effect: Instance, sustain)
+	if typeof(sustain) ~= "table" or typeof(sustain.Duration) ~= "number" or sustain.Duration <= 0 then return end
+
+	for _, descendant in effect:GetDescendants() do
+		if descendant:IsA("ParticleEmitter") and descendant.Name == sustain.Name then
+			descendant:SetAttribute("EmitDuration", sustain.Duration)
+		end
+	end
+end
+
 local function CancelList(spec, settings)
 	local cancelOn = Resolve(spec, settings, "CancelOn", StatusLibrary.HitYield)
 	return typeof(cancelOn) == "table" and cancelOn or nil
@@ -225,6 +236,8 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 	if spec.Retime ~= false and typeof(speed) == "number" and speed > 0 and speed ~= 1 then
 		forge.retime(speed, attack_vfx.Effect)
 	end
+
+	ApplySustain(attack_vfx.Effect, spec.Sustain)
 
 	emission = forge.emit(attack_vfx.Effect)
 	emission.Finished:finally(function()
