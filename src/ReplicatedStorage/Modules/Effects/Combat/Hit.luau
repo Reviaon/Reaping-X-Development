@@ -66,10 +66,18 @@ function Hit.PlayReaction(Info, victim)
 	local folder = reactionSet(Info, victim)
 	if not folder then return nil end
 
+	--@ A hit that names its reaction plays that one; otherwise one of the set at random.
+	local named = rawget(Info, "Reaction")
+	local chosen = typeof(named) == "string" and folder:FindFirstChild(named) or nil
 	local options = {}
-	for _, child in folder:GetChildren() do
-		if child:IsA("Animation") then
-			table.insert(options, child)
+
+	if chosen and chosen:IsA("Animation") then
+		table.insert(options, chosen)
+	else
+		for _, child in folder:GetChildren() do
+			if child:IsA("Animation") then
+				table.insert(options, child)
+			end
 		end
 	end
 
