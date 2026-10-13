@@ -4,6 +4,7 @@ local Settings = {
 	TrackFade = 0.15, --@ Crossfade when one track replaces another, seconds
 	HitEffectPath = "Combat.Hit", --@ ClientEffects path for the impact effect
 	HitEffectMethod = "Emit",
+	HitRetractMethod = "Retract",
 	RelayKey = "VisualRelay", --@ Controller key holding the EffectService relay
 	CombatRelayKey = "CombatRelay", --@ Controller key holding the CombatService relay
 	LivingPath = { "World", "Live" }, --@ Workspace folder holding characters a hitbox may catch
@@ -111,7 +112,8 @@ function AttackService:PlayLocal(payload)
 	return true
 end
 
-function AttackService:HitPayload(character, victim, effect, weaponId, comboIndex)
+--@ reaction names the one hit reaction the victim plays; nil leaves it to the victim's random set.
+function AttackService:HitPayload(character, victim, effect, weaponId, comboIndex, reaction)
 	return {
 		Effect = Settings.HitEffectPath,
 		Method = Settings.HitEffectMethod,
@@ -121,12 +123,26 @@ function AttackService:HitPayload(character, victim, effect, weaponId, comboInde
 			Effect = effect,
 			WeaponId = weaponId,
 			ComboIndex = comboIndex,
+			Reaction = reaction,
 		},
 	}
 end
 
-function AttackService:PlayHit(character, victim, effect, weaponId, comboIndex)
-	return self:PlayLocal(self:HitPayload(character, victim, effect, weaponId, comboIndex))
+--@ Drawn by the attacker ahead of the server, so it is marked: a guard the server saw and this
+--@ client hadn't yet gets it retracted (RetractPayload).
+function AttackService:PlayHit(character, victim, effect, weaponId, comboIndex, reaction)
+	local payload = self:HitPayload(character, victim, effect, weaponId, comboIndex, reaction)
+	payload.Info.Predicted = true
+
+	return self:PlayLocal(payload)
+end
+
+function AttackService:RetractPayload(victim)
+	return {
+		Effect = Settings.HitEffectPath,
+		Method = Settings.HitRetractMethod,
+		Info = { Target = victim },
+	}
 end
 
 --@ Plays on this client now and relays to every other client.
@@ -310,11 +326,17 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)
 
-			if not controller.StatusService:IsGuarding(target) then
-				self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index)
+			local root = character:FindFirstChild("HumanoidRootPart")
+
+			if not (root and controller.StatusService:IsGuardingFrom(target, root.Position)) then
+				self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index, options.reaction)
 			end
 
-			self:ReportHit(controller, target, options.weaponId, timing.combo_index)
+			if options.report then
+				options.report(target)
+			else
+				self:ReportHit(controller, target, options.weaponId, timing.combo_index)
+			end
 
 			if options.onHit then
 				options.onHit(target)
