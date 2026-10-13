@@ -1,3 +1,4 @@
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -27,6 +28,10 @@ RagdollService.Settings = {
 
 	--@ Name given to every instance the rig adds.
 	RigName = "@ragdoll",
+
+	--@ Collision group a character's own parts sit in while it is ragdolled. It is the one group
+	--@ the limb colliders collide with besides the map (see CollisionService).
+	BodyGroup = "RagdollBody",
 }
 
 local LIMB_JOINTS = {
@@ -70,6 +75,34 @@ local function collider(limb: BasePart, parent: Instance): BasePart
 	return part
 end
 
+--@ Moves the character's own parts into the ragdoll body group, remembering where each was.
+local function enterBodyGroup(rig)
+	local settings = RagdollService.Settings
+
+	if not PhysicsService:IsCollisionGroupRegistered(settings.BodyGroup) then return end
+
+	rig.groups = {}
+
+	for _, part in rig.character:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= settings.RigName then
+			rig.groups[part] = part.CollisionGroup
+			part.CollisionGroup = settings.BodyGroup
+		end
+	end
+end
+
+local function leaveBodyGroup(rig)
+	if not rig.groups then return end
+
+	for part, group in rig.groups do
+		if part.Parent then
+			part.CollisionGroup = group
+		end
+	end
+
+	rig.groups = nil
+end
+
 local function claimLimbs(rig, owner: Player?)
 	for _, joint in rig.joints do
 		local limb = joint.limb
@@ -83,6 +116,8 @@ end
 local function enable(rig)
 	if rig.active then return end
 	rig.active = true
+
+	enterBodyGroup(rig)
 
 	rig.rootCollide = rig.root.CanCollide
 	rig.rootWeld.Enabled = true
@@ -139,6 +174,8 @@ local function disable(rig)
 		joint.socket.Enabled = false
 		joint.collider.CanCollide = false
 	end
+
+	leaveBodyGroup(rig)
 
 	rig.rootJoint.Enabled = true
 	rig.rootWeld.Enabled = false
