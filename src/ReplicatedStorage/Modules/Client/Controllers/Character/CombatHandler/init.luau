@@ -67,6 +67,12 @@ local inputActions = {
 				CombatHandler:TryLightAttack(controller)
 			end,
 		},
+		[Enum.UserInputType.MouseButton2] = {
+			canHold = false,
+			action = function(controller)
+				CombatHandler:TryPush(controller)
+			end,
+		},
 		[Enum.KeyCode.R] = {
 			canHold = false,
 			action = function(controller)
@@ -90,7 +96,7 @@ local inputActions = {
 		[Enum.KeyCode.F] = {
 			canHold = false,
 			action = function(controller)
-				CombatHandler:StopBlock(controller)
+				CombatHandler:StopBlock(controller, true)
 			end,
 		},
 	},
@@ -180,6 +186,10 @@ function CombatHandler:TryHeavyAttack(controller)
 	CombatHandler:TryAttackBranch(controller, "Heavy")
 end
 
+function CombatHandler:TryPush(controller)
+	CombatHandler:TryAttackBranch(controller, "Push")
+end
+
 function CombatHandler:TryAttackBranch(controller, branchName: string)
 	if not CombatHandler:CanBeginBranch(controller, branchName) then
 		--@ Presses that land while an attack is still processing are dropped
@@ -202,7 +212,7 @@ function CombatHandler:CanBeginBranch(controller, branchName: string): boolean
 
 	CombatHandler:StateFor(controller).ActiveWeapon = CombatHandler:ResolveActiveWeapon(controller)
 
-	if controller.StatusService:IsHitYielded(Character) then
+	if controller.StatusService:IsHitYielded(Character) or controller.StatusService:IsActionLocked(Character) then
 		return false
 	end
 
@@ -325,10 +335,10 @@ function CombatHandler:StartBlock(controller)
 	end
 end
 
-function CombatHandler:StopBlock(controller)
+function CombatHandler:StopBlock(controller, released: boolean?)
 	local blockComponent = CombatHandler.components["BlockComponent"]
 	if blockComponent and typeof(blockComponent.Deactivate) == "function" then
-		blockComponent:Deactivate(controller, CombatHandler:StateFor(controller))
+		blockComponent:Deactivate(controller, CombatHandler:StateFor(controller), released)
 	end
 end
 
