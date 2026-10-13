@@ -164,6 +164,7 @@ function BlockComponent:CanActivate(controller, _combatState): boolean
 	if controller.StatusService:CheckStatuses(Character, {
 		IsAttacking = true,
 		IsCrouching = true,
+		[BlockLibrary.LockStatus] = true,
 	}) or controller.StatusService:IsHitYielded(Character) or controller.StatusService:IsActionLocked(Character) then
 		return false
 	end
