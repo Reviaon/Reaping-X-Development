@@ -272,6 +272,18 @@ function KnockbackService.Lunge(character, direction: Vector3, impulse)
 		return nil
 	end
 
+	--@ A lunge is the one drive that gives way: a foreign mover that outranks it (the dive's) stays,
+	--@ where moverOf would otherwise clear it. A swing thrown just before a dodge lands its lunge mid-dash
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local foreign = root and PhysicsService.GetImpulse(root)
+
+	if foreign
+		and not foreign:GetAttribute(KnockbackService.Settings.DriveAttribute)
+		and (foreign:GetAttribute(PhysicsService.ImpulsePriorityAttribute) or 0) > (impulse.priority or 0)
+	then
+		return nil
+	end
+
 	local recipe = KnockbackService.Compose(character, direction, impulse, nil, KnockbackService.Active(character), {
 		steer = true,
 	})
