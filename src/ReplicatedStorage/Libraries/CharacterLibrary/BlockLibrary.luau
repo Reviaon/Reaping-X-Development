@@ -14,8 +14,18 @@ return {
 	--@ whoever threw that hit: their hits are refused until the swing ends.
 	CounterWindow = 0.5,
 
+	--@ Degrees in front of the blocker the guard covers, centred on where they face. A hit thrown
+	--@ from outside it lands as if there were no guard.
+	Arc = 180,
+
 	--@ Seconds a held block waits before asking again after the server refuses a raise.
 	RetryDelay = 0.25,
+
+	--@ A hit that lands keeps the guard down for its hitstun plus this many seconds, so a held block
+	--@ can't come up in the gap between two hits of a combo (Hitstun.Settings.Escape). Longer than
+	--@ that gap, with room for a swing that arrives late
+	ComboLockout = 0.3,
+	LockStatus = "GuardLocked",
 
 	HealthAttribute = "BlockHealth",
 	MaxHealthAttribute = "MaxBlockHealth",
