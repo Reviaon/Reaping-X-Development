@@ -23,6 +23,30 @@ DodgeVisuals.Settings = {
 	},
 }
 
+--@ The dodge effect each character has pending or playing, so a redirect can replace it
+local active = setmetatable({}, { __mode = "k" })
+
+local function replace(character: Model)
+	local entry = active[character]
+
+	if entry then
+		if entry.Emission then
+			entry.Emission:Clear()
+		end
+
+		if entry.Effect then
+			entry.Effect:Destroy()
+		end
+	end
+
+	entry = {}
+	active[character] = entry
+
+	return entry
+end
+
+--@ Info.Redirect marks a dash that changed side partway (a swing during a sprint dive): the effect
+--@ already drawn is swapped for this direction's at once, and no second debris trail is laid
 DodgeVisuals.Dodge = function(Info)
 	local settings = DodgeVisuals.Settings
 	local character = Info.Character
@@ -31,23 +55,26 @@ DodgeVisuals.Dodge = function(Info)
 
 	if not root or not assetName then return end
 
-	DashDebris.Trail(Info)
+	if not Info.Redirect then
+		DashDebris.Trail(Info)
+	end
 
 	local assets = Info.GetPath:ReadPath(settings.Assets)
 	local asset = assets and assets:FindFirstChild(assetName)
 
 	if not asset then return end
 
-	local delay = asset:GetAttribute("EmitDelay") or 0
+	local entry = replace(character)
+	local delay = Info.Redirect and 0 or asset:GetAttribute("EmitDelay") or 0
 	local sustain = typeof(Info.Duration) == "number" and {
 		Name = settings.Sustain,
 		Duration = Info.Duration - delay,
 	} or nil
 
 	task.delay(delay, function()
-		if not root.Parent then return end
+		if not root.Parent or active[character] ~= entry then return end
 
-		VisualsCore.SpawnEffect(Info, settings, asset, root, { Sustain = sustain })
+		entry.Effect, entry.Emission = VisualsCore.SpawnEffect(Info, settings, asset, root, { Sustain = sustain })
 	end)
 end
 
