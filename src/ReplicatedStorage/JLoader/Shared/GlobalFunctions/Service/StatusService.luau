@@ -1,4 +1,5 @@
 local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
+local BlockLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/BlockLibrary")
 local StatusResolver = require("./StatusResolver")
 
 local StatusService = {
@@ -315,6 +316,26 @@ end
 function StatusService:IsGuarding(Entity)
 	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
 	return self:CheckStatuses(Entity, StatusLibrary.HitGuard)
+end
+
+--@ True when Entity's guard is up and Position is inside the arc it covers in front of it.
+function StatusService:IsGuardingFrom(Entity, Position: Vector3)
+	if not self:IsGuarding(Entity) then return false end
+
+	local Root = Entity:FindFirstChild("HumanoidRootPart")
+	if not Root then return false end
+
+	local Offset = (Position - Root.Position) * Vector3.new(1, 0, 1)
+	local Look = Root.CFrame.LookVector * Vector3.new(1, 0, 1)
+
+	if Offset.Magnitude < 1e-3 or Look.Magnitude < 1e-3 then return true end
+
+	return Look.Unit:Dot(Offset.Unit) >= math.cos(math.rad(BlockLibrary.Arc / 2))
+end
+
+function StatusService:IsActionLocked(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.ActionLock)
 end
 
 function StatusService:GetRemainingTime(Entity, Name)
