@@ -12,6 +12,9 @@ DodgeVisuals.Settings = {
 
 	Lifetime = 3,
 
+	--@ Emitters of this name stay Enabled until the dash ends (Info.Duration, from DiveComponent)
+	Sustain = "AfterimageParticle",
+
 	Directions = {
 		W = "FrontDash",
 		S = "BackDash",
@@ -35,10 +38,16 @@ DodgeVisuals.Dodge = function(Info)
 
 	if not asset then return end
 
-	task.delay(asset:GetAttribute("EmitDelay") or 0, function()
+	local delay = asset:GetAttribute("EmitDelay") or 0
+	local sustain = typeof(Info.Duration) == "number" and {
+		Name = settings.Sustain,
+		Duration = Info.Duration - delay,
+	} or nil
+
+	task.delay(delay, function()
 		if not root.Parent then return end
 
-		VisualsCore.SpawnEffect(Info, settings, asset, root)
+		VisualsCore.SpawnEffect(Info, settings, asset, root, { Sustain = sustain })
 	end)
 end
 
