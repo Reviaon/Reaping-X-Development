@@ -65,27 +65,6 @@ local function livingFolder()
 	return world and world:FindFirstChild("Live")
 end
 
-local function pushDirection(attacker: Model, victim: Model): Vector3
-	local PositionService = GlobalFunctions.PositionService
-
-	local attackerPosition, attackerLook = PositionService.Reference(attacker)
-	local victimPosition = PositionService.Reference(victim)
-
-	if not attackerPosition or not victimPosition then
-		return Vector3.zero
-	end
-
-	local offset = (victimPosition - attackerPosition) * Vector3.new(1, 0, 1)
-
-	if offset.Magnitude > 0 then
-		return offset.Unit
-	end
-
-	local fallback = (attackerLook or Vector3.zAxis) * Vector3.new(1, 0, 1)
-
-	return fallback.Magnitude > 0 and fallback.Unit or Vector3.zero
-end
-
 function PushService:Apply(attacker: Model, victim: Model): boolean
 	local StatusService = GlobalFunctions.StatusService
 
@@ -97,7 +76,7 @@ function PushService:Apply(attacker: Model, victim: Model): boolean
 		return false
 	end
 
-	local direction = pushDirection(attacker, victim)
+	local direction = GlobalFunctions.PositionService.Aim(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
 
 	return getCombatService():ApplyFinisher(victim, direction, PushLibrary.Launch)
