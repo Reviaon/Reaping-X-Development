@@ -33,6 +33,9 @@ local Hit = {}
 
 local highlights = setmetatable({}, { __mode = "k" })
 
+--@ What the last hit this client drew ahead of the server left on each victim
+local predictions = setmetatable({}, { __mode = "k" })
+
 local function container()
 	local existing = workspace:FindFirstChild(Settings.Container)
 	if existing then return existing end
@@ -176,9 +179,37 @@ function Hit.Emit(Info)
 	if not victim.Parent then return end
 
 	Hit.Shake(victim, Info.Attacker)
-	Hit.Highlight(victim)
-	Hit.SpawnParticles(victim, Info.Effect)
-	Hit.PlayReaction(Info, victim)
+
+	local highlight = Hit.Highlight(victim)
+	local effect = Hit.SpawnParticles(victim, Info.Effect)
+	local track = Hit.PlayReaction(Info, victim)
+
+	if rawget(Info, "Predicted") then
+		predictions[victim] = { Highlight = highlight, Effect = effect, Track = track }
+	end
+end
+
+--@ The server's answer to a predicted hit its victim's guard took: what Emit drew for it is undone.
+function Hit.Retract(Info)
+	local victim = Info.Target
+	local prediction = typeof(victim) == "Instance" and predictions[victim]
+
+	if not prediction then return end
+
+	predictions[victim] = nil
+
+	if prediction.Highlight and highlights[victim] == prediction.Highlight then
+		highlights[victim] = nil
+		prediction.Highlight:Destroy()
+	end
+
+	if prediction.Effect then
+		prediction.Effect:Destroy()
+	end
+
+	if prediction.Track and prediction.Track.IsPlaying then
+		prediction.Track:Stop(Settings.ReactionFade)
+	end
 end
 
 Hit.Settings = Settings
