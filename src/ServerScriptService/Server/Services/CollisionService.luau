@@ -7,13 +7,24 @@ local CollisionService = Jloader.CreateService({ Name = script.Name })
 
 CollisionService.Settings = {
 	--@ Every group this game adds. A group not named here is not registered.
-	Groups = { "Players", "Mobs", "Ragdoll" },
+	Groups = { "Players", "Mobs", "Ragdoll", "RagdollBody" },
 
 	--@ Pairs that pass through each other. Anything not listed collides as usual.
+	--@ Ragdoll is the limb colliders, RagdollBody a character's own parts while it is ragdolled
+	--@ (RagdollService moves them there and back). The colliders touch a ragdolled body and the
+	--@ map, and nothing else: not a standing player or mob, and not each other.
 	Apart = {
 		{ "Players", "Players" },
 		{ "Players", "Mobs" },
 		{ "Mobs", "Mobs" },
+
+		{ "Ragdoll", "Players" },
+		{ "Ragdoll", "Mobs" },
+		{ "Ragdoll", "Ragdoll" },
+
+		{ "RagdollBody", "Players" },
+		{ "RagdollBody", "Mobs" },
+		{ "RagdollBody", "RagdollBody" },
 	},
 
 	PlayerGroup = "Players",
