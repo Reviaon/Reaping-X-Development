@@ -130,9 +130,13 @@ function BlockService:Break(character)
 	end)
 end
 
---@ True when the victim's guard took the hit; the caller then applies nothing else.
+--@ True when the victim's guard took the hit; the caller then applies nothing else. A hit from
+--@ outside the guard's arc is not the guard's to take.
 function BlockService:Absorb(attacker, victim)
-	if not GlobalFunctions.StatusService:IsGuarding(victim) then return false end
+	local attackerRoot = attacker:FindFirstChild("HumanoidRootPart")
+
+	if not attackerRoot then return false end
+	if not GlobalFunctions.StatusService:IsGuardingFrom(victim, attackerRoot.Position) then return false end
 
 	local health = healthOf(victim) - BlockLibrary.HitCost
 
