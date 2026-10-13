@@ -63,27 +63,6 @@ local function rootOf(character)
 	return character and character:FindFirstChild("HumanoidRootPart")
 end
 
-local function knockbackDirection(attacker: Model, victim: Model): Vector3
-	local PositionService = GlobalFunctions.PositionService
-
-	local attackerPosition, attackerLook = PositionService.Reference(attacker)
-	local victimPosition = PositionService.Reference(victim)
-
-	if not attackerPosition or not victimPosition then
-		return Vector3.zero
-	end
-
-	local offset = (victimPosition - attackerPosition) * Vector3.new(1, 0, 1)
-
-	if offset.Magnitude > 0 then
-		return offset.Unit
-	end
-
-	local fallback = (attackerLook or Vector3.zAxis) * Vector3.new(1, 0, 1)
-
-	return fallback.Magnitude > 0 and fallback.Unit or Vector3.zero
-end
-
 function CombatService:ResolveKnockback(weaponId: string, comboIndex: number)
 	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
 	if not weaponConfig then return nil end
@@ -161,7 +140,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	end
 	if getBlockService():Absorb(attacker, victim) then return false end
 
-	local direction = knockbackDirection(attacker, victim)
+	local direction, away = GlobalFunctions.PositionService.Aim(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
 
 	local finisher = self:ResolveFinisher(weaponId, comboIndex)
@@ -175,8 +154,8 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	local KnockbackService = GlobalFunctions.KnockbackService
 
-	--@ direction runs attacker -> victim, so the victim looks back along it.
-	local facing = knockback.face ~= false and -direction or nil
+	--@ away runs attacker -> victim, so the victim looks back along it.
+	local facing = knockback.face ~= false and -away or nil
 
 	local recipe = KnockbackService.Build(victim, direction, {
 		speed = knockback.speed,
@@ -193,6 +172,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	if hitstun and hitstun > 0 then
 		GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, hitstun)
+		getBlockService():Lock(victim, hitstun)
 	end
 
 	--@ Every client draws it; the server drives only what it owns. Fired before Apply so the
