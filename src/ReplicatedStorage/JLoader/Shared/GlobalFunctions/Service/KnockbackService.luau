@@ -3,10 +3,10 @@ local KnockbackService = {}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local PhysicsService = require(script.Parent:WaitForChild("PhysicsService"))
-local PositionService = require(script.Parent:WaitForChild("PositionService"))
-local TrajectoryService = require(script.Parent:WaitForChild("TrajectoryService"))
-local WorldConstants = require(script.Parent.Parent:WaitForChild("WorldConstants"))
+local PhysicsService = require("./PhysicsService")
+local PositionService = require("./PositionService")
+local TrajectoryService = require("./TrajectoryService")
+local WorldConstants = require("../WorldConstants")
 
 KnockbackService.Settings = {
 	--@ Fixed integration steps for the displacement curve. Same count on every machine, so every
@@ -269,6 +269,18 @@ function KnockbackService.Lunge(character, direction: Vector3, impulse)
 	if RunService:IsClient() then
 		if character ~= Players.LocalPlayer.Character then return nil end
 	elseif Players:GetPlayerFromCharacter(character) then
+		return nil
+	end
+
+	--@ A lunge is the one drive that gives way: a foreign mover that outranks it (the dive's) stays,
+	--@ where moverOf would otherwise clear it. A swing thrown just before a dodge lands its lunge mid-dash
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local foreign = root and PhysicsService.GetImpulse(root)
+
+	if foreign
+		and not foreign:GetAttribute(KnockbackService.Settings.DriveAttribute)
+		and (foreign:GetAttribute(PhysicsService.ImpulsePriorityAttribute) or 0) > (impulse.priority or 0)
+	then
 		return nil
 	end
 

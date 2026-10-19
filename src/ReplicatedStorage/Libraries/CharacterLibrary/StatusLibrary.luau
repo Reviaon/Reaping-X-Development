@@ -1,5 +1,9 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
+	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames" },
+	HitYield = { "IsStunned", "GuardBroken" },
+	HitGuard = { "IsGuarding" },
+	ActionLock = { "IsPushing", "IsSprintPushing" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -11,7 +15,7 @@ return{
 		},
 		
 		IsStunned = {
-			WalkSpeed = 4,
+			WalkSpeed = 2,
 			JumpPower = 0,
 			Priority = 10;
 		};
@@ -21,6 +25,14 @@ return{
 			JumpPower = 0,
 			AutoRotate = false,
 			Priority = 11;
+		};
+
+		IsRecovering = {
+			Priority = 2;
+		};
+
+		IFrames = {
+			Priority = 2;
 		};
 
 		IsSprinting = {
@@ -45,6 +57,38 @@ return{
 			WalkSpeed = 8,
 			JumpPower = 0,
 			Priority = 3;
+		};
+
+		IsGuarding = {
+			Priority = 3;
+		};
+
+		GuardBroken = {
+			WalkSpeed = 4,
+			JumpPower = 0,
+			Priority = 2;
+		};
+
+		GuardLocked = {
+			Priority = 2;
+		};
+
+		IsPushing = {
+			WalkSpeed = 4,
+			JumpPower = 0,
+			Priority = 6;
+		};
+
+		IsSprintPushing = {
+			WalkSpeed = 18,
+			JumpPower = 0,
+			Priority = 6;
+		};
+
+		IsLanding = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			Priority = 5;
 		};
 
 		IsCrouching = {

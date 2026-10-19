@@ -11,7 +11,7 @@ local IDLE_PRIORITY = Enum.AnimationPriority.Action
 local IDLE_SUFFIX = "Idle"
 local FADE_TIME = 0.3
 
-local BLOCKING_STATUSES = { "IsCrouching", "IsDiving" }
+local BLOCKING_STATUSES = { "IsCrouching", "IsDiving", "IsBlocking" }
 
 local AIRBORNE_STATES = {
 	[Enum.HumanoidStateType.Jumping] = true,

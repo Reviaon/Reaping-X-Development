@@ -1,6 +1,5 @@
 --@ Combat Handler
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local CombatHandler = Jloader.CreateHandler({ Name = script.Name })
 
 --@ Services
@@ -11,7 +10,7 @@ local GlobalFunctions = Jloader.GlobalFunctions
 local InputHandler = GlobalFunctions.InputHandler
 local GarbageCollection = GlobalFunctions.Trove
 local ClientController = GlobalFunctions.ClientController
-local CombatConfig = require(script:WaitForChild("Config"))
+local CombatConfig = require("@self/Config")
 
 --@ Visuals are built and played on clients only; the relay hands one request to the
 --@ server, which fans it back out so every client renders the same hit.
@@ -27,6 +26,14 @@ local combatRelay = nil
 local function getCombatRelay()
 	combatRelay = combatRelay or Jloader.GetService("CombatService")
 	return combatRelay
+end
+
+local blockRelay = nil
+local guardConnection = nil
+
+local function getBlockRelay()
+	blockRelay = blockRelay or Jloader.GetService("BlockService")
+	return blockRelay
 end
 
 --@ Components
@@ -60,14 +67,21 @@ local inputActions = {
 				CombatHandler:TryLightAttack(controller)
 			end,
 		},
+		[Enum.UserInputType.MouseButton2] = {
+			canHold = false,
+			action = function(controller)
+				CombatHandler:TryPush(controller)
+			end,
+		},
 		[Enum.KeyCode.R] = {
 			canHold = false,
 			action = function(controller)
 				CombatHandler:TryHeavyAttack(controller)
 			end,
 		},
+		--@ Held: the guard goes back up by itself once whatever dropped or refused it has passed.
 		[Enum.KeyCode.F] = {
-			canHold = false,
+			canHold = true,
 			action = function(controller)
 				CombatHandler:StartBlock(controller)
 			end,
@@ -82,7 +96,7 @@ local inputActions = {
 		[Enum.KeyCode.F] = {
 			canHold = false,
 			action = function(controller)
-				CombatHandler:StopBlock(controller)
+				CombatHandler:StopBlock(controller, true)
 			end,
 		},
 	},
@@ -115,6 +129,15 @@ function CombatHandler:InitCharacter(controller)
 
 	controller.VisualRelay = getVisualRelay()
 	controller.CombatRelay = getCombatRelay()
+	controller.BlockRelay = getBlockRelay()
+
+	--@ Once, here rather than in Init: the service lookup can come back empty while the server is
+	--@ still starting, and a nil there aborted the whole client load.
+	if not guardConnection and controller.BlockRelay then
+		guardConnection = controller.BlockRelay.Guard:Connect(function(event)
+			CombatHandler:OnGuard(ClientController, event)
+		end)
+	end
 
 	CombatHandler.Trove:Connect(RunService.Heartbeat, function()
 		CombatHandler:UpdateComboTimeout(controller)
@@ -127,6 +150,19 @@ function CombatHandler:InitCharacter(controller)
 		end
 	end)
 
+	local interrupted = false
+
+	CombatHandler.Trove:Connect(Character.AttributeChanged, function()
+		local yielded = controller.StatusService:IsHitYielded(Character)
+
+		if yielded and not interrupted then
+			CombatHandler:Interrupt(controller)
+			CombatHandler:StopBlock(controller)
+		end
+
+		interrupted = yielded
+	end)
+
 	CombatConfig:WeaponListener(controller, CombatHandler.Trove, function(weaponId)
 		CombatConfig:ClearImpulse(controller)
 
@@ -136,6 +172,7 @@ function CombatHandler:InitCharacter(controller)
 		)
 
 		CombatHandler:StateFor(controller).ActiveWeapon = weaponId
+		CombatHandler:RefreshBlock(controller)
 
 		warn("Active weapon changed to:", weaponId)
 	end)
@@ -147,6 +184,10 @@ end
 
 function CombatHandler:TryHeavyAttack(controller)
 	CombatHandler:TryAttackBranch(controller, "Heavy")
+end
+
+function CombatHandler:TryPush(controller)
+	CombatHandler:TryAttackBranch(controller, "Push")
 end
 
 function CombatHandler:TryAttackBranch(controller, branchName: string)
@@ -171,7 +212,7 @@ function CombatHandler:CanBeginBranch(controller, branchName: string): boolean
 
 	CombatHandler:StateFor(controller).ActiveWeapon = CombatHandler:ResolveActiveWeapon(controller)
 
-	if controller.StatusService:CheckStatuses(Character, { IsStunned = true }) then
+	if controller.StatusService:IsHitYielded(Character) or controller.StatusService:IsActionLocked(Character) then
 		return false
 	end
 
@@ -201,6 +242,25 @@ function CombatHandler:BeginBranch(controller, branchName: string)
 	if typeof(component.Activate) == "function" then
 		component:Activate(controller, state)
 	end
+end
+
+function CombatHandler:Interrupt(controller)
+	local state = CombatHandler:StateFor(controller)
+	local component = CombatHandler.components[state.CurrentBranch .. "AttackComponent"]
+
+	if component and typeof(component.Deactivate) == "function" then
+		component:Deactivate(controller, state)
+	end
+
+	CombatConfig:ClearImpulse(controller)
+
+	if controller.Character then
+		controller.StatusService:RemoveStatus(controller.Character, "IsAttacking")
+	end
+
+	state.QueuedBranch = nil
+	state.ComboIndex = 0
+	state.CurrentBranch = "Neutral"
 end
 
 function CombatHandler:QueueBranch(controller, branchName: string)
@@ -275,10 +335,24 @@ function CombatHandler:StartBlock(controller)
 	end
 end
 
-function CombatHandler:StopBlock(controller)
+function CombatHandler:StopBlock(controller, released: boolean?)
 	local blockComponent = CombatHandler.components["BlockComponent"]
 	if blockComponent and typeof(blockComponent.Deactivate) == "function" then
-		blockComponent:Deactivate(controller, CombatHandler:StateFor(controller))
+		blockComponent:Deactivate(controller, CombatHandler:StateFor(controller), released)
+	end
+end
+
+function CombatHandler:RefreshBlock(controller)
+	local blockComponent = CombatHandler.components["BlockComponent"]
+	if blockComponent and typeof(blockComponent.Refresh) == "function" then
+		blockComponent:Refresh(controller)
+	end
+end
+
+function CombatHandler:OnGuard(controller, event)
+	local blockComponent = CombatHandler.components["BlockComponent"]
+	if blockComponent and typeof(blockComponent.OnGuard) == "function" then
+		blockComponent:OnGuard(controller, event)
 	end
 end
 

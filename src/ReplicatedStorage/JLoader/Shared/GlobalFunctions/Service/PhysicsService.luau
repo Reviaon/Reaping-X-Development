@@ -2,12 +2,11 @@
 local PhysicsService = {}
 
 -- @ Services
-local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 -- @ Modules
-local Trove = require(script.Parent.Parent:WaitForChild("Trove"))
+local Trove = require("../Trove")
 
 -- @ Stamped on every impulse mover so competing impulses can be arbitrated.
 -- Any system that parents its own @impulse_velocity should stamp this too.

@@ -1,10 +1,9 @@
 --@ Start
-local Jloader = require(game.ReplicatedStorage.JLoader)
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 --@ Services
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 --@ Constants

@@ -164,6 +164,10 @@ function AnimatorService:GetTrack(Entity: Model, Name: string) : AnimationTrack
 	end
 end
 
+function AnimatorService:HasAnimation(Name: string) : boolean
+	return AnimationsCache:FindFirstChild(Name, true) ~= nil
+end
+
 function AnimatorService:PlayTrack(Entity: Model, Name: string, Properties: {[string]: any}?) : AnimationTrack
 	assert(Entity:IsA("Model"), "Entity has to be a model.")
 	assert(typeof(Name) == "string", "Name has to be a string.")

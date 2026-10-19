@@ -4,6 +4,7 @@ local Settings = {
 	TrackFade = 0.15, --@ Crossfade when one track replaces another, seconds
 	HitEffectPath = "Combat.Hit", --@ ClientEffects path for the impact effect
 	HitEffectMethod = "Emit",
+	HitRetractMethod = "Retract",
 	RelayKey = "VisualRelay", --@ Controller key holding the EffectService relay
 	CombatRelayKey = "CombatRelay", --@ Controller key holding the CombatService relay
 	LivingPath = { "World", "Live" }, --@ Workspace folder holding characters a hitbox may catch
@@ -111,19 +112,42 @@ function AttackService:PlayLocal(payload)
 	return true
 end
 
-function AttackService:BroadcastHit(controller, character, victim, effect, weaponId, comboIndex)
-	local payload = {
+--@ reaction names the one hit reaction the victim plays; nil leaves it to the victim's random set.
+function AttackService:HitPayload(character, victim, effect, weaponId, comboIndex, reaction)
+	return {
 		Effect = Settings.HitEffectPath,
 		Method = Settings.HitEffectMethod,
-		SkipSender = true,
 		Info = {
 			Target = victim,
 			Attacker = character,
 			Effect = effect,
 			WeaponId = weaponId,
 			ComboIndex = comboIndex,
+			Reaction = reaction,
 		},
 	}
+end
+
+--@ Drawn by the attacker ahead of the server, so it is marked: a guard the server saw and this
+--@ client hadn't yet gets it retracted (RetractPayload).
+function AttackService:PlayHit(character, victim, effect, weaponId, comboIndex, reaction)
+	local payload = self:HitPayload(character, victim, effect, weaponId, comboIndex, reaction)
+	payload.Info.Predicted = true
+
+	return self:PlayLocal(payload)
+end
+
+function AttackService:RetractPayload(victim)
+	return {
+		Effect = Settings.HitEffectPath,
+		Method = Settings.HitRetractMethod,
+		Info = { Target = victim },
+	}
+end
+
+--@ Plays on this client now and relays to every other client.
+function AttackService:BroadcastVisual(controller, payload)
+	payload.SkipSender = true
 
 	self:PlayLocal(payload)
 	return self:Broadcast(controller, payload)
@@ -201,6 +225,22 @@ function AttackService:ReportLunge(controller, weaponId, comboIndex, direction)
 	return true
 end
 
+function AttackService:ReportSwing(controller, weaponId, comboIndex)
+	local relay = controller[Settings.CombatRelayKey]
+	if not relay then return false end
+
+	relay.ReportSwing:Fire(weaponId, comboIndex)
+	return true
+end
+
+function AttackService:ReportDive(controller)
+	local relay = controller[Settings.CombatRelayKey]
+	if not relay then return false end
+
+	relay.ReportDive:Fire()
+	return true
+end
+
 function AttackService:ScheduleImpulse(controller, key, character, timing, options)
 	key = part(key, "impulse")
 	self:Cancel(controller, key)
@@ -266,6 +306,7 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 
 	self:Schedule(controller, key, timing.hitbox_delay, function()
 		if not character or not character.Parent then return end
+		if controller.StatusService:IsHitYielded(character) then return end
 
 		local data = controller.CombatConfig:BuildHitboxData(hitbox)
 		data.Attacker = character
@@ -279,11 +320,23 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 		local hits = {}
 
 		handle.onHit:Connect(function(target)
+			if controller.StatusService:IsHitYielded(character) then return end
+			if controller.StatusService:IsHitImmune(target) then return end
+
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)
 
-			self:BroadcastHit(controller, character, target, hitbox.effect, options.weaponId, timing.combo_index)
-			self:ReportHit(controller, target, options.weaponId, timing.combo_index)
+			local root = character:FindFirstChild("HumanoidRootPart")
+
+			if not (root and controller.StatusService:IsGuardingFrom(target, root.Position)) then
+				self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index, options.reaction)
+			end
+
+			if options.report then
+				options.report(target)
+			else
+				self:ReportHit(controller, target, options.weaponId, timing.combo_index)
+			end
 
 			if options.onHit then
 				options.onHit(target)
@@ -322,6 +375,28 @@ function AttackService:CancelSwing(controller, key, fade)
 	self:Cancel(controller, part(key, "impulse"))
 	self:CancelHitbox(controller, key)
 	self:StopTrack(controller, key, fade)
+end
+
+function AttackService:HitboxSpent(controller, key): boolean
+	key = part(key, "hitbox")
+	local scope = self:Scope(controller)
+
+	return scope.threads[key] == nil and scope.hitboxes[key] == nil
+end
+
+--@ Cancels every swing whose hitbox is spent; true if one is still before or inside its hitbox.
+function AttackService:ReleaseSpentSwings(controller, fade): boolean
+	local holding = false
+
+	for key in self:Scope(controller).tracks do
+		if self:HitboxSpent(controller, key) then
+			self:CancelSwing(controller, key, fade)
+		else
+			holding = true
+		end
+	end
+
+	return holding
 end
 
 return AttackService

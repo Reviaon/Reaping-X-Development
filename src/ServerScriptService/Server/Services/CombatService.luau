@@ -1,21 +1,16 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "Launch" } },
+	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch" } },
 })
 
-local CombatConfig = require(
-	ReplicatedStorage:WaitForChild("Modules")
-		:WaitForChild("Client")
-		:WaitForChild("Controllers")
-		:WaitForChild("Character")
-		:WaitForChild("CombatHandler")
-		:WaitForChild("Config")
-)
+local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
+local Hitstun = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Hitstun")
+local WeaponTiers = require("@game/ReplicatedStorage/Libraries/TierLibrary/WeaponTiers")
+local DiveConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/MovementHandler/@Components/DiveComponent/Config")
 
 CombatService.Settings = {
 	--@ Studs. A hit reported from further than this is dropped as implausible.
@@ -30,13 +25,34 @@ CombatService.Settings = {
 	--@ Seconds. Floor on how often one player's lunge report is relayed.
 	LungeReportCooldown = 0.1,
 
-	--@ Seconds a hit victim is stunned. 0 disables.
-	HitstunDuration = 0.25,
+	--@ Hit immunity after a ragdoll; the victim loses it once one of their own hits lands or they dive.
+	RecoveryStatus = "IsRecovering",
+
+	--@ Universal hit immunity; a dive applies it for its first DiveConfig.IFrames seconds.
+	IFrameStatus = "IFrames",
+
+	--@ Seconds. A dive report is accepted this much sooner than the dive's own cooldown, for jitter.
+	DiveReportLeniency = 0.2,
 }
 
 local lastReport = {}
 local lastRootReport = {}
 local lastLungeReport = {}
+local lastDiveReport = {}
+
+local effectRelay = nil
+
+local function getEffectRelay()
+	effectRelay = effectRelay or Jloader.GetService("EffectService")
+	return effectRelay
+end
+
+local blockService = nil
+
+local function getBlockService()
+	blockService = blockService or Jloader.GetService("BlockService")
+	return blockService
+end
 
 local function livingFolder()
 	local world = workspace:FindFirstChild("World")
@@ -45,27 +61,6 @@ end
 
 local function rootOf(character)
 	return character and character:FindFirstChild("HumanoidRootPart")
-end
-
-local function knockbackDirection(attacker: Model, victim: Model): Vector3
-	local PositionService = GlobalFunctions.PositionService
-
-	local attackerPosition, attackerLook = PositionService.Reference(attacker)
-	local victimPosition = PositionService.Reference(victim)
-
-	if not attackerPosition or not victimPosition then
-		return Vector3.zero
-	end
-
-	local offset = (victimPosition - attackerPosition) * Vector3.new(1, 0, 1)
-
-	if offset.Magnitude > 0 then
-		return offset.Unit
-	end
-
-	local fallback = (attackerLook or Vector3.zAxis) * Vector3.new(1, 0, 1)
-
-	return fallback.Magnitude > 0 and fallback.Unit or Vector3.zero
 end
 
 function CombatService:ResolveKnockback(weaponId: string, comboIndex: number)
@@ -99,7 +94,15 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 
 	if not RagdollService.Ragdoll(victim, finisher.ragdoll) then return false end
 
-	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll + finisher.getup)
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
+
+	if finisher.recovery > 0 then
+		task.delay(finisher.ragdoll, function()
+			if not victim.Parent or not GlobalFunctions.StatusService:IsAlive(victim) then return end
+
+			GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, finisher.recovery)
+		end)
+	end
 
 	if landing then
 		landing.At = workspace:GetServerTimeNow() + landing.Time
@@ -125,8 +128,19 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if not profile then return false end
 
 	if not rootOf(attacker) or not rootOf(victim) then return false end
+	if not GlobalFunctions.StatusService:IsAlive(victim) then return false end
+	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
+	if GlobalFunctions.StatusService:IsHitYielded(attacker) then return false end
+	if getBlockService():HasPriority(victim, attacker) then
+		if GlobalFunctions.DebugService.IsEnabled() then
+			warn(`[Block] {victim.Name}'s counter outranks {attacker.Name}: hit refused`)
+		end
 
-	local direction = knockbackDirection(attacker, victim)
+		return false
+	end
+	if getBlockService():Absorb(attacker, victim) then return false end
+
+	local direction, away = GlobalFunctions.PositionService.Aim(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
 
 	local finisher = self:ResolveFinisher(weaponId, comboIndex)
@@ -135,15 +149,13 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 		return self:ApplyFinisher(victim, direction, finisher)
 	end
 
-	if GlobalFunctions.RagdollService.IsRagdolled(victim) then return false end
-
 	local knockback = self:ResolveKnockback(weaponId, comboIndex)
 	if not knockback then return false end
 
 	local KnockbackService = GlobalFunctions.KnockbackService
 
-	--@ direction runs attacker -> victim, so the victim looks back along it.
-	local facing = knockback.face ~= false and -direction or nil
+	--@ away runs attacker -> victim, so the victim looks back along it.
+	local facing = knockback.face ~= false and -away or nil
 
 	local recipe = KnockbackService.Build(victim, direction, {
 		speed = knockback.speed,
@@ -156,16 +168,64 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	if not recipe then return false end
 
-	local hitstun = self.Settings.HitstunDuration
+	local hitstun = Hitstun.Resolve(weaponId, comboIndex)
 
-	if hitstun > 0 then
+	if hitstun and hitstun > 0 then
 		GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, hitstun)
+		getBlockService():Lock(victim, hitstun)
 	end
 
 	--@ Every client draws it; the server drives only what it owns. Fired before Apply so the
 	--@ recipe is serialised exactly as built.
 	self.Knockback:FireAll(victim, recipe)
 	KnockbackService.Apply(victim, recipe)
+
+	return true
+end
+
+function CombatService:BroadcastHit(attacker: Model, victim: Model, weaponId: string, comboIndex: number, except: Player?)
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	local hitbox = weaponConfig and CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).hitbox
+	local payload = GlobalFunctions.AttackService:HitPayload(attacker, victim, hitbox and hitbox.effect, weaponId, comboIndex)
+	local relay = getEffectRelay()
+
+	if except then
+		relay.CreateVisual:FireExcept(except, payload)
+	else
+		relay.CreateVisual:FireAll(payload)
+	end
+end
+
+--@ The weapon's base damage, multiplied by the tier of what the attacker is holding. The tier is the
+--@ attribute the server set on equip, so a client can't claim a better one.
+function CombatService:ApplyDamage(attacker: Model, victim: Model, weaponId: string, comboIndex: number): number
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	local humanoid = victim:FindFirstChildOfClass("Humanoid")
+
+	if not weaponConfig or not humanoid then return 0 end
+
+	local tier = WeaponTiers.Tiers[attacker:GetAttribute(WeaponTiers.EquippedAttribute)]
+	local damage = CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).damage * (tier and tier.Damage or 1)
+
+	if damage > 0 then
+		humanoid:TakeDamage(damage)
+	end
+
+	return damage
+end
+
+function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?)
+	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
+
+	self:ApplyDamage(attacker, victim, weaponId, comboIndex)
+
+	local recovery = self.Settings.RecoveryStatus
+
+	if attacker:GetAttribute(recovery) ~= nil then
+		GlobalFunctions.StatusService:RemoveStatus(attacker, recovery)
+	end
+
+	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except)
 
 	return true
 end
@@ -237,6 +297,46 @@ function CombatService:HandleLungeReport(player: Player, weaponId, comboIndex, p
 	self:BroadcastLunge(character, direction.Unit, weaponId, math.floor(comboIndex), player)
 end
 
+function CombatService:HandleDiveReport(player: Player)
+	local settings = self.Settings
+	local StatusService = GlobalFunctions.StatusService
+
+	local character = player and player.Character
+	if not character or not rootOf(character) then return end
+	if not StatusService:IsAlive(character) or StatusService:IsHitYielded(character) then return end
+
+	local now = os.clock()
+	local last = lastDiveReport[player]
+
+	if last and now - last < DiveConfig.Cooldown - settings.DiveReportLeniency then return end
+
+	lastDiveReport[player] = now
+
+	if character:GetAttribute(settings.RecoveryStatus) ~= nil then
+		StatusService:RemoveStatus(character, settings.RecoveryStatus)
+	end
+
+	if DiveConfig.IFrames > 0 then
+		StatusService:ApplyStatus(character, settings.IFrameStatus, true, DiveConfig.IFrames)
+	end
+end
+
+function CombatService:HandleSwingReport(player: Player, weaponId, comboIndex)
+	local character = player and player.Character
+	if not character or not rootOf(character) then return end
+
+	if typeof(weaponId) ~= "string" then return end
+	if typeof(comboIndex) ~= "number" or comboIndex < 1 then return end
+	if GlobalFunctions.StatusService:IsHitYielded(character) then return end
+
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	if not weaponConfig then return end
+
+	local timing = CombatConfig:ResolveAttackTiming(nil, math.floor(comboIndex), weaponConfig)
+
+	getBlockService():BeginSwing(character, timing.duration)
+end
+
 function CombatService:HandleRootReport(player: Player, payload)
 	local character = player and player.Character
 	if not character then return end
@@ -260,6 +360,7 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return end
 	if victim == attacker then return end
 	if not victim:FindFirstChildOfClass("Humanoid") then return end
+	if GlobalFunctions.StatusService:IsHitImmune(victim) then return end
 
 	local living = livingFolder()
 	if not living or not victim:IsDescendantOf(living) then return end
@@ -291,7 +392,7 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 		GlobalFunctions.PositionService.Accept(attacker, attackerRoot)
 	end
 
-	self:ApplyKnockback(attacker, victim, profile, weaponId, math.floor(comboIndex))
+	self:LandHit(attacker, victim, profile, weaponId, math.floor(comboIndex), player)
 end
 
 function CombatService:Init()
@@ -307,6 +408,14 @@ function CombatService:Init()
 		self:HandleLungeReport(player, weaponId, comboIndex, payload)
 	end)
 
+	self.ReportDive:Connect(function(player)
+		self:HandleDiveReport(player)
+	end)
+
+	self.ReportSwing:Connect(function(player, weaponId, comboIndex)
+		self:HandleSwingReport(player, weaponId, comboIndex)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		local prefix = tostring(player.UserId) .. "|"
 
@@ -318,6 +427,7 @@ function CombatService:Init()
 
 		lastRootReport[player] = nil
 		lastLungeReport[player] = nil
+		lastDiveReport[player] = nil
 
 		if player.Character then
 			GlobalFunctions.PositionService.Clear(player.Character)

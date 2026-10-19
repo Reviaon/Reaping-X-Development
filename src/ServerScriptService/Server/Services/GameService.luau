@@ -1,6 +1,6 @@
 --@ Start
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local Main = Jloader.CreateService{Name = script.Name}
 
 --@ Services
@@ -12,7 +12,7 @@ local RunService = game:GetService('RunService')
 --@ Assets
 local Storage = ReplicatedStorage.Storage
 local Live = workspace:WaitForChild("World"):WaitForChild("Live")
-local DataService = require(script.Parent.DataService)
+local DataService = require("./DataService")
 
 --@ Import
 local GlobalFunctions = Jloader.GlobalFunctions;

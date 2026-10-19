@@ -11358,7 +11358,7 @@ globals:
     - type: any
   require:
     args:
-    - type: number
+    - type: any
   script:
     struct: Script
   select:

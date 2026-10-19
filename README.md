@@ -481,7 +481,7 @@ Three details are what make it hold together:
   facing `AlignOrientation` are created once per root, re-aimed by each recipe, and parked
   (`Enabled = false`, priority cleared) between drives rather than rebuilt, so a chained combo
   changes nothing about the assembly. Anything that reads `PhysicsService.GetImpulse` must check
-  `Enabled`, as `TiltComponent` does. A foreign mover on the root — the dive's — is still cleared.
+  `Enabled`, as `LeanComponent` does. A foreign mover on the root — the dive's — is still cleared.
 
 The facing turn is part of the recipe: yaw slerps toward the attacker over the first
 `FacingPortion` of the duration. Arbitration survives — the drive stamps `knockback_priority` and
@@ -596,9 +596,11 @@ as the impulse. It is flattened to horizontal, so it is yaw only and never tips 
 suppresses `Humanoid.AutoRotate` while it runs — otherwise the Humanoid turns the character back the
 moment they have any move input.
 
-`CombatService` passes `-direction`. The knockback direction runs attacker → victim, so negating it
-looks back down the same line: the victim slides backwards while facing the attacker, which is what
-the hit reactions are animated against. Per weapon and per combo, `face` turns it off and
+`PositionService.Aim` gives `CombatService` two directions. The throw follows the attacker's look, so
+a hit goes where the swing was aimed however far off its centre the victim stood (a victim behind the
+attacker is thrown along the attacker → victim line instead). The facing is the negated attacker →
+victim line: the victim slides back while facing the attacker, which is what the hit reactions are
+animated against. Per weapon and per combo, `face` turns it off and
 `faceResponsiveness` controls how sharply the turn is taken — a lower number reads as a stagger, a
 higher one as a snap.
 
@@ -654,7 +656,7 @@ the step and the shove cover the same studs and the target stays in reach throug
 
 The final hit of every combo (`timing.is_final`) is a finisher: instead of a knockback recipe it
 **launches and ragdolls** the victim, player or NPC. `CombatConfig` gives every weapon
-`DEFAULT_FINISHER` — `ragdoll` 1.5s, `getup` 0.6s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
+`DEFAULT_FINISHER` — `ragdoll` 1.5s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
 `flail` 16 — and a weapon's `finisher = { ... }` overrides any key, while `finisher = false` turns
 it off. `spin` is degrees per second of backward tumble on the torso assembly; `twist` adds that
 share of it again as a random angular velocity so no two launches turn the same way; `flail` is
@@ -675,12 +677,38 @@ legs from sinking through the torso and head mid-tumble; there are no `NoCollisi
 between them any more.
 
 `CombatService:ApplyFinisher` cancels any push still running on the victim, applies `IsRagdolled`
-for `ragdoll` seconds and `IsStunned` for `ragdoll + getup` (so every existing stun gate holds
-through the get-up), and broadcasts `Launch(victim, velocity)` with `direction × speed + up × lift`.
+for `ragdoll` seconds and `IsStunned` for the same `ragdoll` seconds (so every existing stun gate holds
+through the ragdoll), and broadcasts `Launch(victim, velocity)` with `direction × speed + up × lift`.
 A ragdoll is real physics, so only its physics owner can move it: the server launches an NPC itself
 and the victim's own client applies the launch to a player (`KnockbackHandler:Launch`); everyone
-else sees it through replication. A ragdolled victim ignores ordinary knockback; another finisher
-re-launches them and the ragdoll time stacks.
+else sees it through replication. A ragdolled victim cannot be hit at all — `StatusService:IsHitImmune`
+(`StatusLibrary.HitImmune`) is checked by both hitboxes, the server report and `ApplyKnockback`.
+Once the ragdoll ends the victim gets `IsRecovering` for the finisher's `recovery` seconds, also in
+`HitImmune`: they can swing or dive but nobody can hit them, so they act first and the finisher can't
+be chained straight into another combo. The immunity ends early the moment one of their own hits is
+accepted (`CombatService:LandHit` removes `Settings.RecoveryStatus`), so it can't cover a whole
+counter-combo, or the moment they dive.
+
+**`IFrames` is the universal i-frame status.** It is in `HitImmune`, carries no movement overrides,
+and anything that needs brief hit immunity applies it on the server with
+`StatusService:ApplyStatus(character, "IFrames", true, seconds)` (`CombatService.Settings.IFrameStatus`)
+instead of adding a status of its own. Applications stack, so overlapping sources keep the longest.
+
+**Dive i-frames.** `DiveComponent:Activate` reports the dive (`AttackService:ReportDive` →
+`CombatService:HandleDiveReport`). The server refuses a dead or yielded diver and anything faster than
+the dive's `Cooldown` minus `Settings.DiveReportLeniency`, then removes `IsRecovering` and applies
+`IFrames` for the dive config's `IFrames` seconds. After that the dash can be hit
+like anything else, and a stun ends it through the dive's own interrupt. The window starts when the
+server receives the report, so a hit the server processes first still lands.
+
+The attacker's side is `StatusLibrary.HitYield` (`IsStunned`) through `StatusService:IsHitYielded`: a
+yielded attacker spawns no hitbox, a live hitbox ignores contacts, and `ApplyKnockback` refuses the
+hit, so in a trade whichever report the server takes first wins. The same moment interrupts the
+swing (`CombatHandler:Interrupt` — track, lunge, `IsAttacking`, combo) and deletes the attacker's
+swing and dodge visuals on every client: `VisualsCore.SpawnEffect` builds them as cancellable
+EffectService objects on the `HitYield` list (`CancelOn` in a visual's settings or spec overrides it,
+`false` opts out), and `VisualsCore.WatchInterrupt` stops the rest of that swing's timeline and clears
+its afterimages.
 
 `RagdollService` (GlobalFunctions) builds the rig once per R6 character from its own joints — no
 template instances — when `ServerController` loads it: a ball socket at each shoulder and hip,
@@ -691,6 +719,61 @@ the loose limbs for the character's owner, so they are simulated where the rest 
 Humanoid goes to `Physics` and back through `GettingUp` — on the server for an NPC, through
 `RagdollService.Watch` on the player's own client. Shift-lock's per-frame root rotation stands down
 while ragdolled.
+
+### Blocking
+
+Holding **F** raises a guard. The numbers live in `Libraries/CharacterLibrary/BlockLibrary`, which
+both sides require.
+
+**The server owns the guard.** `IsBlocking` is set on the client, so it never reaches the server.
+It still gates the local client (walk speed, no sprinting or attacking) the moment F goes down.
+`BlockComponent` reports raise and lower to `BlockService` (`ReportBlock`), which applies the
+replicated `IsGuarding` status (`StatusLibrary.HitGuard`, read through `StatusService:IsGuarding`).
+A dead or yielded character can't raise it, and neither can one under `GuardBroken`.
+
+**Block health.** Characters spawn with `BlockHealth` and `MaxBlockHealth` attributes (100, seeded
+from `AttributesLibrary`). `CombatService:ApplyKnockback` asks `BlockService:Absorb` right after the
+immunity and yield checks. A guarded victim takes no knockback, stun or finisher, and
+loses `HitCost` (20) block health instead, so the fifth blocked hit breaks the guard: `IsGuarding`
+is removed and `GuardBroken` applied for `BreakLockout` seconds, after which block health is full
+again. Otherwise block health refills at `RegenRate` per second, starting `RegenDelay` seconds
+after the last blocked hit. The server keeps the unrounded value and publishes the rounded one, so
+a UI only has to read `BlockHealth`.
+
+**Animations.** The guard holds `{Weapon}BlockIdle` at Action2, or `UniversalBlock` for a weapon
+without one. The server tells the blocker's own client about each blocked hit through `Guard`
+(`Absorbed`, `Broken`, `Refused`), and that client plays `{Weapon}BlockReaction1..n` in turn at
+Action3 (1 → 2 → 1 …), starting at 1 each time the guard goes up. A weapon without reactions plays
+none. Because the owner plays them, everyone sees them through replication. `Broken` lets the last
+reaction finish while the guard drops; `Refused` drops it straight away. An attacker's hitbox doesn't
+play its predicted hit effect on a target that's guarding.
+
+A stun drops the guard on the client (`CombatHandler`'s yield watch), and changing weapon while
+guarding swaps the idle. **F is a held input**: while it stays down the raise is retried every
+frame, so the guard comes back by itself after a stun, a break's lockout or a swing that was still
+running when F went down. A raise the server refuses waits `RetryDelay` before asking again. While blocking, `IdleComponent` suspends the weapon's `{Weapon}Idle` so
+the block idle plays alone; the weapon idle comes back once the character is idle and not
+blocking. `BlockComponent` keeps its tracks in its own scope, not AttackService's, so a dive's
+`ReleaseSpentSwings` can't stop them. While blocking, the only dive allowed is a back dive
+(`DiveComponent/Config.BlockingDirections`); the guard stays up through it, and the block idle
+shows again as the dive track ends.
+
+**A broken guard can't act.** `GuardBroken` is in `StatusLibrary.HitYield` with `IsStunned`, so for
+`BreakLockout` it gets everything a stun does: the swing is interrupted, no hitbox spawns, the server
+refuses its hits and its dive i-frames, and the guard can't go back up. It also has `JumpPower` 0
+and `WalkSpeed` 4, and its own client plays `BlockLibrary.Animations.Break` (`UniversalGaurdBreak`)
+in place of the last reaction, at whatever speed makes the track end with the lockout. Attacks, sprint, crouch, dive and block all gate on `StatusService:IsHitYielded` rather than
+`IsStunned` alone. The server relays `Combat.Daze` (`Effects/Combat/Daze`) to every client. That
+holds `Storage.Particles.CombatVFX.Hit.Daze` on the victim's head, spinning, until `GuardBroken`
+clears, then fades it out (`FadeOutAll` + `SetRemoval`). `Info.Until` is the lockout's end in
+server time, because the relay can arrive before the attribute replicates.
+
+**Counter priority.** A guard remembers who it last absorbed a hit from. Lowering that guard
+(not a break) opens a `CounterWindow` (0.5s). A swing started inside it (`LightAttackComponent` →
+`AttackService:ReportSwing` → `CombatService:HandleSwingReport` → `BlockService:BeginSwing`)
+outranks that attacker for the swing's duration: `ApplyKnockback` refuses their hits on the
+blocker (`BlockService:HasPriority`, logged in debug mode). It covers only the first swing, and
+only against that attacker. Raising the guard again clears it.
 
 ### Trajectory debug and landing prediction
 
@@ -762,10 +845,15 @@ The decision is made once, on arrival: a long-lived effect started while a viewe
 does not begin playing if they walk into range.
 
 **A payload may carry `SkipSender = true`.** `EffectService` then broadcasts with `FireExcept` rather
-than `FireAll`, and the firing client is expected to have played it locally already — that is what
-`AttackService:PlayLocal` does for hit effects, so an attacker sees the impact on the frame it lands
-instead of after a round trip. Set it only when the sender has genuinely played it itself, or that
-client sees nothing at all.
+than `FireAll`, and the firing client is expected to have played it locally already. Set it only when
+the sender has genuinely played it itself, or that client sees nothing at all.
+
+**Hit effects are server-relayed on acceptance, not client-relayed.** The attacker's client plays its
+own hit at once (`AttackService:PlayHit`), and only reports it. `CombatService:LandHit` sends
+`Combat.Hit` to everyone else (`FireExcept` the reporting player; `FireAll` for a dummy) only after
+`ApplyKnockback` accepts it, with the effect name resolved from weapon config rather than taken from
+the client. A hit refused as immune or yielded therefore shows nowhere but, at most, the attacker's
+own screen.
 
 ---
 

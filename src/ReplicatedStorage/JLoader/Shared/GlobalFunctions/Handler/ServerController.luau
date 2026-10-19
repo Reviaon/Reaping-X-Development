@@ -44,6 +44,7 @@ local Trove = GlobalFunctions.Trove
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local AttributesLibrary = require(Libraries.CharacterLibrary.AttributesLibrary)
+local WeaponTiers = require(Libraries:WaitForChild("TierLibrary"):WaitForChild("WeaponTiers"))
 
 --@ WeaponsLibrary is a FOLDER of one ModuleScript per weapon, not a single table.
 --@ The module NAME is the weapon id and must match the Tool's name exactly.
@@ -77,13 +78,40 @@ local function GetWeaponData(WeaponName : string)
 	return Data
 end
 
+--@ The tier a weapon ends up as, and the model that tier swaps onto the rig (nil for the rig's own
+--@ mesh). A tier the weapon has no model for falls back to the default, then to the rig's own.
+local function ResolveTier(WeaponName : string, Requested : string?)
+	local Folder = Weapons:FindFirstChild(WeaponName)
+	local Candidates = { WeaponTiers.Default }
+
+	if typeof(Requested) == "string" then
+		table.insert(Candidates, 1, Requested)
+	end
+
+	for _, Tier in Candidates do
+		if not WeaponTiers.Tiers[Tier] then continue end
+		if Tier == WeaponTiers.Native then return Tier, nil end
+
+		local Model = Folder and Folder:FindFirstChild(Tier)
+
+		if Model and Model:IsA("BasePart") then
+			return Tier, Model
+		end
+	end
+
+	return WeaponTiers.Native, nil
+end
+
 --========================================================================
 --@ CharacterProfile  (preserved ProfileHandler code - per-character state)
 --========================================================================
 
 local CharacterProfile = {}
 
-function CharacterProfile.BuildWeaponTool(WeaponName : string)
+CharacterProfile.ResolveTier = ResolveTier
+
+--@ Tier is optional; the Tool carries it as an attribute and ApplyRig resolves it on equip.
+function CharacterProfile.BuildWeaponTool(WeaponName : string, Tier : string?)
 	local Handle = RigParts:FindFirstChild("Handle")
 
 	if not Handle or not Handle:IsA("BasePart") then
@@ -94,6 +122,10 @@ function CharacterProfile.BuildWeaponTool(WeaponName : string)
 	Tool.Name = WeaponName
 	Tool.RequiresHandle = true
 	Tool.CanBeDropped = false
+
+	if typeof(Tier) == "string" then
+		Tool:SetAttribute(WeaponTiers.Attribute, Tier)
+	end
 
 	local Clone = Handle:Clone()
 	Clone.Name = "Handle"
@@ -255,6 +287,32 @@ local function WeldRigGeometry(Piece : BasePart)
 	end
 end
 
+--@ The rig's own piece, or the tier's model dressed as it: same name, same attachments and child
+--@ geometry. The model is first matched to the rig piece's position and orientation, so the rig's
+--@ own joint then holds it exactly as it holds the rig's mesh.
+local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
+	if not Variant or Variant:GetAttribute("RigPiece") ~= Piece.Name then
+		return Piece:Clone()
+	end
+
+	local Clone = Variant:Clone()
+	Clone.Name = Piece.Name
+	Clone.CFrame = Piece.CFrame
+
+	for _, Child in Piece:GetChildren() do
+		if Child:IsA("SurfaceAppearance") then continue end
+
+		local Copy = Child:Clone()
+		Copy.Parent = Clone
+
+		if Copy:IsA("Attachment") then
+			Copy.WorldCFrame = Child.WorldCFrame
+		end
+	end
+
+	return Clone
+end
+
 local function ApplyRigAttachments(Character : Model, Template : Model, Names : {string}?)
 	if typeof(Names) ~= "table" then return end
 
@@ -292,6 +350,7 @@ end
 
 function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 	CharacterProfile.ClearRig(Character)
+	Character:SetAttribute(WeaponTiers.EquippedAttribute, nil)
 
 	local WeaponName = Tool and Tool.Name
 
@@ -323,6 +382,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		return
 	end
 
+	local Tier, Variant = ResolveTier(WeaponName, Tool:GetAttribute(WeaponTiers.Attribute))
 	local Applied = 0
 
 	for _, Joint in Template:GetDescendants() do
@@ -338,7 +398,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		if not CharacterLimb or not CharacterLimb:IsA("BasePart") then continue end
 		if Character:FindFirstChild(Piece.Name) then continue end --@ Skeleton joint, the character already owns it
 
-		local PieceClone = Piece:Clone()
+		local PieceClone = ClonePiece(Piece, Variant)
 		PieceClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
 		PieceClone.CanCollide = false
 		PieceClone.CanQuery = false
@@ -368,6 +428,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 	--@ Replicated so every client's CombatConfig:ResolveWeaponId agrees on the weapon;
 	--@ the client owns idle/attack animation swapping off the back of this.
 	Character:SetAttribute("EquippedWeapon", WeaponName)
+	Character:SetAttribute(WeaponTiers.EquippedAttribute, Tier)
 end
 
 function CharacterProfile:RigCharacter(Character : Model)

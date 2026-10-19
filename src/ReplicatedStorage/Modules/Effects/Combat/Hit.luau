@@ -1,5 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
 
 local Storage = ReplicatedStorage:WaitForChild("Storage")
 local HitEffects = Storage:WaitForChild("Particles"):WaitForChild("CombatVFX"):WaitForChild("Hit")
@@ -7,8 +7,9 @@ local HitEffects = Storage:WaitForChild("Particles"):WaitForChild("CombatVFX"):W
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 local NPCLibrary = Libraries:WaitForChild("NPCLibrary")
 
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local AnimatorService = Jloader.GlobalFunctions.AnimatorService
+local EffectService = Jloader.GlobalFunctions.EffectService
 
 local Settings = {
 	DefaultEffect = "BluntHit", --@ Used when the swing names no effect
@@ -17,9 +18,23 @@ local Settings = {
 	ReactionFade = 0.1, --@ Crossfade into the reaction, seconds
 	ReactionPriority = Enum.AnimationPriority.Action2,
 	Container = "@combat_hit_vfx", --@ Workspace folder the clones are parented under
+
+	--@ Storage.Other.HitHighlight is put on the victim as authored, its FillTransparency eased to
+	--@ HighlightEnd over HighlightTime seconds, then removed. 1 fades it out; 0 fills it in
+	--@ ShakeLibrary shapes for the local player landing a hit and taking one
+	ShakeDealt = "HitDealt",
+	ShakeTaken = "HitTaken",
+
+	HighlightTime = 0.35,
+	HighlightEnd = 1,
 }
 
 local Hit = {}
+
+local highlights = setmetatable({}, { __mode = "k" })
+
+--@ What the last hit this client drew ahead of the server left on each victim
+local predictions = setmetatable({}, { __mode = "k" })
 
 local function container()
 	local existing = workspace:FindFirstChild(Settings.Container)
@@ -35,25 +50,6 @@ local function pivotOf(model)
 	return model.PrimaryPart
 		or model:FindFirstChild("HumanoidRootPart")
 		or model:FindFirstChildWhichIsA("BasePart")
-end
-
-local function emitAll(root)
-	for _, emitter in root:GetDescendants() do
-		if not emitter:IsA("ParticleEmitter") then continue end
-
-		local count = emitter:GetAttribute("EmitCount") or 1
-		local wait_for = emitter:GetAttribute("EmitDelay") or 0
-
-		if wait_for > 0 then
-			task.delay(wait_for, function()
-				if emitter.Parent then
-					emitter:Emit(count)
-				end
-			end)
-		else
-			emitter:Emit(count)
-		end
-	end
 end
 
 local function reactionSet(Info, victim)
@@ -73,17 +69,23 @@ function Hit.PlayReaction(Info, victim)
 	local folder = reactionSet(Info, victim)
 	if not folder then return nil end
 
+	--@ A hit that names its reaction plays that one; otherwise one of the set at random.
+	local named = rawget(Info, "Reaction")
+	local chosen = typeof(named) == "string" and folder:FindFirstChild(named) or nil
 	local options = {}
-	for _, child in folder:GetChildren() do
-		if child:IsA("Animation") then
-			table.insert(options, child)
+
+	if chosen and chosen:IsA("Animation") then
+		table.insert(options, chosen)
+	else
+		for _, child in folder:GetChildren() do
+			if child:IsA("Animation") then
+				table.insert(options, child)
+			end
 		end
 	end
 
 	if #options == 0 then return nil end
-
-	--@ Not AnimatorService:LoadAnimation: these are randomised one-shots this function destroys
-	--@ itself, and registering them would leave destroyed tracks in the shared Registry.
+	
 	local animator = AnimatorService:GetAnimator(victim)
 	if not animator then return nil end
 
@@ -110,19 +112,65 @@ function Hit.SpawnParticles(victim, effectName)
 		return nil
 	end
 
-	local clone = template:Clone()
-	clone.Anchored = true
-	clone.CanCollide = false
-	clone.CanQuery = false
-	clone.CanTouch = false
-	clone.Massless = true
-	clone.CFrame = pivot.CFrame
-	clone.Parent = container()
+	local effect = EffectService.new({ Effect = template })
+	effect:SetCFrame(pivot.CFrame)
+	effect:SetParent(container())
+	effect:Play()
+	effect:SetRemoval(Settings.Lifetime)
 
-	emitAll(clone)
-	Debris:AddItem(clone, Settings.Lifetime)
+	return effect
+end
 
-	return clone
+--@ Only the two people in the hit feel it: the one struck, and the one who landed it.
+function Hit.Shake(victim, attacker)
+	local player = game:GetService("Players").LocalPlayer
+	local character = player and player.Character
+	if not character then return end
+
+	local shape = (victim == character and Settings.ShakeTaken) or (attacker == character and Settings.ShakeDealt)
+	if not shape then return end
+
+	local camera = Jloader.GetHandler("CameraHandler")
+
+	if camera and camera.Shake then
+		camera:Shake(shape)
+	end
+end
+
+function Hit.Highlight(victim)
+	local other = Storage:FindFirstChild("Other")
+	local template = other and other:FindFirstChild("HitHighlight")
+	if not template then return nil end
+
+	local existing = highlights[victim]
+
+	if existing then
+		existing:Destroy()
+	end
+
+	local highlight = template:Clone()
+	highlight.Adornee = victim
+	highlight.Parent = victim
+
+	highlights[victim] = highlight
+
+	local tween = TweenService:Create(
+		highlight,
+		TweenInfo.new(Settings.HighlightTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ FillTransparency = Settings.HighlightEnd }
+	)
+
+	tween.Completed:Once(function()
+		if highlights[victim] == highlight then
+			highlights[victim] = nil
+		end
+
+		highlight:Destroy()
+	end)
+
+	tween:Play()
+
+	return highlight
 end
 
 function Hit.Emit(Info)
@@ -130,8 +178,38 @@ function Hit.Emit(Info)
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return end
 	if not victim.Parent then return end
 
-	Hit.SpawnParticles(victim, Info.Effect)
-	Hit.PlayReaction(Info, victim)
+	Hit.Shake(victim, Info.Attacker)
+
+	local highlight = Hit.Highlight(victim)
+	local effect = Hit.SpawnParticles(victim, Info.Effect)
+	local track = Hit.PlayReaction(Info, victim)
+
+	if rawget(Info, "Predicted") then
+		predictions[victim] = { Highlight = highlight, Effect = effect, Track = track }
+	end
+end
+
+--@ The server's answer to a predicted hit its victim's guard took: what Emit drew for it is undone.
+function Hit.Retract(Info)
+	local victim = Info.Target
+	local prediction = typeof(victim) == "Instance" and predictions[victim]
+
+	if not prediction then return end
+
+	predictions[victim] = nil
+
+	if prediction.Highlight and highlights[victim] == prediction.Highlight then
+		highlights[victim] = nil
+		prediction.Highlight:Destroy()
+	end
+
+	if prediction.Effect then
+		prediction.Effect:Destroy()
+	end
+
+	if prediction.Track and prediction.Track.IsPlaying then
+		prediction.Track:Stop(Settings.ReactionFade)
+	end
 end
 
 Hit.Settings = Settings

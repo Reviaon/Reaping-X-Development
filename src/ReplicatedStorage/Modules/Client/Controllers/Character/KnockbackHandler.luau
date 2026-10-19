@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local KnockbackHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local CombatService = Jloader.GetService("CombatService")

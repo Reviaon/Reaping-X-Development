@@ -1,6 +1,5 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Jloader = require(ReplicatedStorage:WaitForChild("JLoader"))
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local PositionHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local GlobalFunctions = Jloader.GlobalFunctions

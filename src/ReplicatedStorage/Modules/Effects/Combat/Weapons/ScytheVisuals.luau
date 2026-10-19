@@ -1,6 +1,6 @@
 local ScytheVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.VisualsCore)
+local VisualsCore = require("../VisualsCore")
 
 ScytheVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Scythe",

@@ -1,8 +1,13 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StatusLibrary = require(ReplicatedStorage.Libraries.CharacterLibrary.StatusLibrary)
-local StatusResolver = require(script.Parent.StatusResolver)
+local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
+local BlockLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/BlockLibrary")
+local StatusResolver = require("./StatusResolver")
 
-local StatusService = { Registry = {} }
+local StatusService = {
+	Registry = {},
+	Settings = {
+		ExpirySuffix = "_Expires", --@ Attribute holding a status's server-time expiry
+	},
+}
 local Handle = {}
 Handle.__index = Handle
 
@@ -34,11 +39,12 @@ local function Invalidate(Entry)
 end
 
 local function Publish(Entity, Name, Entries)
-	local Newest
+	local Newest, Latest
 	for _, Entry in Entries or {} do
 		if not Newest or Entry.Id > Newest.Id then
 			Newest = Entry
 		end
+		Latest = math.max(Latest or 0, Entry.ExpiresAt)
 	end
 	local Value
 	if Newest then
@@ -46,6 +52,12 @@ local function Publish(Entity, Name, Entries)
 	end
 	if Entity:GetAttribute(Name) ~= Value then
 		Entity:SetAttribute(Name, Value)
+	end
+
+	--@ Server time, so every machine can count down a status another machine applied.
+	local Expires = Latest and Latest < math.huge and Latest or nil
+	if Entity:GetAttribute(Name .. StatusService.Settings.ExpirySuffix) ~= Expires then
+		Entity:SetAttribute(Name .. StatusService.Settings.ExpirySuffix, Expires)
 	end
 end
 
@@ -289,6 +301,49 @@ function StatusService:GetDominantStatus(Entity)
 		end
 	end
 	return Selected
+end
+
+function StatusService:IsHitImmune(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.HitImmune)
+end
+
+function StatusService:IsHitYielded(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.HitYield)
+end
+
+function StatusService:IsGuarding(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.HitGuard)
+end
+
+--@ True when Entity's guard is up and Position is inside the arc it covers in front of it.
+function StatusService:IsGuardingFrom(Entity, Position: Vector3)
+	if not self:IsGuarding(Entity) then return false end
+
+	local Root = Entity:FindFirstChild("HumanoidRootPart")
+	if not Root then return false end
+
+	local Offset = (Position - Root.Position) * Vector3.new(1, 0, 1)
+	local Look = Root.CFrame.LookVector * Vector3.new(1, 0, 1)
+
+	if Offset.Magnitude < 1e-3 or Look.Magnitude < 1e-3 then return true end
+
+	return Look.Unit:Dot(Offset.Unit) >= math.cos(math.rad(BlockLibrary.Arc / 2))
+end
+
+function StatusService:IsActionLocked(Entity)
+	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
+	return self:CheckStatuses(Entity, StatusLibrary.ActionLock)
+end
+
+function StatusService:GetRemainingTime(Entity, Name)
+	ValidateEntity(Entity)
+	ValidateName(Name)
+	local Expires = Entity:GetAttribute(Name .. StatusService.Settings.ExpirySuffix)
+	if typeof(Expires) ~= "number" then return nil end
+	return math.max(0, Expires - Now())
 end
 
 function StatusService:IsAlive(Entity)

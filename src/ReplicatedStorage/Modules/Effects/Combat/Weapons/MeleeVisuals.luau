@@ -1,6 +1,6 @@
 local MeleeVisuals = {}
 
-local VisualsCore = require(script.Parent.Parent.VisualsCore)
+local VisualsCore = require("../VisualsCore")
 
 MeleeVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/CombatVFX/Weapons/Melee",

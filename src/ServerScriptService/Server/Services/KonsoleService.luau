@@ -9,6 +9,7 @@ local Konsole = require(ReplicatedStorage:WaitForChild("Utilities"):WaitForChild
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local WeaponsLibrary = Libraries:WaitForChild("WeaponsLibrary")
+local WeaponTiers = require(Libraries:WaitForChild("TierLibrary"):WaitForChild("WeaponTiers"))
 
 local ServerStorage = game:GetService("ServerStorage")
 local NPCs = ServerStorage:WaitForChild("NPCs")
@@ -198,8 +199,23 @@ function KonsoleService.Allows(entity)
 	return true
 end
 
-local function buildWeaponTool(weaponName)
-	return Jloader.GlobalFunctions.ServerController.CharacterProfile.BuildWeaponTool(weaponName)
+local function buildWeaponTool(weaponName, tier)
+	return Jloader.GlobalFunctions.ServerController.CharacterProfile.BuildWeaponTool(weaponName, tier)
+end
+
+--@ A tier named anywhere among the tokens, and the tokens without it.
+local function tierOf(tokens)
+	for index, token in ipairs(tokens) do
+		for _, tier in ipairs(WeaponTiers.Order) do
+			if string.lower(token) == string.lower(tier) then
+				local rest = table.clone(tokens)
+				table.remove(rest, index)
+				return tier, rest
+			end
+		end
+	end
+
+	return nil, tokens
 end
 
 local Implementations = {}
@@ -212,6 +228,9 @@ function Implementations.giveWeaponServer(context)
 	if not target then
 		return context.err("no-target", "nobody to give it to")
 	end
+
+	local tier
+	tier, rest = tierOf(rest)
 
 	local weapon, why = resolve(table.concat(rest, " "), weaponNames())
 
@@ -235,7 +254,7 @@ function Implementations.giveWeaponServer(context)
 		end
 	end
 
-	local tool, problem = buildWeaponTool(weapon)
+	local tool, problem = buildWeaponTool(weapon, tier)
 
 	if not tool then
 		return context.err("no-handle", problem)
@@ -243,11 +262,13 @@ function Implementations.giveWeaponServer(context)
 
 	tool.Parent = backpack
 
+	local given = ("%s %s"):format(Jloader.GlobalFunctions.ServerController.CharacterProfile.ResolveTier(weapon, tier), weapon)
+
 	if target == context.entity then
-		return context.reply(("%s is in your backpack"):format(weapon))
+		return context.reply(("%s is in your backpack"):format(given))
 	end
 
-	return context.reply(("gave %s to %s"):format(weapon, target.Name))
+	return context.reply(("gave %s to %s"):format(given, target.Name))
 end
 
 function Implementations.clearWeaponsServer(context)
@@ -521,7 +542,7 @@ function KonsoleService:Init()
 		name = "give",
 		rank = settings.CommandRank,
 		aliases = { "giveweapon", "weapon", "tool" },
-		description = "Puts a weapon in somebody's backpack.",
+		description = "Puts a weapon in somebody's backpack, optionally of a tier (Wooden, Stone, Diamond).",
 		server = "giveWeaponServer",
 		args = {
 			{
@@ -529,6 +550,12 @@ function KonsoleService:Init()
 				type = "string",
 				required = true,
 				suggestions = weaponNames(),
+			},
+			{
+				name = "tier",
+				type = "string",
+				required = false,
+				suggestions = WeaponTiers.Order,
 			},
 			{
 				name = "target",

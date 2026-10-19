@@ -18,18 +18,21 @@ local function broadcastVisual(controller, weaponId, comboIndex, speed)
 	})
 end
 
-function LightAttackComponent:CanActivate(controller, _combatState): boolean
+function LightAttackComponent:CanActivate(controller, combatState): boolean
 	local Character = controller.Character
-	if not Character then return false end
+	
+	if not Character then 
+		return false 
+	end
 
 	if controller.CooldownService:CheckCooldown(Character, "IsAttacking") then
 		return false
 	end
 
 	if controller.StatusService:CheckStatuses(Character, {
-		IsStunned = true,
 		IsBlocking = true,
-	}) then
+		IsRagdolled = true,
+	}) or controller.StatusService:IsHitYielded(Character) then
 		return false
 	end
 
@@ -38,15 +41,18 @@ end
 
 function LightAttackComponent:Activate(controller, combatState)
 	local Character = controller.Character
-	if not Character then return end
+	
+	if not LightAttackComponent:CanActivate(controller, combatState) then
+		return
+	end
 
 	local weaponId = combatState.ActiveWeapon or controller.CombatConfig:ResolveWeaponId(controller)
 	local weaponConfig = controller.CombatConfig:ResolveWeaponConfig(controller)
 
 	if weaponId == "Unarmed" then
 		return
-	end
-
+	end	
+	
 	local comboIndex = combatState.ComboIndex
 	local animationName = string.format("%s%s%d", weaponId, "Attack", comboIndex)
 
@@ -63,6 +69,7 @@ function LightAttackComponent:Activate(controller, combatState)
 	})
 
 	AttackService:ScheduleEaseOut(controller, SWING, track, timing)
+	AttackService:ReportSwing(controller, weaponId, comboIndex)
 	broadcastVisual(controller, weaponId, comboIndex, timing.speed)
 	AttackService:ScheduleHitbox(controller, SWING, Character, timing, { weaponId = weaponId })
 
