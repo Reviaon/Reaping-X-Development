@@ -7,6 +7,7 @@ local PhysicsService = require("./PhysicsService")
 local PositionService = require("./PositionService")
 local TrajectoryService = require("./TrajectoryService")
 local WorldConstants = require("../WorldConstants")
+local Chrono = require("@game/ReplicatedStorage/Libraries/Chrono")
 
 KnockbackService.Settings = {
 	--@ Fixed integration steps for the displacement curve. Same count on every machine, so every
@@ -16,6 +17,9 @@ KnockbackService.Settings = {
 	--@ Seconds a non-owning client assumes the replicated position trails the owner by. It draws only
 	--@ the slice of the push younger than this on top of what replication already shows.
 	ReplicationLag = 0.15,
+	OwnerTransit = 1,
+	ServerTransit = 0.5,
+	MaxReplicationLag = 1,
 
 	--@ Studs kept between a wall the blockcast hit and the clamped finish.
 	WallPadding = 0.5,
@@ -506,10 +510,44 @@ end
 --@ Non-owner: the physical root is left to replication, which is the only way to keep reading it,
 --@ and the slice of the curve replication has not delivered yet is drawn as a visual offset through
 --@ the root joint. The correction decays to nothing as the push arrives underneath it.
-local function driveObserver(drive, position: Vector3, turn: number, at: number)
+local function chronoClock(entity)
+	if entity._clientClock then
+		return entity._clientClock
+	end
+
+	local clocks = entity.entityConfig.CLIENT_CLOCK
+
+	return clocks and (entity.isHalfTicked and clocks.HALF or clocks.NORMAL)
+end
+
+local function replicationLag(victim): number
+	local settings = KnockbackService.Settings
+	local entity = Chrono.Holder.GetEntityFromModel(victim)
+
+	if not Players.LocalPlayer or not entity or entity.paused or entity.isContextOwner then
+		return settings.ReplicationLag
+	end
+
+	local clock = chronoClock(entity)
+
+	if not clock or not clock.lastClockAt then
+		return settings.ReplicationLag
+	end
+
+	local buffered = clock:GetEstimatedServerTime() - clock:GetTargetRenderTime()
+	local transit = Players.LocalPlayer:GetNetworkPing() * (entity.networkOwner and settings.OwnerTransit or settings.ServerTransit)
+	local lag = buffered + transit
+
+	if buffered <= 0 or lag > settings.MaxReplicationLag then
+		return settings.ReplicationLag
+	end
+
+	return lag
+end
+
+local function driveObserver(drive, position: Vector3, turn: number, at: number, lag: number)
 	local root = drive.root
 	local recipe = drive.recipe
-	local lag = KnockbackService.Settings.ReplicationLag
 	local delivered = KnockbackService.Evaluate(recipe, math.max(at - lag, recipe.startTime))
 	local correction = position - delivered
 	local yaw = 0
@@ -606,13 +644,15 @@ local function step(frameDt: number)
 			continue
 		end
 
+		local lag = replicationLag(victim)
+
 		if drive.joint then
-			driveObserver(drive, position, turn, at)
+			driveObserver(drive, position, turn, at, lag)
 		else
 			write(drive, position, turn)
 		end
 
-		if done and at - recipe.startTime >= recipe.curve.duration + KnockbackService.Settings.ReplicationLag then
+		if done and at - recipe.startTime >= recipe.curve.duration + lag then
 			finish(victim, drive)
 		end
 	end

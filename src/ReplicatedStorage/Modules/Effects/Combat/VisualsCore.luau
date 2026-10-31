@@ -100,6 +100,16 @@ local function ApplySustain(effect: Instance, sustain)
 	end
 end
 
+local function ApplyRecolor(effect: Instance, recolor)
+	if typeof(recolor) ~= "table" or typeof(recolor.Color) ~= "Color3" then return end
+
+	for _, descendant in effect:GetDescendants() do
+		if descendant:IsA("ParticleEmitter") and descendant.Name == recolor.Name then
+			descendant.Color = ColorSequence.new(recolor.Color)
+		end
+	end
+end
+
 local function CancelList(spec, settings)
 	local cancelOn = Resolve(spec, settings, "CancelOn", StatusLibrary.HitYield)
 	return typeof(cancelOn) == "table" and cancelOn or nil
@@ -238,6 +248,7 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 	end
 
 	ApplySustain(attack_vfx.Effect, spec.Sustain)
+	ApplyRecolor(attack_vfx.Effect, spec.Recolor)
 
 	emission = forge.emit(attack_vfx.Effect)
 	emission.Finished:finally(function()

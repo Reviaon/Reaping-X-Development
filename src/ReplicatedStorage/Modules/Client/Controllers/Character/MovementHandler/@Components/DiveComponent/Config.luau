@@ -1,5 +1,5 @@
 return {
-	Speed = 60,
+	Speed = 75,
 	Duration = 1,
 	Cooldown = 1.5,
 
@@ -11,11 +11,11 @@ return {
 
 	--@ Starts at Floor of Speed and climbs exponentially to full speed on the direction's StartTime
 	Ramp = {
-		Floor = 0.15,
+		Floor = 0.5,
 		Curve = 4,
 	},
 
-	Falloff = 0.8,
+	Falloff = 0.6,
 	CutoffSpeed = 10,
 	ForcePerMass = 4e4,
 	CleanupGrace = 0.5,
@@ -44,13 +44,14 @@ return {
 	},
 
 	Directions = {
-		W = { Track = "DiveForward", StartTime = 0.125 },
-		A = { Track = "DiveLeft", StartTime = 0.125 },
-		S = { Track = "DiveBackward", StartTime = 0.2 },
-		D = { Track = "DiveRight", StartTime = 0.125 },
+		W = { Track = "DiveForward", StartTime = 0.06 },
+		A = { Track = "DiveLeft", StartTime = 0.06 },
+		S = { Track = "DiveBackward", StartTime = 0.1 },
+		D = { Track = "DiveRight", StartTime = 0.06 },
 	},
 
 	TrackPriority = Enum.AnimationPriority.Action3,
+	TrackSpeed = 1.3,
 	StopFade = 0.1,
 	SwingReleaseFade = 0.1,
 
@@ -64,6 +65,6 @@ return {
 		--@ The afterimages switch off once the dash has slowed to this share of its peak speed, so they
 		--@ end while it is still moving fast. Their own particle Lifetime (0.5s) fades out after that.
 		--@ Lower keeps them longer; 0 runs them until the dash's velocity is let go
-		SustainSpeed = 0.65,
+		SustainSpeed = 0.4,
 	},
 }
