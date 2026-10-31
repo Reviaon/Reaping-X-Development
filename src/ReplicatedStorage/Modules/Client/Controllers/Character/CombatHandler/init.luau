@@ -187,7 +187,9 @@ function CombatHandler:TryHeavyAttack(controller)
 end
 
 function CombatHandler:TryPush(controller)
-	CombatHandler:TryAttackBranch(controller, "Push")
+	local tackle = CombatHandler.components["TackleAttackComponent"]
+
+	CombatHandler:TryAttackBranch(controller, if tackle and tackle:IsArmed(controller) then "Tackle" else "Push")
 end
 
 function CombatHandler:TryAttackBranch(controller, branchName: string)

@@ -23,6 +23,14 @@ local function stopLift(state)
 	end
 end
 
+local function disarm(controller)
+	local character = controller.Character
+
+	if character and character:GetAttribute(Config.ArmedStatus) ~= nil then
+		controller.StatusService:RemoveStatus(character, Config.ArmedStatus, SCOPE)
+	end
+end
+
 local function liftFor(root: BasePart, scale: number): Vector3
 	return Vector3.new(0, root.AssemblyMass * workspace.Gravity * (1 - scale), 0)
 end
@@ -76,9 +84,15 @@ function RunJumpComponent:Init(controller)
 	state.trove = controller.Trove.new()
 
 	state.trove:Add(humanoid.StateChanged:Connect(function(_, new)
+		if not AIRBORNE[new] then
+			disarm(controller)
+			return
+		end
+
 		if new ~= Enum.HumanoidStateType.Jumping then return end
 		if not controller.StatusService:CheckStatuses(character, { IsSprinting = true }) then return end
 
+		controller.StatusService:SetStatus(character, Config.ArmedStatus, true, nil, SCOPE)
 		startLift(controller, state)
 	end))
 
@@ -93,6 +107,7 @@ function RunJumpComponent.Reset(controller)
 	local state = controller:Scope(SCOPE)
 
 	stopLift(state)
+	disarm(controller)
 
 	if state.trove then
 		state.trove:Clean()

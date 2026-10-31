@@ -15,7 +15,6 @@ local function BuildWeaponConfig()
 	for _, module in WeaponsLibrary:GetDescendants() do
 		if not module:IsA("ModuleScript") then continue end
 
-		--@ One malformed weapon module must not take the whole combat config down with it
 		local loaded, data = pcall(require, module)
 
 		if not loaded then
@@ -37,7 +36,6 @@ local CombatConfig = {
 	DefaultAttackSpeed = 1, --@ Playback multiplier for weapons that do not author attack_speed.
 	InputBuffering = false, --@ When true, attack presses blocked by an active attack queue and auto-fire when ready.
 
-	--@ Keyed by weapon id -> that weapon's module under Libraries.WeaponsLibrary.
 	WeaponConfig = BuildWeaponConfig(),
 }
 
@@ -62,8 +60,6 @@ function CombatConfig:WeaponListener(controller, trove, onChanged: (weaponId: st
 		if onChanged then onChanged(existing.Name) end
 	end
 
-	--@ Resolve once up front, armed or not, so the idle stance has a name to play from
-	--@ the first frame instead of waiting on the next equip/unequip event.
 	self:UpdateWeaponConfig(controller)
 
 	trove:Connect(Character.ChildAdded, function(child)
@@ -238,7 +234,6 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 		combo_index = comboIndex,
 		is_final = isFinal,
 
-		--@ Handed straight to AnimationTrack:Play and AdjustSpeed.
 		speed = speed,
 
 		duration = ResolveNumber(weaponConfig.attack_duration, comboIndex, Defaults.AttackDuration) / speed,
@@ -250,8 +245,6 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 		ease_pause = ResolveNumber(weaponConfig.ease_pause, comboIndex, Defaults.EasePause) / speed,
 		ease_fade = ResolveNumber(weaponConfig.ease_fade, comboIndex, Defaults.EaseFade) / speed,
 
-		--@ Retimed as a whole: same displacement, played at the animation's tempo, with the
-		--@ cue point moving alongside it so the step still fires on the same frame.
 		impulse = Scaling.Impulse(impulseData, impulse, speed),
 		impulse_delay = impulseDelay,
 		impulse_priority = impulseData and (impulseData.priority or impulse.priority) or 1,
