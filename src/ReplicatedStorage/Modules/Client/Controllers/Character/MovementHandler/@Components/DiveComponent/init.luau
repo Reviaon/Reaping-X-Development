@@ -176,6 +176,7 @@ function DiveComponent:CanActivate(controller)
 	if controller.StatusService:CheckStatuses(_character, {
 		IsDiving = true,
 		IsRagdolled = true,
+		ComboLocked = true,
 		}) or controller.StatusService:IsHitYielded(_character) or controller.StatusService:IsActionLocked(_character) then
 		return false
 	end
@@ -223,7 +224,7 @@ function DiveComponent:Activate(controller)
 	local _swingHolding = controller.AttackService:ReleaseSpentSwings(controller, Config.SwingReleaseFade)
 
 	if not (_isAttacking and _swingHolding) then
-		_track:Play()
+		_track:Play(nil, nil, Config.TrackSpeed)
 	end
 
 	local _trove = controller.Trove.new()
@@ -278,7 +279,7 @@ function DiveComponent:Activate(controller)
 			_track:Stop(Config.StopFade)
 			_track = controller.AnimatorService:GetTrack(_character, _matching)
 			_track.Priority = Config.TrackPriority
-			_track:Play(Config.StopFade)
+			_track:Play(Config.StopFade, nil, Config.TrackSpeed)
 			_track.TimePosition = _position
 		end
 	end

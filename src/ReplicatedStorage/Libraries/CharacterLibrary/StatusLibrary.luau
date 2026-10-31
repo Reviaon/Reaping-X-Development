@@ -69,7 +69,7 @@ return{
 			Priority = 2;
 		};
 
-		GuardLocked = {
+		ComboLocked = {
 			Priority = 2;
 		};
 

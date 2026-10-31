@@ -7,13 +7,13 @@ DodgeVisuals.Settings = {
 	Assets = "ReplicatedStorage/Storage/Particles/MovementVFX/Dodge",
 	Parent = "Workspace/World/Visuals",
 
-	--@ The assets author SyncPosition per emitter; false leaves those flags alone.
 	SyncPosition = false,
 
 	Lifetime = 3,
+	Sustain = "Recolor",
 
-	--@ Emitters of this name stay Enabled until the dash ends (Info.Duration, from DiveComponent)
-	Sustain = "AfterimageParticle",
+	Recolor = "Recolor",
+	RecolorPart = "Torso",
 
 	Directions = {
 		W = "FrontDash",
@@ -23,7 +23,6 @@ DodgeVisuals.Settings = {
 	},
 }
 
---@ The dodge effect each character has pending or playing, so a redirect can replace it
 local active = setmetatable({}, { __mode = "k" })
 
 local function replace(character: Model)
@@ -45,8 +44,6 @@ local function replace(character: Model)
 	return entry
 end
 
---@ Info.Redirect marks a dash that changed side partway (a swing during a sprint dive): the effect
---@ already drawn is swapped for this direction's at once, and no second debris trail is laid
 DodgeVisuals.Dodge = function(Info)
 	local settings = DodgeVisuals.Settings
 	local character = Info.Character
@@ -71,10 +68,16 @@ DodgeVisuals.Dodge = function(Info)
 		Duration = Info.Duration - delay,
 	} or nil
 
+	local recolorPart = character:FindFirstChild(settings.RecolorPart)
+	local recolor = recolorPart and recolorPart:IsA("BasePart") and {
+		Name = settings.Recolor,
+		Color = recolorPart.Color,
+	} or nil
+
 	task.delay(delay, function()
 		if not root.Parent or active[character] ~= entry then return end
 
-		entry.Effect, entry.Emission = VisualsCore.SpawnEffect(Info, settings, asset, root, { Sustain = sustain })
+		entry.Effect, entry.Emission = VisualsCore.SpawnEffect(Info, settings, asset, root, { Sustain = sustain, Recolor = recolor })
 	end)
 end
 

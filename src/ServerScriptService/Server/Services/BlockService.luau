@@ -11,16 +11,10 @@ local BlockService = Jloader.CreateService({
 	Signals = { Remote = { "ReportBlock", "Guard" } },
 })
 
---@ Health below MaxHealth, kept unrounded so regen isn't lost to the rounded attribute. A character
---@ is only in here while it has something to regenerate.
 local pool = setmetatable({}, { __mode = "k" })
 local lastAbsorbedAt = setmetatable({}, { __mode = "k" })
 
---@ Whoever the raised guard last absorbed a hit from.
 local absorbedFrom = setmetatable({}, { __mode = "k" })
-
---@ Opened when that guard is lowered: { Attacker, OpenUntil, Until }. Until is set by the first
---@ swing inside the window and ends with that swing.
 local counters = setmetatable({}, { __mode = "k" })
 
 local function healthOf(character)
@@ -90,8 +84,6 @@ function BlockService:CanGuard(character)
 		and not StatusService:CheckStatuses(character, { [BlockLibrary.LockStatus] = true })
 end
 
---@ Called for a hit that landed with hitstun seconds of stun: the guard stays down through the
---@ stun and ComboLockout past it, renewed by every further hit of the combo.
 function BlockService:Lock(character, hitstun: number)
 	GlobalFunctions.StatusService:ApplyStatus(character, BlockLibrary.LockStatus, true, hitstun + BlockLibrary.ComboLockout)
 end
@@ -138,16 +130,12 @@ function BlockService:Break(character)
 	end)
 end
 
---@ True when the victim's guard took the hit; the caller then applies nothing else. A hit from
---@ outside the guard's arc is not the guard's to take.
 function BlockService:Absorb(attacker, victim)
-	--@ The position the attacker reported with the hit, which is the one their client judged the arc from
 	local attackerPosition = GlobalFunctions.PositionService.Reference(attacker)
 
 	if not attackerPosition then return false end
 	if not GlobalFunctions.StatusService:IsGuardingFrom(victim, attackerPosition) then return false end
 
-	--@ The attacker draws a hit before the server answers; one that met a guard they hadn't seen is undone
 	local attackerPlayer = Players:GetPlayerFromCharacter(attacker)
 
 	if attackerPlayer then
@@ -170,7 +158,6 @@ function BlockService:Absorb(attacker, victim)
 	return true
 end
 
---@ A swing starting inside an open counter window claims it for the swing's duration.
 function BlockService:BeginSwing(character, duration)
 	local counter = counters[character]
 	if not counter or counter.Until then return end
@@ -185,7 +172,6 @@ function BlockService:BeginSwing(character, duration)
 	counter.Until = now + duration
 end
 
---@ True while character's counter swing outranks attacker's hits.
 function BlockService:HasPriority(character, attacker)
 	local counter = counters[character]
 	if not counter or counter.Attacker ~= attacker or not counter.Until then return false end
