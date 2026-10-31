@@ -272,18 +272,22 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 	end
 end
 
-local function WeldRigGeometry(Piece : BasePart)
-	for _, Descendant in Piece:GetDescendants() do
+local function WeldRigGeometry(Root : Instance, Anchor : BasePart)
+	for _, Descendant in Root:GetDescendants() do
 		if not Descendant:IsA("BasePart") then continue end
 
 		--@ Welded into the character's assembly, so it must not add mass to it.
 		Descendant.Massless = true
+		Descendant.CanCollide = false
+		Descendant.CanQuery = false
+		Descendant.CanTouch = false
 
 		local GeometryWeld = Instance.new("WeldConstraint")
 		GeometryWeld.Name = "@RigGeometryWeld"
-		GeometryWeld.Part0 = Piece
+		GeometryWeld.Part0 = Anchor
 		GeometryWeld.Part1 = Descendant
-		GeometryWeld.Parent = Piece
+		GeometryWeld:SetAttribute(RIG_PART_ATTRIBUTE, true)
+		GeometryWeld.Parent = Anchor
 	end
 end
 
@@ -291,7 +295,7 @@ end
 --@ and child geometry except where the model authors a child of the same name. The model is first
 --@ matched to the rig piece's position and orientation, so the rig's own joint then holds it
 --@ exactly as it holds the rig's mesh.
-local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
+local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[string]: boolean}) : BasePart
 	if not Variant or Variant:GetAttribute("RigPiece") ~= Piece.Name then
 		return Piece:Clone()
 	end
@@ -306,7 +310,11 @@ local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
 	local Authored = {}
 
 	for _, Child in Clone:GetChildren() do
-		Authored[Child.Name] = true
+		if LimbOwned[Child.Name] then
+			Child:Destroy()
+		else
+			Authored[Child.Name] = true
+		end
 	end
 
 	for _, Descendant in Clone:GetDescendants() do
@@ -331,7 +339,24 @@ local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
 	return Clone
 end
 
-local function ApplyRigAttachments(Character : Model, Template : Model, Names : {string}?)
+local function LimbAttachments(Character : Model, Template : Model, Names : {string}?) : {[string]: boolean}
+	local Owned = {}
+
+	if typeof(Names) ~= "table" then return Owned end
+
+	for _, Name in Names do
+		local Source = Template:FindFirstChild(Name, true)
+		local Host = Source and Source.Parent
+
+		if Host and Character:FindFirstChild(Host.Name) then
+			Owned[Name] = true
+		end
+	end
+
+	return Owned
+end
+
+local function ApplyRigAttachments(Character : Model, Template : Model, Names : {string}?, Variant : BasePart?)
 	if typeof(Names) ~= "table" then return end
 
 	for _, Name in Names do
@@ -351,9 +376,23 @@ local function ApplyRigAttachments(Character : Model, Template : Model, Names : 
 		if CharacterHost:GetAttribute(RIG_PART_ATTRIBUTE) then continue end
 		if CharacterHost:FindFirstChild(Name) then continue end
 
-		local Clone = Source:Clone()
+		local Authored = Variant and Variant:FindFirstChild(Name)
+		local Original = if Authored and Authored:IsA("Attachment") then Authored else Source
+		local Shift = CharacterHost.CFrame * Source.CFrame * Original.WorldCFrame:Inverse()
+
+		local Clone = Original:Clone()
+
+		for _, Descendant in Clone:GetDescendants() do
+			if Descendant:IsA("BasePart") then
+				Descendant.CFrame = Shift * Descendant.CFrame
+			end
+		end
+
+		Clone.CFrame = Source.CFrame
 		Clone:SetAttribute(RIG_PART_ATTRIBUTE, true)
 		Clone.Parent = CharacterHost
+
+		WeldRigGeometry(Clone, CharacterHost)
 	end
 end
 
@@ -401,6 +440,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 	end
 
 	local Tier, Variant = ResolveTier(WeaponName, Tool:GetAttribute(WeaponTiers.Attribute))
+	local LimbOwned = LimbAttachments(Character, Template, WeaponData.RigAttachments)
 	local Applied = 0
 
 	for _, Joint in Template:GetDescendants() do
@@ -416,7 +456,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		if not CharacterLimb or not CharacterLimb:IsA("BasePart") then continue end
 		if Character:FindFirstChild(Piece.Name) then continue end --@ Skeleton joint, the character already owns it
 
-		local PieceClone = ClonePiece(Piece, Variant)
+		local PieceClone = ClonePiece(Piece, Variant, LimbOwned)
 		PieceClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
 		PieceClone.CanCollide = false
 		PieceClone.CanQuery = false
@@ -424,7 +464,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		PieceClone.Massless = true
 		PieceClone.Parent = Character
 
-		WeldRigGeometry(PieceClone)
+		WeldRigGeometry(PieceClone, PieceClone)
 
 		local JointClone = Joint:Clone()
 		JointClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
@@ -441,7 +481,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		return
 	end
 
-	ApplyRigAttachments(Character, Template, WeaponData.RigAttachments)
+	ApplyRigAttachments(Character, Template, WeaponData.RigAttachments, Variant)
 
 	--@ Replicated so every client's CombatConfig:ResolveWeaponId agrees on the weapon;
 	--@ the client owns idle/attack animation swapping off the back of this.
