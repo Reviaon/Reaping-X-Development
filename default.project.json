@@ -18,8 +18,10 @@
       },
       "Storage": {
         "$className": "Folder",
+        "$ignoreUnknownInstances": true,
         "Other": {
           "$className": "Folder",
+          "$ignoreUnknownInstances": true,
           "GrassSystem": {
             "$className": "LocalScript",
             "$properties": {
@@ -46,8 +48,10 @@
       "$className": "ServerStorage",
       "Animations": {
         "$className": "Folder",
+        "$ignoreUnknownInstances": true,
         "Rig": {
           "$className": "Model",
+          "$ignoreUnknownInstances": true,
           "Animate": {
             "$className": "LocalScript",
             "$properties": {
