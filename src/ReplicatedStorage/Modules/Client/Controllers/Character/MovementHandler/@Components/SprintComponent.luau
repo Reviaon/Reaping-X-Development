@@ -3,6 +3,7 @@ local SprintComponent = {}
 local RunService = game:GetService("RunService")
 
 local SCOPE = "Sprint"
+local YIELD_TO = { IsBlocking = true }
 
 local function stopSprint(controller)
 	local state = controller:Scope(SCOPE)
@@ -54,6 +55,10 @@ function SprintComponent:Activate(controller)
 	state.trove = controller.Trove.new()
 
 	state.trove:Add(RunService.Heartbeat:Connect(function()
+		if controller.StatusService:CheckStatuses(Character, YIELD_TO) then
+			SprintComponent:Deactivate(controller)
+		end
+
 		if not controller.StatusService:CheckStatuses(Character, { IsSprinting = true }) then
 			if state.trove then
 				state.trove:Clean()

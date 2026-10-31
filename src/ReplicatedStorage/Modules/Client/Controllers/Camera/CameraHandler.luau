@@ -13,6 +13,7 @@ local InputHandler = GlobalFunctions.InputHandler
 local MouseModule = GlobalFunctions.MouseModule
 local ClientController = GlobalFunctions.ClientController
 local ShakeLibrary = require("@game/ReplicatedStorage/Libraries/CameraLibrary/ShakeLibrary")
+local DynamicLibrary = require("@game/ReplicatedStorage/Libraries/CameraLibrary/DynamicLibrary")
 
 --@ Constants
 local Camera = Workspace.CurrentCamera
@@ -46,6 +47,34 @@ CameraHandler.cameraOffsetSpring.Damper = 1
 local shakeSpring = Spring.new(Vector3.zero)
 shakeSpring.Damper = 0.8
 shakeSpring.Speed = 40
+
+local function punchSpring()
+	local spring = Spring.new(0)
+	spring.Speed = DynamicLibrary.Punch.Speed
+	spring.Damper = DynamicLibrary.Punch.Damper
+	return spring
+end
+
+local punchFov = punchSpring()
+local punchRoll = punchSpring()
+
+local sceneFov = Spring.new(0)
+sceneFov.Speed = DynamicLibrary.FovSpeed
+sceneFov.Damper = 1
+
+local swayOffset = Spring.new(Vector3.zero)
+swayOffset.Speed = DynamicLibrary.Sway.Speed
+swayOffset.Damper = DynamicLibrary.Sway.Damper
+
+local swayRoll = Spring.new(0)
+swayRoll.Speed = DynamicLibrary.Sway.Speed
+swayRoll.Damper = DynamicLibrary.Sway.Damper
+
+local sceneProfiles = {}
+local activeProfile = nil
+local activePartner = nil
+local markerConnections = {}
+local lastMarkerAt = 0
 
 --@ Components
 CameraHandler.components = {};
@@ -106,8 +135,46 @@ local function getTorso(Character)
 		)
 end
 
+local function unwatchMarkers()
+	for _, connection in markerConnections do
+		connection:Disconnect()
+	end
+
+	table.clear(markerConnections)
+end
+
+local function watchMarkers(characters: { Model }, scene)
+	unwatchMarkers()
+
+	if not scene.Marker then return end
+
+	local function onMarker()
+		local now = os.clock()
+		if now - lastMarkerAt < scene.MarkerSpacing then return end
+
+		lastMarkerAt = now
+		CameraHandler:Shake(scene.MarkerShake)
+	end
+
+	local function watchTrack(track: AnimationTrack)
+		table.insert(markerConnections, track:GetMarkerReachedSignal(scene.Marker):Connect(onMarker))
+	end
+
+	for _, character in characters do
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+		if not animator then continue end
+
+		for _, track in animator:GetPlayingAnimationTracks() do
+			watchTrack(track)
+		end
+
+		table.insert(markerConnections, animator.AnimationPlayed:Connect(watchTrack))
+	end
+end
+
 function CameraHandler:CreateCameraObject(controller)
-	
+
 	if controller._camera_origin then
 		getOriginCache():ReturnPart(controller._camera_origin)
 		controller._camera_origin = nil
@@ -166,6 +233,24 @@ function CameraHandler:Cleanup(controller)
 	_influenceLevel = INFLUENCE_FLOOR
 	controller._camera_world_lag = nil
 
+	activeProfile = nil
+	activePartner = nil
+	unwatchMarkers()
+
+	for _, spring in { punchFov, punchRoll, sceneFov, swayRoll } do
+		spring.Target = 0
+		spring.Position = 0
+		spring.Velocity = 0
+	end
+
+	swayOffset.Target = Vector3.zero
+	swayOffset.Position = Vector3.zero
+	swayOffset.Velocity = Vector3.zero
+
+	if Camera then
+		Camera.FieldOfView = DynamicLibrary.BaseFov
+	end
+
 	if controller._camera_trove then
 		controller._camera_trove:Destroy()
 		controller._camera_trove = nil
@@ -210,6 +295,62 @@ function CameraHandler:Shake(name: string, scale: number?)
 	)
 end
 
+function CameraHandler:Punch(name: string, scale: number?)
+	local shape = DynamicLibrary.Punch.Shapes[name]
+	if not shape then return end
+
+	scale = scale or 1
+
+	punchFov.Position += (shape.Fov or 0) * scale
+	punchRoll.Position += (shape.Roll or 0) * scale * (math.random() < 0.5 and -1 or 1)
+end
+
+local function sceneProfile(name: string?)
+	local key = name or ""
+	local cached = sceneProfiles[key]
+	if cached then return cached end
+
+	local profile = table.clone(DynamicLibrary.Scene)
+
+	for field, value in (name and DynamicLibrary.Scenes[name]) or {} do
+		profile[field] = value
+	end
+
+	sceneProfiles[key] = profile
+	return profile
+end
+
+local function findFocus(controller): (Model?, {}?)
+	local partner, name = controller.PairSceneService.PartnerOf(controller.Character)
+
+	if partner and getTorso(partner) then
+		return partner, sceneProfile(name)
+	end
+
+	return nil, nil
+end
+
+local function swayTarget(controller): (Vector3, number)
+	local sway = DynamicLibrary.Sway
+	local character = controller.Character
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+
+	if activeProfile or not root or not torso then return Vector3.zero, 0 end
+	if not controller.StatusService:CheckStatuses(character, sway.Statuses) then return Vector3.zero, 0 end
+
+	local joint = root:FindFirstChild("RootJoint") or torso:FindFirstChild("Root")
+	local rest = if joint and joint:IsA("Motor6D") and joint.Part0 then joint.Part0.CFrame * joint.C0 * joint.C1:Inverse() else root.CFrame
+	local travel = Camera.CFrame:VectorToObjectSpace(torso.Position - rest.Position)
+	local offset = Vector3.new(travel.X * sway.Share, travel.Y * sway.Share, travel.Z * sway.Depth)
+
+	if offset.Magnitude > sway.MaxOffset then
+		offset = offset.Unit * sway.MaxOffset
+	end
+
+	return offset, math.clamp(-travel.X * sway.Roll, -sway.MaxRoll, sway.MaxRoll)
+end
+
 function CameraHandler:ToggleShiftLock(state, controller)
 	local Character = controller.Character
 	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
@@ -231,7 +372,7 @@ function CameraHandler:ToggleShiftLock(state, controller)
 		RunService:BindToRenderStep("ShiftLockRotation", Enum.RenderPriority.Camera.Value + 1, function(dt)
 			if not (Character.Parent and HumanoidRootPart.Parent) then return end
 
-			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true, IsRagdolled = true})  
+			if not controller.StatusService:CheckStatuses(Character, {NoRotate = true, IsRagdolled = true, InPairScene = true})
 				and not (controller.StatusService:CheckStatuses(Character, {IsSprinting = true}) 
 				and not controller.StatusService:CheckStatuses(Character, {IsAttacking = true})) then
 
@@ -292,7 +433,37 @@ function CameraHandler:UpdateOrigin(DeltaTime, controller)
 	end
 
 	local status = controller.StatusService
-	local torsoFocus = CFrame.new(torso.Position + Vector3.new(0, 2, 0))
+	local root = Character:FindFirstChild("HumanoidRootPart") or torso
+	local partner, profile = findFocus(controller)
+	local previous = activeProfile
+
+	if profile ~= previous or partner ~= activePartner then
+		activeProfile = profile
+		activePartner = partner
+		sceneFov.Speed = if profile then DynamicLibrary.FovSpeed else DynamicLibrary.ReturnFovSpeed
+
+		if profile then
+			watchMarkers({ Character, partner }, profile)
+		else
+			unwatchMarkers()
+		end
+
+		if profile and not previous and profile.EnterPunch then
+			CameraHandler:Punch(profile.EnterPunch)
+		end
+	end
+
+	local height = Vector3.new(0, DynamicLibrary.Height, 0)
+	local home = root.Position + height
+	local target = home
+
+	if partner then
+		target = torso.Position:Lerp(getTorso(partner).Position, profile.Blend) + height
+	end
+
+	local returning = Camera.CameraSubject == origin and (origin.Position - home).Magnitude > DynamicLibrary.SettleDistance
+	local onOrigin = profile ~= nil or returning
+	local followSpeed = if profile then profile.FollowSpeed elseif returning then DynamicLibrary.ReturnSpeed else ORIGIN_FOLLOW_SPEED
 
 	local gated = Humanoid.FloorMaterial ~= Enum.Material.Air
 		and (
@@ -303,13 +474,15 @@ function CameraHandler:UpdateOrigin(DeltaTime, controller)
 
 	_influenceLevel = _influenceLevel + ((gated and 1 or INFLUENCE_FLOOR) - _influenceLevel) * math.min(1, DeltaTime * INFLUENCE_BLEND)
 
-	origin.CFrame = origin.CFrame:Lerp(torsoFocus, math.min(1, DeltaTime * ORIGIN_FOLLOW_SPEED))
+	origin.CFrame = origin.CFrame:Lerp(CFrame.new(target), math.min(1, DeltaTime * followSpeed))
 
-	if Camera and Camera.CameraSubject and Camera.CameraSubject ~= origin then
-		Camera.CameraSubject = USE_DYNAMIC_INFLUENCE and torso or Humanoid
+	local subject = if onOrigin then origin elseif USE_DYNAMIC_INFLUENCE then torso else Humanoid
+
+	if Camera and Camera.CameraSubject ~= subject then
+		Camera.CameraSubject = subject
 	end
 
-	controller._camera_world_lag = torsoFocus.Position - origin.Position
+	controller._camera_world_lag = home - origin.Position
 end
 
 function CameraHandler:UpdateCamera(DeltaTime, controller)
@@ -329,8 +502,21 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 		end
 	end
 
-	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position + drift
-	Camera.CFrame = Camera.CFrame * CFrame.new(totalOffset) + Vector3.new(0,  USE_DYNAMIC_INFLUENCE and SUBJECT_HEIGHT_OFFSET or 0, 0)
+	sceneFov.Target = activeProfile and activeProfile.Fov or 0
+
+	local swayTo, rollTo = swayTarget(controller)
+
+	swayOffset.Target = swayTo
+	swayRoll.Target = rollTo
+
+	local totalOffset = CameraHandler.cameraOffsetSpring.Position + shakeSpring.Position + drift + swayOffset.Position
+
+	Camera.CFrame = Camera.CFrame
+		* CFrame.new(totalOffset)
+		* CFrame.Angles(0, 0, math.rad(punchRoll.Position + swayRoll.Position))
+		+ Vector3.new(0, USE_DYNAMIC_INFLUENCE and SUBJECT_HEIGHT_OFFSET or 0, 0)
+
+	Camera.FieldOfView = DynamicLibrary.BaseFov + sceneFov.Position + punchFov.Position
 end
 
 return CameraHandler
