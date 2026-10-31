@@ -304,6 +304,7 @@ function CombatService:HandleDiveReport(player: Player)
 	local character = player and player.Character
 	if not character or not rootOf(character) then return end
 	if not StatusService:IsAlive(character) or StatusService:IsHitYielded(character) then return end
+	if StatusService:CheckStatuses(character, { ComboLocked = true }) then return end
 
 	local now = os.clock()
 	local last = lastDiveReport[player]
