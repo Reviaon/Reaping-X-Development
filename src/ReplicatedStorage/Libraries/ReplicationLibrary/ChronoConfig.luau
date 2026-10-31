@@ -3,7 +3,7 @@ local Chrono = require("@game/ReplicatedStorage/Libraries/Chrono")
 local ChronoConfig = {
 	NpcType = "NPC",
 	PrimaryPart = "HumanoidRootPart",
-	PauseStatus = "IsRagdolled",
+	PauseStatuses = { "IsRagdolled", "InPairScene" },
 	LiveFolder = "World/Live",
 }
 

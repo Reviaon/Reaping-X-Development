@@ -4,6 +4,8 @@ local ChronoConfig = require("@game/ReplicatedStorage/Libraries/ReplicationLibra
 
 local ChronoService = Jloader.CreateService({ Name = script.Name })
 
+local GlobalFunctions = Jloader.GlobalFunctions
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -25,14 +27,18 @@ local function watchPause(character: Model, entity)
 	local function sync()
 		if entity.destroyed then return end
 
-		if character:GetAttribute(ChronoConfig.PauseStatus) == true then
+		if GlobalFunctions.StatusService:CheckStatuses(character, ChronoConfig.PauseStatuses) then
 			Entity.PauseReplication(entity)
 		else
 			Entity.ResumeReplication(entity)
 		end
 	end
 
-	local connection = character:GetAttributeChangedSignal(ChronoConfig.PauseStatus):Connect(sync)
+	local connection = character.AttributeChanged:Connect(function(name)
+		if table.find(ChronoConfig.PauseStatuses, name) then
+			sync()
+		end
+	end)
 
 	Entity.GetEvent(entity, "Destroying"):Once(function()
 		connection:Disconnect()
