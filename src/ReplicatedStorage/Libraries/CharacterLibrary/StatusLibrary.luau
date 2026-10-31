@@ -1,9 +1,9 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
-	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames" },
-	HitYield = { "IsStunned", "GuardBroken" },
+	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames", "InPairScene" },
+	HitYield = { "IsStunned", "GuardBroken", "IsGrappled" },
 	HitGuard = { "IsGuarding" },
-	ActionLock = { "IsPushing", "IsSprintPushing" },
+	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -83,6 +83,32 @@ return{
 			WalkSpeed = 18,
 			JumpPower = 0,
 			Priority = 6;
+		};
+
+		IsTackling = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			AutoRotate = false,
+			Priority = 7;
+		};
+
+		IsRunJumping = {
+			Priority = 0;
+		};
+
+		InPairScene = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			AutoRotate = false,
+			Priority = 9;
+		};
+
+		IsGrappling = {
+			Priority = 9;
+		};
+
+		IsGrappled = {
+			Priority = 9;
 		};
 
 		IsLanding = {
