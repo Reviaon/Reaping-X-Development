@@ -476,7 +476,7 @@ local function step(brain, now)
 
 	local recipe = GlobalFunctions.KnockbackService.Active(character)
 
-	if StatusService:CheckStatuses(character, { IsStunned = true }) or (recipe and not recipe.steer) then
+	if StatusService:CheckStatuses(character, { IsStunned = true, InPairScene = true }) or (recipe and not recipe.steer) then
 		stopMoving(brain)
 		unface(brain)
 		interrupt(brain)
