@@ -218,10 +218,45 @@ local function tierOf(tokens)
 	return nil, tokens
 end
 
+local function riggedWeaponNames()
+	local names = {}
+
+	for _, name in weaponNames() do
+		local module = WeaponsLibrary:FindFirstChild(name, true)
+		local ok, data = pcall(require, module)
+
+		if ok and type(data) == "table" and data.Rig ~= nil then
+			table.insert(names, name)
+		end
+	end
+
+	return names
+end
+
+local function giveTool(target, backpack, weapon, tier)
+	if KonsoleService.Settings.ReplaceExisting then
+		for _, place in { backpack, target.Character } do
+			local existing = place and place:FindFirstChild(weapon)
+
+			if existing and existing:IsA("Tool") then
+				existing:Destroy()
+			end
+		end
+	end
+
+	local tool, problem = buildWeaponTool(weapon, tier)
+
+	if not tool then
+		return nil, problem
+	end
+
+	tool.Parent = backpack
+	return tool
+end
+
 local Implementations = {}
 
 function Implementations.giveWeaponServer(context)
-	local settings = KonsoleService.Settings
 	local tokens = argumentsOf(context)
 	local target, rest = targetOf(context, tokens)
 
@@ -244,23 +279,11 @@ function Implementations.giveWeaponServer(context)
 		return context.err("no-backpack", ("%s has no backpack yet"):format(target.Name))
 	end
 
-	if settings.ReplaceExisting then
-		for _, place in { backpack, target.Character } do
-			local existing = place and place:FindFirstChild(weapon)
-
-			if existing and existing:IsA("Tool") then
-				existing:Destroy()
-			end
-		end
-	end
-
-	local tool, problem = buildWeaponTool(weapon, tier)
+	local tool, problem = giveTool(target, backpack, weapon, tier)
 
 	if not tool then
 		return context.err("no-handle", problem)
 	end
-
-	tool.Parent = backpack
 
 	local given = ("%s %s"):format(Jloader.GlobalFunctions.ServerController.CharacterProfile.ResolveTier(weapon, tier), weapon)
 
@@ -269,6 +292,49 @@ function Implementations.giveWeaponServer(context)
 	end
 
 	return context.reply(("gave %s to %s"):format(given, target.Name))
+end
+
+function Implementations.giveAllServer(context)
+	local tier, rest = tierOf(argumentsOf(context))
+	local target = context.entity
+
+	if #rest > 1 then
+		return context.err("bad-arguments", "expected at most a tier and a player")
+	end
+
+	if #rest == 1 and string.lower(rest[1]) ~= "me" then
+		target = playerNamed(rest[1])
+
+		if not target then
+			return context.err("no-target", ("'%s' is not a tier or a player here"):format(rest[1]))
+		end
+	end
+
+	local backpack = target:FindFirstChildOfClass("Backpack")
+
+	if not backpack then
+		return context.err("no-backpack", ("%s has no backpack yet"):format(target.Name))
+	end
+
+	local given = {}
+
+	for _, weapon in riggedWeaponNames() do
+		local tool, problem = giveTool(target, backpack, weapon, tier)
+
+		if not tool then
+			return context.err("no-handle", problem)
+		end
+
+		table.insert(given, weapon)
+	end
+
+	local summary = ("%s%s"):format(tier and tier .. " " or "", table.concat(given, ", "))
+
+	if target == context.entity then
+		return context.reply(("%s in your backpack"):format(summary))
+	end
+
+	return context.reply(("gave %s to %s"):format(summary, target.Name))
 end
 
 function Implementations.clearWeaponsServer(context)
@@ -551,6 +617,27 @@ function KonsoleService:Init()
 				required = true,
 				suggestions = weaponNames(),
 			},
+			{
+				name = "tier",
+				type = "string",
+				required = false,
+				suggestions = WeaponTiers.Order,
+			},
+			{
+				name = "target",
+				type = "string",
+				required = false,
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "giveall",
+		rank = settings.CommandRank,
+		aliases = { "allweapons" },
+		description = "Puts every rigged weapon in somebody's backpack, optionally all of one tier (Wooden, Stone, Diamond).",
+		server = "giveAllServer",
+		args = {
 			{
 				name = "tier",
 				type = "string",
