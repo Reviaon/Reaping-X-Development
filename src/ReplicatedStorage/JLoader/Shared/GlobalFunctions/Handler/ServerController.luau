@@ -287,22 +287,38 @@ local function WeldRigGeometry(Piece : BasePart)
 	end
 end
 
---@ The rig's own piece, or the tier's model dressed as it: same name, same attachments and child
---@ geometry. The model is first matched to the rig piece's position and orientation, so the rig's
---@ own joint then holds it exactly as it holds the rig's mesh.
+--@ The rig's own piece, or the tier's model dressed as it: same name, and the rig piece's attachments
+--@ and child geometry except where the model authors a child of the same name. The model is first
+--@ matched to the rig piece's position and orientation, so the rig's own joint then holds it
+--@ exactly as it holds the rig's mesh.
 local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
 	if not Variant or Variant:GetAttribute("RigPiece") ~= Piece.Name then
 		return Piece:Clone()
 	end
 
 	local Offset = Variant:GetAttribute("RigOffset")
+	local Target = if typeof(Offset) == "CFrame" then Piece.CFrame * Offset else Piece.CFrame
+	local Shift = Target * Variant.CFrame:Inverse()
 
 	local Clone = Variant:Clone()
 	Clone.Name = Piece.Name
-	Clone.CFrame = if typeof(Offset) == "CFrame" then Piece.CFrame * Offset else Piece.CFrame
+
+	local Authored = {}
+
+	for _, Child in Clone:GetChildren() do
+		Authored[Child.Name] = true
+	end
+
+	for _, Descendant in Clone:GetDescendants() do
+		if Descendant:IsA("BasePart") then
+			Descendant.CFrame = Shift * Descendant.CFrame
+		end
+	end
+
+	Clone.CFrame = Target
 
 	for _, Child in Piece:GetChildren() do
-		if Child:IsA("SurfaceAppearance") then continue end
+		if Child:IsA("SurfaceAppearance") or Authored[Child.Name] then continue end
 
 		local Copy = Child:Clone()
 		Copy.Parent = Clone
