@@ -295,9 +295,11 @@ local function ClonePiece(Piece : BasePart, Variant : BasePart?) : BasePart
 		return Piece:Clone()
 	end
 
+	local Offset = Variant:GetAttribute("RigOffset")
+
 	local Clone = Variant:Clone()
 	Clone.Name = Piece.Name
-	Clone.CFrame = Piece.CFrame
+	Clone.CFrame = if typeof(Offset) == "CFrame" then Piece.CFrame * Offset else Piece.CFrame
 
 	for _, Child in Piece:GetChildren() do
 		if Child:IsA("SurfaceAppearance") then continue end
