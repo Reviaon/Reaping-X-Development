@@ -14,7 +14,6 @@ end
 function Scaling.ResolveNumber(value: any, comboIndex: number?, fallback: number): number
 	local resolved = Scaling.ResolveIndexed(value, comboIndex)
 
-	--@ resolved ~= resolved catches NaN, which would otherwise stall the attack without erroring
 	if typeof(resolved) ~= "number" or resolved ~= resolved then
 		return fallback
 	end
@@ -42,7 +41,6 @@ function Scaling.Impulse(impulseData, parent, speed: number)
 		scaled.distance = parent.distance
 	end
 
-	--@ Studs. Absent, the lunge covers whatever the speed/duration/falloff curve integrates to
 	if scaled.distance ~= nil then
 		scaled.distance = ResolveNumber(scaled.distance, nil, 0)
 	end
@@ -74,8 +72,6 @@ function Scaling.Knockback(knockbackData, parent, speed: number, impulse)
 		scaled.falloff = ResolveNumber(scaled.falloff, nil, Defaults.ImpulseFalloff) / speed
 	end
 
-	--@ A knockback that names nothing of its own takes the attacker's lunge curve wholesale, so the
-	--@ shove and the step that delivered it cover the same studs by construction
 	if impulse then
 		if scaled.speed == nil then scaled.speed = impulse.speed end
 		if scaled.duration == nil then scaled.duration = impulse.duration end

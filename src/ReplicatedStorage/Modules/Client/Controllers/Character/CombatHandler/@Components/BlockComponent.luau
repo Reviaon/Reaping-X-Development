@@ -41,8 +41,6 @@ local function report(controller, raised)
 	end
 end
 
---@ Tracks live in this component's scope, not AttackService's: a dive releases every AttackService
---@ track with no live hitbox, which took the block idle with it.
 local function stopTrack(state, key)
 	local track = state[key]
 
@@ -68,8 +66,6 @@ local function playIdle(controller)
 	})
 end
 
---@ force plays it with the guard already down: a break's GuardBroken can replicate before the
---@ Broken event, and the yield interrupt lowers the guard first.
 local function react(controller, force)
 	local state = controller:Scope(SCOPE)
 	local reactions = reactionsFor(controller)
@@ -90,7 +86,6 @@ local function react(controller, force)
 	})
 end
 
---@ False when there is no break animation, so the caller falls back to a reaction.
 local function playBreak(controller): boolean
 	local Character = controller.Character
 
@@ -116,7 +111,6 @@ local function playBreak(controller): boolean
 	return true
 end
 
---@ True if the guard was up. A broken guard keeps its last reaction playing out.
 local function lower(controller, keepReaction)
 	local Character = controller.Character
 	local state = controller:Scope(SCOPE)
@@ -187,8 +181,6 @@ function BlockComponent:Activate(controller, combatState)
 	report(controller, true)
 end
 
---@ released is true when the block input itself was let go. A guard a stun knocked down stays down
---@ through a held input until that input is released and pressed again.
 function BlockComponent:Deactivate(controller, _combatState, released: boolean?)
 	local Character = controller.Character
 	local StatusService = controller.StatusService
@@ -216,8 +208,6 @@ function BlockComponent:Refresh(controller)
 	end
 end
 
---@ The server's word on the guard: Absorbed and Broken are blocked hits, Refused a raise it
---@ turned down.
 function BlockComponent:OnGuard(controller, event)
 	local shape = BlockLibrary.Shakes[event]
 	local camera = shape and Jloader.GetHandler("CameraHandler")

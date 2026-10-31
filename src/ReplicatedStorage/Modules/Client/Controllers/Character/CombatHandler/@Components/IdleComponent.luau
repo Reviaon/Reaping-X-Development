@@ -1,5 +1,3 @@
---@ Idle Component
---@ Holds the equipped weapon's idle stance ({WeaponId}Idle) while the character is
 local IdleComponent = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,7 +43,6 @@ local function stopIdle(controller)
 	state.currentAnim = nil
 end
 
---@ The whole point of the component: are they actually standing still?
 local function shouldIdle(controller): boolean
 	local Character = controller.Character
 	local Humanoid = controller.Humanoid
@@ -81,12 +78,8 @@ local function update(controller)
 		return
 	end
 
-	--@ Resolved every frame rather than read from _idle_animation: that field is only
-	--@ refreshed on equip events, and an unequip recomputes it from an attribute that is
-	--@ still stale at that moment, which left the last weapon's stance playing forever.
 	local equipped = config:ResolveEquippedWeapon(controller)
 
-	--@ Unarmed is not a stance.
 	if not equipped then
 		stopIdle(controller)
 		return
@@ -94,7 +87,6 @@ local function update(controller)
 
 	local desired = equipped .. IDLE_SUFFIX
 
-	--@ Weapon swapped out from under a playing idle
 	if state.currentAnim and state.currentAnim ~= desired then
 		stopIdle(controller)
 	end

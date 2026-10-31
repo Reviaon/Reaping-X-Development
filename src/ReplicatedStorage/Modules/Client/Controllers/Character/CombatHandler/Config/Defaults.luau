@@ -3,14 +3,14 @@ return {
 	AttackCooldown = 0.3,
 	ImpulseDelay = 0.2,
 
-	BaseDamage = 4, --@ Health a landed hit takes when the weapon authors no base_damage
+	BaseDamage = 4, 
 
 	ImpulseSpeed = 30,
 	ImpulseDuration = 0.2,
 	ImpulseFalloff = 0.2,
-	RampIn = 0.06, --@ Seconds a lunge or shove takes to reach full speed; 0 is an instant step
+	RampIn = 0.06, 
 
-	KnockbackFace = true, --@ Whether a hit turns the victim to face their attacker
+	KnockbackFace = true,
 	KnockbackFaceResponsiveness = 100,
 
 	HitboxDuration = 0.1,
@@ -25,7 +25,6 @@ return {
 	MinAttackSpeed = 0.1,
 	MaxAttackSpeed = 10,
 
-	--@ The final hit of a combo launches and ragdolls its victim; a weapon's `finisher` overrides any key, `false` turns it off
 	Finisher = {
 		ragdoll = 1.5, --@ Seconds the victim stays ragdolled and stunned
 		recovery = 0.5, --@ Seconds of hit immunity once the ragdoll ends, so the victim acts first

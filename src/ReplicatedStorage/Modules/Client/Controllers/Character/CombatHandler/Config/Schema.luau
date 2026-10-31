@@ -1,6 +1,4 @@
---@ Weapon table shapes and the validator that warns on unknown keys, wrong types and short arrays
 local Defaults = require("./Defaults")
-
 local Schema = {}
 
 Schema.Weapon = {
