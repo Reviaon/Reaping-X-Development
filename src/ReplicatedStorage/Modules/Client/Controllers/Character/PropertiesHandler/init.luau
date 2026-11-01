@@ -1,6 +1,7 @@
 --@ Property Handler
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local Config = require("@self/Config")
+local RunService = game:GetService("RunService")
 
 local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 
@@ -18,6 +19,10 @@ end
 
 local function resolveJumpPower(controller)
 	local state = stateOf(controller)
+
+	if state.launchPower then
+		return state.launchPower
+	end
 
 	if state.decayedJumpPower < Config.Jump.MinPower then
 		return 0
@@ -91,6 +96,7 @@ function PropertyHandler:InitCharacter(controller)
 	state.decayedJumpPower = Config.BaseJumpPower
 	state.jumpLimit = Config.BaseJumpPower
 	state.jumpResetPending = false
+	state.launchPower = nil
 
 	local trove = controller.Trove.new()
 	self.CharacterTrove = trove
@@ -105,6 +111,15 @@ function PropertyHandler:InitCharacter(controller)
 
 	trove:Connect(controller.Humanoid.Jumping, function(active)
 		if controller.Character ~= Character or not active or state.jumpResetPending then return end
+
+		state.launchPower = controller.Humanoid.JumpPower
+		RunService.Heartbeat:Once(function()
+			state.launchPower = nil
+
+			if controller.Character == Character then
+				applyHumanoidProperties(controller)
+			end
+		end)
 
 		state.decayedJumpPower = math.max(0, state.decayedJumpPower - Config.Jump.DecayStep)
 

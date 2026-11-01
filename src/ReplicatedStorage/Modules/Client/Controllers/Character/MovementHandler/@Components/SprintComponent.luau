@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 
 local SCOPE = "Sprint"
 local YIELD_TO = { IsBlocking = true }
+local SUPPRESSED_BY = { ComboLocked = true, IsStunned = true }
 
 local function stopSprint(controller)
 	local state = controller:Scope(SCOPE)
@@ -47,10 +48,12 @@ function SprintComponent:Activate(controller)
 
 	local state = controller:Scope(SCOPE)
 
-	state.track = controller.AnimatorService:PlayTrack(Character, "UniversalSprintAnim", {
-		Speed = 1,
-		Priority = Enum.AnimationPriority.Action,
-	})
+	state.track = controller.AnimatorService:GetTrack(Character, "UniversalSprintAnim")
+	state.track.Priority = Enum.AnimationPriority.Action
+
+	if not controller.StatusService:CheckStatuses(Character, SUPPRESSED_BY) then
+		state.track:Play(0.1)
+	end
 
 	state.trove = controller.Trove.new()
 
@@ -67,7 +70,7 @@ function SprintComponent:Activate(controller)
 			return
 		end
 
-		if Humanoid.MoveDirection.Magnitude <= 0 then
+		if Humanoid.MoveDirection.Magnitude <= 0 or controller.StatusService:CheckStatuses(Character, SUPPRESSED_BY) then
 			if state.track and state.track.IsPlaying then
 				state.track:Stop(0.3)
 			end

@@ -66,6 +66,10 @@ function MovementHandler:InitCharacter(controller)
 	MovementHandler.Trove:Destroy()
 	MovementHandler.Trove = GarbageCollection.new()
 
+	if controller.Humanoid then
+		controller.CharacterService.DisableFlingStates(controller.Humanoid)
+	end
+
 	MovementHandler.components["LeanComponent"]:Init(controller)
 	MovementHandler.components["StrafeComponent"]:Init(controller)
 	MovementHandler.components["RunJumpComponent"]:Init(controller)
