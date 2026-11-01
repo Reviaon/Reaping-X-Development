@@ -27,6 +27,36 @@ local function isBehind(attacker: Model, victim: Model): boolean
 	return look.Unit:Dot(toward.Unit) <= math.cos(math.rad(180 - PushLibrary.GrabArc / 2))
 end
 
+local function hitStop(controller, track: AnimationTrack, variant)
+	local AttackService = controller.AttackService
+	local stop = PushLibrary.HitStop
+
+	local camera = Jloader.GetHandler("CameraHandler")
+
+	if camera and camera.Punch then
+		camera:Punch(stop.Punch)
+	end
+
+	if not track.IsPlaying then return end
+
+	AttackService:Cancel(controller, BLEND)
+	track:AdjustSpeed(0)
+
+	task.delay(stop.Duration, function()
+		if AttackService:GetTrack(controller, SWING) ~= track or not track.IsPlaying then return end
+
+		track:AdjustSpeed(1)
+
+		if variant.BlendAt then
+			AttackService:Schedule(controller, BLEND, math.max(variant.BlendAt - track.TimePosition, 0), function()
+				if AttackService:GetTrack(controller, SWING) == track then
+					AttackService:StopTrack(controller, SWING, variant.BlendFade)
+				end
+			end)
+		end
+	end)
+end
+
 function PushComponent:CanActivate(controller, _combatState): boolean
 	local Character = controller.Character
 	if not Character then return false end
@@ -82,6 +112,8 @@ function PushComponent:Activate(controller, combatState)
 
 	relay.ReportPush:Fire(sprinting)
 
+	local stopped = false
+
 	AttackService:ScheduleHitbox(controller, SWING, Character, {
 		hitbox = variant.Hitbox,
 		hitbox_delay = variant.HitboxDelay,
@@ -94,6 +126,12 @@ function PushComponent:Activate(controller, combatState)
 		end,
 		report = function(target)
 			relay.ReportHit:Fire(target)
+		end,
+		onHit = function(target)
+			if stopped or not track or isBehind(Character, target) then return end
+
+			stopped = true
+			hitStop(controller, track, variant)
 		end,
 	})
 

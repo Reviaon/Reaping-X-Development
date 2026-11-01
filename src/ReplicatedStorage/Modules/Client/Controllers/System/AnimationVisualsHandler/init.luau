@@ -133,16 +133,36 @@ local function holdWhileAirborne(effect, character: Model, follow: boolean?)
 	end)
 end
 
-local function emit(entry, character: Model, start: CFrame?)
-	local source = template(entry.Effect)
-	if not source then return end
+local function mount(entry, host: Model)
+	local holder = find(ReplicatedStorage, Config.Assets)
+	local source = holder and holder:FindFirstChild(entry.Effect)
+	source = source and source:FindFirstChild(entry.Mount)
 
+	local limb = if entry.On then host:FindFirstChild(entry.On) else torsoOf(host)
+	if not source or not limb then return end
+
+	local mounted = source:Clone()
+	mounted.Parent = limb
+
+	GlobalFunctions.ForgeVFX.emit(mounted)
+	task.delay(Config.Lifetime, mounted.Destroy, mounted)
+end
+
+local function emit(entry, character: Model, start: CFrame?)
 	local host = character
 
 	if entry.Anchor == "Partner" then
 		host = GlobalFunctions.PairSceneService.PartnerOf(character)
 		if not host then return end
 	end
+
+	if entry.Mount then
+		mount(entry, host)
+		return
+	end
+
+	local source = template(entry.Effect)
+	if not source then return end
 
 	local cframe = if entry.Anchor == "Start" then start elseif entry.Follow then travelFrame(host) else anchorOf(host)
 	if not cframe then return end
