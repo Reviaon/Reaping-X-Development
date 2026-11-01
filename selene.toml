@@ -1,2 +1,2 @@
 std = "roblox"
-exclude = ["src/ReplicatedStorage/Libraries/Chrono/**"]
+exclude = ["src/ReplicatedStorage/Libraries/Chrono/**", "src/ReplicatedStorage/Utilities/Fusion/**"]
