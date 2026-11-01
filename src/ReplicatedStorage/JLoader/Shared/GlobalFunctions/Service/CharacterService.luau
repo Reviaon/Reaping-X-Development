@@ -22,6 +22,22 @@ local BODYMOVER_TYPES = {
 	BodyVelocity = true,
 }
 
+local FLING_STATES = {
+	Enum.HumanoidStateType.FallingDown,
+	Enum.HumanoidStateType.Ragdoll,
+	Enum.HumanoidStateType.PlatformStanding,
+}
+
+function Utils.DisableFlingStates(humanoid: Humanoid)
+	for _, state in FLING_STATES do
+		humanoid:SetStateEnabled(state, false)
+	end
+
+	if table.find(FLING_STATES, humanoid:GetState()) then
+		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end
+end
+
 function Utils.GetCFrame(character: Model, client_check: boolean)
 	if not character then return CFrame.new() end
 
