@@ -116,13 +116,7 @@ function GameService:Initialize()
 		if not live:FindFirstChild("Humanoid") then return end
 		if GlobalFunctions.ServerController:GetProfile(live) then return end
 
-		local humanoid = live:FindFirstChildOfClass("Humanoid")
-		humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-
-		if humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
-			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-		end
-
+		GlobalFunctions.CharacterService.DisableFlingStates(live:FindFirstChildOfClass("Humanoid"))
 		GlobalFunctions.AnimatorService:EnsureAnimator(live)
 		GlobalFunctions.ServerController:SetCharacter(live)
 	end
