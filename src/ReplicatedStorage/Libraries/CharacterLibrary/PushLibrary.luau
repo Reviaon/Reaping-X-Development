@@ -23,6 +23,11 @@ return {
 		flail = 12,
 	},
 
+	HitStop = {
+		Duration = 0.1,
+		Punch = "Push",
+	},
+
 	GrabArc = 120,
 
 	ClashWindow = 0.3,
