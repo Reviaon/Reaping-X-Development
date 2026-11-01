@@ -61,6 +61,7 @@ return {
 
 		TackleHitAttackerLoop = {
 			{ Marker = "Hit", Effect = "grappleloophit", Anchor = "Partner" },
+			{ At = 1.45, Effect = "grappleloophit", Mount = "Block", On = "Right Arm" },
 		},
 
 		TackleHitVictimBackLoop = {
@@ -73,7 +74,8 @@ return {
 		},
 
 		GrabFailVictim = {
-			{ Marker = "Ragdoll", Effect = "headlockbreakneckdrop" },
+			{ At = 0.55, Effect = "headlockbreakneckdrop", Mount = "crack" },
+			{ At = 1.1, Effect = "headlockbreakneckdrop" },
 		},
 	},
 }
