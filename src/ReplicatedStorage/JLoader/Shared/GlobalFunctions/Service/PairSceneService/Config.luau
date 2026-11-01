@@ -1,0 +1,46 @@
+return {
+	SceneAttribute = "PairScene",
+	AnchorAttribute = "PairSceneAnchor",
+	OutcomeAttribute = "PairSceneOutcome",
+	Status = "InPairScene",
+	TrackPriority = Enum.AnimationPriority.Action4,
+	BreakOn = { "IsRagdolled" },
+	LivePath = { "World", "Live" },
+	IgnorePaths = { { "World", "Live" }, { "World", "Visuals" } },
+
+	RagdollMarker = "Ragdoll",
+	MarkerRagdoll = 1.2,
+	HoldLastFrame = 1 / 30,
+
+	Hit = {
+		Marker = "Hit",
+		Damage = 4,
+	},
+
+	TracksAttribute = "PairSceneTracks",
+	MutePriorities = {
+		Enum.AnimationPriority.Action,
+		Enum.AnimationPriority.Action2,
+		Enum.AnimationPriority.Action3,
+		Enum.AnimationPriority.Action4,
+	},
+	MutedWeight = 0.001,
+	MuteFade = 0.08,
+	RestoreFade = 0.2,
+
+	SettleMinimum = 0.3,
+	SettleFade = 0.06,
+	SettleUpright = 0.7,
+
+	ProbeUp = 3,
+	MaxDrop = 20,
+	StepTolerance = 1.5,
+	FootClearance = 0.4,
+	SceneHeight = 5.5,
+	Padding = 2.5,
+	BoundsMargin = 0.25,
+	Yaws = { 0, 30, -30, 60, -60, 90, -90, 135, -135, 180 },
+	Shifts = { 0, 2, 4, 6 },
+	ShiftDirections = 8,
+	RigPartAttribute = "RigPart",
+}
