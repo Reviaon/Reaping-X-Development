@@ -52,8 +52,6 @@ local function applyHumanoidProperties(controller)
 	end
 end
 
---@ Restarted on every jump. Going Jump.IdleReset seconds without jumping wipes
---  the accumulated decay entirely, independent of the zeroed-out reset cooldown.
 local function cancelIdleReset(state)
 
 	if state.idleThread then

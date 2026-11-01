@@ -31,8 +31,8 @@ local USE_DYNAMIC_INFLUENCE = false
 
 --@ Dynamic camera offset (drift) — tune to taste.
 local ORIGIN_FOLLOW_SPEED = 20 --@ how fast the origin part catches up to the torso (lower = more drift)
-local DRIFT_STRENGTH = 0.4     --@ fraction of the origin's lag applied as camera drift
-local DRIFT_MAX = 2            --@ max drift magnitude, in studs
+local DRIFT_STRENGTH = 0.4 --@ fraction of the origin's lag applied as camera drift
+local DRIFT_MAX = 2 --@ max drift magnitude, in studs
 
 local INFLUENCE_FLOOR = 0.2
 local INFLUENCE_BLEND = 6

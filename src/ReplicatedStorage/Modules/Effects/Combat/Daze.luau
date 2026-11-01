@@ -37,8 +37,6 @@ local function fade(character)
 	end)
 end
 
---@ Held on the victim's head for as long as GuardBroken lasts, then faded out. Info.Until is the
---@ lockout's end in server time: the relay can land before the attribute replicates.
 function Daze.Attach(Info)
 	local character = Info.Character
 	if typeof(character) ~= "Instance" or not character:IsA("Model") then return end
@@ -63,12 +61,14 @@ function Daze.Attach(Info)
 
 	local entry = {
 		Effect = effect,
+		
 		Spin = RunService.Heartbeat:Connect(function(deltaTime)
 			if not attachment.Parent then return end
 
 			angle = (angle + Settings.SpinSpeed * deltaTime) % (2 * math.pi)
 			attachment.CFrame = base * CFrame.Angles(0, angle, 0)
 		end),
+
 		Watch = character:GetAttributeChangedSignal(BlockLibrary.BrokenStatus):Connect(function()
 			if character:GetAttribute(BlockLibrary.BrokenStatus) ~= true then
 				fade(character)

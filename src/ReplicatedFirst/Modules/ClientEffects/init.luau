@@ -47,9 +47,6 @@ local PATH_SEPARATOR = "."
 local CullingConfig = require("@self/CullingConfig")
 local LocalPlayer = Players.LocalPlayer
 
---@ Payloads arrive as plain tables (ByteNet drops metatables), so give them the same
---@ GlobalFunctions fallback ClientController has - that is what lets a visual read
---@ Info.EffectService or Info.GetPath without requiring the framework in every effect module.
 local function WithTools(Info)
 	if typeof(Info) ~= "table" or getmetatable(Info) then
 		return Info
@@ -58,8 +55,6 @@ local function WithTools(Info)
 	return setmetatable(Info, { __index = Jloader.GlobalFunctions })
 end
 
---@ A world position out of whatever an Info key holds. Payloads carry a Model most of the
---@ time, but a raw part, attachment, CFrame or Vector3 all describe a spot just as well.
 local function PositionOf(value)
 	local kind = typeof(value)
 
@@ -70,8 +65,6 @@ local function PositionOf(value)
 	if value:IsA("BasePart") then return value.Position end
 	if value:IsA("Attachment") then return value.WorldPosition end
 
-	--@ GetPivot covers a Model whose PrimaryPart was never assigned - common on imported
-	--@ rigs, and the same gap that silently breaks EffectService:Weld.
 	if value:IsA("Model") then
 		local primary = value.PrimaryPart or value:FindFirstChild("HumanoidRootPart")
 		return primary and primary.Position or value:GetPivot().Position
@@ -80,9 +73,6 @@ local function PositionOf(value)
 	return nil
 end
 
---@ Returns the effect's origin position and the instance it came from (needed to tell whether
---@ the effect is the local player's own). rawget, because Info may already carry the
---@ GlobalFunctions __index fallback and a key like "Target" could resolve against that.
 local function ResolveOrigin(Info)
 	if typeof(Info) ~= "table" then return nil, nil end
 
@@ -97,8 +87,6 @@ local function ResolveOrigin(Info)
 	return nil, nil
 end
 
---@ Where the viewer is. Falls back to the camera so effects still play in the window between
---@ joining and the character replicating, rather than every one of them being culled.
 local function ViewerPosition()
 	local character = LocalPlayer and LocalPlayer.Character
 	local root = character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart"))
@@ -119,8 +107,6 @@ end
 local ByPath = {} --@ ["combat.weapons.staffvisuals"] = module
 local ByName = {} --@ ["staffvisuals"]              = module   (bare-name fallback)
 
---@ Build a module's dotted path relative to the Effects folder,
---  e.g. Effects.Combat.Weapons.StaffVisuals -> "Combat.Weapons.StaffVisuals"
 local function getEffectPath(module: Instance): string
 	local segments = { module.Name }
 	local ancestor = module.Parent
@@ -192,8 +178,6 @@ function ClientEffects:PassesCulling(Data)
 
 	local origin, source = ResolveOrigin(Data.Info)
 	if not origin then
-		--@ Nothing to measure against. Fail open unless the config says otherwise, so an
-		--@ effect with an unrecognised Info shape degrades to the pre-culling behaviour.
 		return not CullingConfig.CullUnresolved
 	end
 
