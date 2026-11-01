@@ -40,17 +40,19 @@ function TackleService:HandleTackle(player: Player)
 	tackles[player] = { At = now, Hit = false }
 end
 
-function TackleService:CheckHit(player: Player, victim, hitAt): (string?, Model?, number?)
+function TackleService:CheckHit(player: Player, victim, hitAt, variant): (string?, Model?, number?, {}?)
 	local StatusService = GlobalFunctions.StatusService
 	local PairSceneService = GlobalFunctions.PairSceneService
 	local report = TackleLibrary.Report
 	local tackle = tackles[player]
 	local attacker = player and player.Character
+	local definition = typeof(variant) == "string" and TackleLibrary.Grapples[variant]
 
 	if not attacker then return "no character" end
+	if not definition then return `unknown variant {tostring(variant)}` end
 	if not tackle then return "no tackle on record" end
 	if tackle.Hit then return "this tackle already caught someone" end
-	if os.clock() - tackle.At > TackleLibrary.Leap.MaxFlight + TackleLibrary.Grapple.ConfirmWindow then return "the tackle on record is too old" end
+	if os.clock() - tackle.At > TackleLibrary.Leap.MaxFlight + definition.ConfirmWindow then return "the tackle on record is too old" end
 
 	if typeof(hitAt) ~= "number" or hitAt ~= hitAt then return "bad hit time" end
 
@@ -75,20 +77,19 @@ function TackleService:CheckHit(player: Player, victim, hitAt): (string?, Model?
 	local distance = (victimRoot.Position - attackerRoot.Position).Magnitude
 	if distance > report.MaxDistance then return `{victim.Name} is {math.floor(distance)} studs away on the server` end
 
-	return nil, attacker, math.max(age, 0)
+	return nil, attacker, math.max(age, 0), definition
 end
 
-function TackleService:HandleHit(player: Player, victim, hitAt)
-	local rejection, attacker, age = self:CheckHit(player, victim, hitAt)
+function TackleService:HandleHit(player: Player, victim, hitAt, variant)
+	local rejection, attacker, age, definition = self:CheckHit(player, victim, hitAt, variant)
 
 	if not rejection then
 		tackles[player].Hit = true
 
-		if GlobalFunctions.PairSceneService:Begin(TackleLibrary.Grapple, attacker, victim, { Age = age, Predicted = true }) then
-			return
-		end
+		local scene, problem = GlobalFunctions.PairSceneService:Begin(definition, attacker, victim, { Age = age, Predicted = true })
+		if scene then return end
 
-		rejection = "the scene could not start"
+		rejection = problem or "the scene could not start"
 	end
 
 	if GlobalFunctions.DebugService.IsEnabled() then
@@ -103,8 +104,8 @@ function TackleService:Init()
 		self:HandleTackle(player)
 	end)
 
-	self.ReportHit:Connect(function(player, victim, hitAt)
-		self:HandleHit(player, victim, hitAt)
+	self.ReportHit:Connect(function(player, victim, hitAt, variant)
+		self:HandleHit(player, victim, hitAt, variant)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

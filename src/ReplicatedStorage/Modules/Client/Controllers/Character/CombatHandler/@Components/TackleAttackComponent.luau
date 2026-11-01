@@ -3,7 +3,9 @@ local RunService = game:GetService("RunService")
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local TackleLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/TackleLibrary")
 
-local TackleComponent = {}
+local TackleComponent = {
+	KeepsScene = true,
+}
 
 local SCOPE = "Tackle"
 local COOLDOWN = "Tackle"
@@ -96,6 +98,17 @@ local function isInterrupted(controller, character: Model, grabbing: boolean?): 
 	return recipe ~= nil and not recipe.steer and (recipe.priority or 0) >= TackleLibrary.ImpulsePriority
 end
 
+local function variantFor(victim: CFrame, from: Vector3): string
+	local look = flat(victim.LookVector)
+	local toward = flat(from - victim.Position)
+
+	if look and toward and look:Dot(toward) <= math.cos(math.rad(180 - TackleLibrary.BackArc / 2)) then
+		return "Back"
+	end
+
+	return "Front"
+end
+
 local function isGrabbable(controller, target: Instance): boolean
 	if typeof(target) ~= "Instance" or not target:IsA("Model") then return false end
 
@@ -178,7 +191,8 @@ function TackleComponent:Activate(controller, combatState)
 	local humanoid = controller.Humanoid
 	local root = controller.HumanoidRootPart
 	local StatusService = controller.StatusService
-	local leap, miss, grapple = TackleLibrary.Leap, TackleLibrary.Miss, TackleLibrary.Grapple
+	local leap, miss = TackleLibrary.Leap, TackleLibrary.Miss
+	local grapple = nil
 	local relay = getTackleRelay()
 
 	local state = controller:Scope(SCOPE)
@@ -272,12 +286,17 @@ function TackleComponent:Activate(controller, combatState)
 	end
 
 	local function grab(target: Model)
-		if not relay then return end
+		local targetRoot = target:FindFirstChild("HumanoidRootPart")
+		if not relay or not targetRoot then return end
 
-		local predicted = controller.PairSceneService.Predict(character, grapple, target)
+		local variant = variantFor(targetRoot.CFrame, root.Position)
+		local definition = TackleLibrary.Grapples[variant]
+
+		local predicted = controller.PairSceneService.Predict(character, definition, target)
 		if not predicted then return end
 
 		scene = predicted
+		grapple = definition
 
 		hitbox:Dispose()
 		velocity:Destroy()
@@ -300,7 +319,7 @@ function TackleComponent:Activate(controller, combatState)
 			end
 		end
 
-		relay.ReportHit:Fire(target, workspace:GetServerTimeNow())
+		relay.ReportHit:Fire(target, workspace:GetServerTimeNow(), variant)
 	end
 
 	if hitbox then

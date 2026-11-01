@@ -50,27 +50,59 @@ local TackleLibrary = {
 		max_targets = 1,
 	},
 
-	Grapple = {
-		Name = "TackleGrapple",
-		Spacing = 2,
-		Duration = 5,
+	BackArc = 120,
 
-		IntroFade = 0.05,
-		LoopFade = 0.2,
-		ReleaseFade = 0.3,
+	Grapples = {
+		Front = {
+			Name = "TackleGrapple",
+			Facing = "Face",
+			Spacing = 2,
+			Bounds = { Min = Vector3.new(-2.8, -4.0, -5.4), Max = Vector3.new(2.8, 3.8, 7.7) },
+			Duration = 5,
 
-		ConfirmWindow = 1,
+			IntroFade = 0.05,
+			LoopFade = 0.2,
+			ReleaseFade = 0.3,
 
-		Attacker = {
-			Status = "IsGrappling",
-			Intro = "TackleHitAttacker",
-			Loop = "TackleHitAttackerLoop",
+			ConfirmWindow = 1,
+
+			Attacker = {
+				Status = "IsGrappling",
+				Intro = "TackleHitAttacker",
+				Loop = "TackleHitAttackerLoop",
+			},
+
+			Victim = {
+				Status = "IsGrappled",
+				Intro = "TackleHitVictim",
+				Loop = "TackleHitVictimLoop",
+			},
 		},
 
-		Victim = {
-			Status = "IsGrappled",
-			Intro = "TackleHitVictim",
-			Loop = "TackleHitVictimLoop",
+		Back = {
+			Name = "TackleGrappleBack",
+			Facing = "Away",
+			Spacing = 2,
+			Bounds = { Min = Vector3.new(-3.0, -4.0, -7.1), Max = Vector3.new(3.0, 3.8, 5.4) },
+			Duration = 5,
+
+			IntroFade = 0.05,
+			LoopFade = 0.2,
+			ReleaseFade = 0.3,
+
+			ConfirmWindow = 1,
+
+			Attacker = {
+				Status = "IsGrappling",
+				Intro = "TackleHitAttackerBack",
+				Loop = "TackleHitAttackerBackLoop",
+			},
+
+			Victim = {
+				Status = "IsGrappled",
+				Intro = "TackleVictimBack",
+				Loop = "TackleHitVictimBackLoop",
+			},
 		},
 	},
 
