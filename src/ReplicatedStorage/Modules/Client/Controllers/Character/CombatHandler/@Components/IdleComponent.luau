@@ -61,7 +61,7 @@ local function shouldIdle(controller): boolean
 		end
 	end
 
-	return true
+	return not controller.PairSceneService.IsInScene(Character)
 end
 
 local function update(controller)

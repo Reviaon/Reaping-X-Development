@@ -151,6 +151,7 @@ function CombatHandler:InitCharacter(controller)
 	end)
 
 	local interrupted = false
+	local inScene = false
 
 	CombatHandler.Trove:Connect(Character.AttributeChanged, function()
 		local yielded = controller.StatusService:IsHitYielded(Character)
@@ -161,14 +162,32 @@ function CombatHandler:InitCharacter(controller)
 		end
 
 		interrupted = yielded
+
+		local scened = controller.PairSceneService.IsInScene(Character)
+
+		if scened and not inScene then
+			local branch = CombatHandler.components[CombatHandler:StateFor(controller).CurrentBranch .. "AttackComponent"]
+
+			if not (branch and branch.KeepsScene) then
+				CombatHandler:Interrupt(controller)
+			end
+
+			CombatHandler:StopBlock(controller)
+		end
+
+		inScene = scened
 	end)
 
 	CombatConfig:WeaponListener(controller, CombatHandler.Trove, function(weaponId)
+		if controller.StatusService:CheckStatuses(Character, { IsAttacking = true }) then
+			CombatHandler:Interrupt(controller)
+		end
+
 		CombatConfig:ClearImpulse(controller)
 
 		controller.AnimatorService:StopAllWithReference(
-			Character, 
-			"Attack"
+			Character,
+			"Attack%d+$"
 		)
 
 		CombatHandler:StateFor(controller).ActiveWeapon = weaponId

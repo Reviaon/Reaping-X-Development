@@ -15,7 +15,7 @@ return{
 		},
 		
 		IsStunned = {
-			WalkSpeed = 2,
+			WalkSpeed = 0,
 			JumpPower = 0,
 			Priority = 10;
 		};
@@ -70,7 +70,9 @@ return{
 		};
 
 		ComboLocked = {
-			Priority = 2;
+			WalkSpeed = 8,
+			JumpPower = 0,
+			Priority = 5;
 		};
 
 		IsPushing = {
