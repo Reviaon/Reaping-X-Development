@@ -13,6 +13,7 @@ return {
 
 		Shapes = {
 			Grab = { Roll = 3 },
+			Push = { Fov = -4, Roll = 1.5 },
 		},
 	},
 
