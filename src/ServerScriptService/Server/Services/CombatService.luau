@@ -396,6 +396,15 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 	self:LandHit(attacker, victim, profile, weaponId, math.floor(comboIndex), player)
 end
 
+function CombatService:SceneStrike(target: Model, hit)
+	local humanoid = target:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+
+	if hit.Damage > 0 then
+		humanoid:TakeDamage(hit.Damage)
+	end
+end
+
 function CombatService:Init()
 	self.ReportHit:Connect(function(player, victim, weaponId, comboIndex, attackerRoot)
 		self:HandleReport(player, victim, weaponId, comboIndex, attackerRoot)
@@ -415,6 +424,10 @@ function CombatService:Init()
 
 	self.ReportSwing:Connect(function(player, weaponId, comboIndex)
 		self:HandleSwingReport(player, weaponId, comboIndex)
+	end)
+
+	GlobalFunctions.PairSceneService.Struck:Connect(function(_, _, target, hit)
+		self:SceneStrike(target, hit)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

@@ -328,7 +328,10 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 
 			local root = character:FindFirstChild("HumanoidRootPart")
 
-			if not (root and controller.StatusService:IsGuardingFrom(target, root.Position)) then
+			local guarded = root and controller.StatusService:IsGuardingFrom(target, root.Position)
+			local predicted = not options.predict or options.predict(target)
+
+			if not guarded and predicted then
 				self:PlayHit(character, target, hitbox.effect, options.weaponId, timing.combo_index, options.reaction)
 			end
 

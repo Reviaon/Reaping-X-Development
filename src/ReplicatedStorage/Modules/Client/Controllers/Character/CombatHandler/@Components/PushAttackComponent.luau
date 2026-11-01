@@ -15,6 +15,18 @@ local function getPushRelay()
 	return pushRelay
 end
 
+local function isBehind(attacker: Model, victim: Model): boolean
+	local attackerRoot = attacker:FindFirstChild("HumanoidRootPart")
+	local victimRoot = victim:FindFirstChild("HumanoidRootPart")
+	if not attackerRoot or not victimRoot then return false end
+
+	local look = victimRoot.CFrame.LookVector * Vector3.new(1, 0, 1)
+	local toward = (attackerRoot.Position - victimRoot.Position) * Vector3.new(1, 0, 1)
+	if look.Magnitude <= 1e-3 or toward.Magnitude <= 1e-3 then return false end
+
+	return look.Unit:Dot(toward.Unit) <= math.cos(math.rad(180 - PushLibrary.GrabArc / 2))
+end
+
 function PushComponent:CanActivate(controller, _combatState): boolean
 	local Character = controller.Character
 	if not Character then return false end
@@ -77,6 +89,9 @@ function PushComponent:Activate(controller, combatState)
 	}, {
 		weaponId = SWING,
 		reaction = PushLibrary.Reaction,
+		predict = function(target)
+			return not isBehind(Character, target)
+		end,
 		report = function(target)
 			relay.ReportHit:Fire(target)
 		end,

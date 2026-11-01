@@ -23,6 +23,75 @@ return {
 		flail = 12,
 	},
 
+	GrabArc = 120,
+
+	ClashWindow = 0.3,
+	ClashArc = 120,
+	ClashDistance = 8,
+
+	Struggle = {
+		Name = "PushStruggle",
+		Struggle = "Default",
+		Facing = "Face",
+		Spacing = 2,
+		Bounds = { Min = Vector3.new(-2.4, -3.4, -4.7), Max = Vector3.new(2.4, 2.1, 2.7) },
+		Duration = 5,
+
+		IntroFade = 0.15,
+		LoopFade = 0.15,
+		ReleaseFade = 0.3,
+
+		Attacker = {
+			Loop = "PushStruggleAttackerLoop",
+		},
+
+		Victim = {
+			Loop = "PushStruggleVictimLoop",
+		},
+
+		LaunchDelay = 0.25,
+
+		Outcomes = {
+			AttackerWins = { Attacker = "Push" },
+			AttackerLoses = { Victim = "Push" },
+		},
+	},
+
+	Grab = {
+		Name = "PushGrab",
+		Struggle = "Default",
+		Facing = "Away",
+		Spacing = 2,
+		Bounds = { Min = Vector3.new(-3.1, -3.7, -7.3), Max = Vector3.new(2.9, 2.9, 6.1) },
+		Duration = 5,
+
+		IntroFade = 0.05,
+		LoopFade = 0.2,
+		ReleaseFade = 0.3,
+
+		Attacker = {
+			Status = "IsGrappling",
+			Intro = "GrabStartAttacker",
+			Loop = "GrabStruggleAttackerLoop",
+		},
+
+		Victim = {
+			Status = "IsGrappled",
+			Intro = "GrabStartVictim",
+			Loop = "GrabStruggleVictimLoop",
+		},
+
+		TimeoutOutcome = "Draw",
+
+		HitTargets = { GrabFailAttacker = "Self" },
+
+		Outcomes = {
+			Draw = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
+			AttackerWins = { Attacker = "GrabSuccessAttacker", Victim = "GrabFailVictim", Launch = { Victim = true } },
+			AttackerLoses = { Attacker = "GrabFailAttacker", Victim = "GrabEscapeVictim", Launch = { Attacker = true } },
+		},
+	},
+
 	--@ Each variant:
 	--@   Status      held on the pusher for Duration seconds; nothing else can be started under it
 	--@   HitboxDelay seconds into the push the shove lands
