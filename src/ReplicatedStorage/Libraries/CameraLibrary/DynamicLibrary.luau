@@ -16,6 +16,15 @@ return {
 		},
 	},
 
+	Kick = {
+		RiseSpeed = 14,
+		SettleSpeed = 4,
+
+		Shapes = {
+			RunJump = { Fov = 8, Hold = 0.25 },
+		},
+	},
+
 	Scene = {
 		Blend = 0.5,
 		FollowSpeed = 7,
@@ -31,6 +40,9 @@ return {
 
 	Scenes = {
 		TackleGrapple = {},
+		TackleGrappleBack = {},
+		PushStruggle = {},
+		PushGrab = {},
 	},
 
 	Sway = {

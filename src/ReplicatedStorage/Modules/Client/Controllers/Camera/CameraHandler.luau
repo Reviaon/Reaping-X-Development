@@ -62,6 +62,12 @@ local sceneFov = Spring.new(0)
 sceneFov.Speed = DynamicLibrary.FovSpeed
 sceneFov.Damper = 1
 
+local kickFov = Spring.new(0)
+kickFov.Speed = DynamicLibrary.Kick.RiseSpeed
+kickFov.Damper = 1
+
+local kickToken = 0
+
 local swayOffset = Spring.new(Vector3.zero)
 swayOffset.Speed = DynamicLibrary.Sway.Speed
 swayOffset.Damper = DynamicLibrary.Sway.Damper
@@ -237,7 +243,9 @@ function CameraHandler:Cleanup(controller)
 	activePartner = nil
 	unwatchMarkers()
 
-	for _, spring in { punchFov, punchRoll, sceneFov, swayRoll } do
+	kickToken += 1
+
+	for _, spring in { punchFov, punchRoll, sceneFov, swayRoll, kickFov } do
 		spring.Target = 0
 		spring.Position = 0
 		spring.Velocity = 0
@@ -303,6 +311,24 @@ function CameraHandler:Punch(name: string, scale: number?)
 
 	punchFov.Position += (shape.Fov or 0) * scale
 	punchRoll.Position += (shape.Roll or 0) * scale * (math.random() < 0.5 and -1 or 1)
+end
+
+function CameraHandler:Kick(name: string)
+	local shape = DynamicLibrary.Kick.Shapes[name]
+	if not shape then return end
+
+	kickToken += 1
+	local token = kickToken
+
+	kickFov.Speed = DynamicLibrary.Kick.RiseSpeed
+	kickFov.Target = shape.Fov
+
+	task.delay(shape.Hold, function()
+		if token ~= kickToken then return end
+
+		kickFov.Speed = DynamicLibrary.Kick.SettleSpeed
+		kickFov.Target = 0
+	end)
 end
 
 local function sceneProfile(name: string?)
@@ -516,7 +542,7 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 		* CFrame.Angles(0, 0, math.rad(punchRoll.Position + swayRoll.Position))
 		+ Vector3.new(0, USE_DYNAMIC_INFLUENCE and SUBJECT_HEIGHT_OFFSET or 0, 0)
 
-	Camera.FieldOfView = DynamicLibrary.BaseFov + sceneFov.Position + punchFov.Position
+	Camera.FieldOfView = DynamicLibrary.BaseFov + sceneFov.Position + punchFov.Position + kickFov.Position
 end
 
 return CameraHandler
