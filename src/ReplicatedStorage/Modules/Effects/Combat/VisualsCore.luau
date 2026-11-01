@@ -7,6 +7,7 @@ local DEFAULT_FPS = 60
 local DEFAULT_LIFETIME = 3
 
 local DEFAULT_PREFIXES = { "Attack", "Hit" }
+local RIG_ATTRIBUTE = "EquippedWeapon"
 
 local function ReadAssets(controller, settings)
 	return controller.GetPath:ReadPath(settings.Assets)
@@ -123,21 +124,22 @@ local function IsInterrupted(controller, cancelOn)
 end
 
 function VisualsCore.WatchInterrupt(controller, settings)
-	local watch = { Cancelled = false, Emissions = {}, Connection = nil }
+	local watch = { Cancelled = false, Emissions = {}, Spawned = {}, Connections = {} }
 
 	function watch:Stop()
-		if self.Connection then
-			self.Connection:Disconnect()
-			self.Connection = nil
+		for _, connection in self.Connections do
+			connection:Disconnect()
 		end
+
+		table.clear(self.Connections)
 	end
 
 	local character = controller.Character
 	local cancelOn = CancelList({}, settings)
 
-	if not character or not cancelOn then return watch end
+	if not character then return watch end
 
-	local function cancel()
+	local function cancel(clearSpawned: boolean?)
 		if watch.Cancelled then return end
 		watch.Cancelled = true
 		watch:Stop()
@@ -147,13 +149,36 @@ function VisualsCore.WatchInterrupt(controller, settings)
 		end
 
 		table.clear(watch.Emissions)
+
+		if not clearSpawned then return end
+
+		for _, spawned in watch.Spawned do
+			if spawned.Emission then
+				spawned.Emission:Clear()
+			end
+
+			spawned.Effect:Destroy()
+		end
+
+		table.clear(watch.Spawned)
 	end
 
-	watch.Connection = character.AttributeChanged:Connect(function(name)
-		if table.find(cancelOn, name) and character:GetAttribute(name) == true then
-			cancel()
+	local function onToolChanged(child: Instance)
+		if child:IsA("Tool") then
+			cancel(true)
 		end
-	end)
+	end
+
+	table.insert(watch.Connections, character.ChildAdded:Connect(onToolChanged))
+	table.insert(watch.Connections, character.ChildRemoved:Connect(onToolChanged))
+
+	if cancelOn then
+		table.insert(watch.Connections, character.AttributeChanged:Connect(function(name)
+			if table.find(cancelOn, name) and character:GetAttribute(name) == true then
+				cancel()
+			end
+		end))
+	end
 
 	if IsInterrupted(controller, cancelOn) then
 		cancel()
@@ -260,11 +285,26 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 	return attack_vfx, emission
 end
 
+local function Track(watch, effect, emission)
+	if not watch or not effect then return end
+
+	if watch.Cancelled then
+		if emission then
+			emission:Clear()
+		end
+
+		effect:Destroy()
+		return
+	end
+
+	table.insert(watch.Spawned, { Effect = effect, Emission = emission })
+end
+
 function VisualsCore.SpawnAttack(controller, settings, comboIndex, root)
 	local assets = ReadAssets(controller, settings)
 	local asset = assets and FindAsset(assets, settings, comboIndex)
 
-	VisualsCore.SpawnEffect(controller, settings, asset, root, nil)
+	return VisualsCore.SpawnEffect(controller, settings, asset, root, nil)
 end
 
 function VisualsCore.SpawnOneShot(controller, settings, spec, root)
@@ -280,12 +320,12 @@ function VisualsCore.SpawnOneShot(controller, settings, spec, root)
 		host = character:FindFirstChild(spec.Attach) or character:FindFirstChild(spec.Attach, true) or root
 	end
 
-	VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
+	return VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 end
 
 --@ Turns one OneShots entry into timeline events; baseFrame is the swing's own frame, so a spec
 --@ naming neither Frame nor Offset lands on the swing it belongs to.
-function VisualsCore.CollectOneShots(controller, settings, key, baseFrame, root, events)
+function VisualsCore.CollectOneShots(controller, settings, key, baseFrame, root, events, watch)
 	events = events or {}
 
 	if key == nil or not settings.OneShots then return events end
@@ -297,7 +337,7 @@ function VisualsCore.CollectOneShots(controller, settings, key, baseFrame, root,
 		table.insert(events, {
 			frame = (spec.Frame or baseFrame or 0) + (spec.Offset or 0),
 			run = function()
-				VisualsCore.SpawnOneShot(controller, settings, spec, root)
+				Track(watch, VisualsCore.SpawnOneShot(controller, settings, spec, root))
 			end,
 		})
 	end
@@ -319,6 +359,11 @@ function VisualsCore.ResolveAfterImage(controller, settings, spec)
 end
 
 function VisualsCore.EmitAfterImage(controller, settings, spec, watch)
+	local character = controller.Character
+	local weaponId = rawget(controller, "WeaponId")
+
+	if character and typeof(weaponId) == "string" and character:GetAttribute(RIG_ATTRIBUTE) ~= weaponId then return end
+
 	local source = VisualsCore.ResolveAfterImage(controller, settings, spec or {})
 	if not source then return end
 
@@ -345,7 +390,7 @@ function VisualsCore.Attack(controller, settings)
 		{
 			frame = frame,
 			run = function()
-				VisualsCore.SpawnAttack(controller, settings, comboIndex, root)
+				Track(watch, VisualsCore.SpawnAttack(controller, settings, comboIndex, root))
 			end,
 		},
 	}
@@ -359,7 +404,7 @@ function VisualsCore.Attack(controller, settings)
 		})
 	end
 
-	VisualsCore.CollectOneShots(controller, settings, comboIndex, frame, root, events)
+	VisualsCore.CollectOneShots(controller, settings, comboIndex, frame, root, events, watch)
 
 	VisualsCore.Play(events, controller.Speed, settings.FPS, watch)
 end
@@ -371,10 +416,15 @@ function VisualsCore.OneShot(controller, settings)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
-	local events = VisualsCore.CollectOneShots(controller, settings, controller.Shot, 0, root)
-	if #events == 0 then return end
+	local watch = VisualsCore.WatchInterrupt(controller, settings)
+	local events = VisualsCore.CollectOneShots(controller, settings, controller.Shot, 0, root, nil, watch)
 
-	VisualsCore.Play(events, controller.Speed, settings.FPS, VisualsCore.WatchInterrupt(controller, settings))
+	if #events == 0 then
+		watch:Stop()
+		return
+	end
+
+	VisualsCore.Play(events, controller.Speed, settings.FPS, watch)
 end
 
 return VisualsCore

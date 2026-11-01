@@ -66,6 +66,10 @@ local function reactionSet(Info, victim)
 end
 
 function Hit.PlayReaction(Info, victim)
+	local Players = game:GetService("Players")
+	local owner = Players:GetPlayerFromCharacter(victim)
+	if owner and owner ~= Players.LocalPlayer then return nil end
+
 	local folder = reactionSet(Info, victim)
 	if not folder then return nil end
 
