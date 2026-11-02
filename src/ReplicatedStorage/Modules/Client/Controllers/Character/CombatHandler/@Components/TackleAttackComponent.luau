@@ -322,14 +322,6 @@ function TackleComponent:Activate(controller, combatState)
 		relay.ReportHit:Fire(target, workspace:GetServerTimeNow(), variant)
 	end
 
-	if hitbox then
-		hitbox.onHit:Connect(function(target)
-			if scene or landedAt or not isGrabbable(controller, target) then return end
-
-			grab(target)
-		end)
-	end
-
 	local function land()
 		landedAt = os.clock()
 		landingSpeed = (root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude
@@ -354,6 +346,27 @@ function TackleComponent:Activate(controller, combatState)
 		end
 
 		getUpAt = landedAt + math.max(length, miss.SkidTime) + miss.ProneHold
+	end
+
+	local function impact(target: Model)
+		if not relay then return end
+
+		relay.ReportHit:Fire(target, workspace:GetServerTimeNow(), TackleLibrary.Impact.Variant)
+
+		land()
+		landingSpeed *= TackleLibrary.Impact.SkidCarry
+	end
+
+	if hitbox then
+		hitbox.onHit:Connect(function(target)
+			if scene or landedAt or not isGrabbable(controller, target) then return end
+
+			if controller.PairSceneService.Supports(target) then
+				grab(target)
+			else
+				impact(target)
+			end
+		end)
 	end
 
 	trove:Add(RunService.RenderStepped:Connect(function(dt)
