@@ -12,6 +12,8 @@ Team Create; `src/` is synced into it with Rojo.
 - [Adding a component](#adding-a-component)
 - [Adding a service](#adding-a-service)
 - [Adding a weapon](#adding-a-weapon)
+- [Mobs](#mobs)
+- [Adding a mob](#adding-a-mob)
 - [Combat](#combat)
 - [Effects](#effects)
 - [The console](#the-console)
@@ -55,6 +57,7 @@ place file and are invisible to git. Know this before you go looking for somethi
 | --- | --- |
 | `ReplicatedStorage.Storage` | Mapped `$className`-only. Rigs, weapon models, `Models.RigParts.Handle`, particles, animations and `UIFolder` all live here. |
 | `Workspace` | Not mapped at all. The map, `World.Live` (where characters are parented) and the NPC placements are place-only. |
+| `ServerStorage.Mobs` | Mob template models (e.g. `Wolf`). Mob spawn zones are Parts tagged `MobZone` in the Workspace. |
 
 Practical consequence: inspect the live place through Studio rather than reasoning from `src/`, and
 do not assume something is absent just because grep found nothing.
@@ -368,6 +371,73 @@ Notes that are not obvious:
 - **A typo'd key is silent.** `ResolveNumber` falls back to a default on an unknown or wrongly-typed
   value, so `attack_duraton` produces default timing and no warning. Check spelling against this list
   before assuming a weapon is misbehaving.
+
+---
+
+## Mobs
+
+Server-only, in `ServerScriptService/Server/Services/MobService/` plus `MobSpawnService`. Every mob runs the
+same framework; a mob is data, not code.
+
+| Piece | Role |
+| --- | --- |
+| `Defaults.luau` | Every tunable, shared by all mobs. Aggression is tuned **here** so it applies everywhere. |
+| `Libraries/MobLibrary/<Name>.luau` | One mob's differences from `Defaults`. Merged over them (nested tables merge, lists replace, `false` disables). |
+| `Config.luau` | Does the merge, then derives size-based values (`attack.reach`, `attack_range`, `pounce.range`, `pack.clearance`, `pack.orbit_radius`) from the measured body when an entry leaves them out. |
+| `Trees/Hunter.luau` | The shared brain: disabled → returning → acquire target → leash / attack / pounce / chase / circle → wander. |
+| `Brain/` | Behaviour-tree nodes, conditions, actions and states, each its own module found by name. A tree leaf asks the state machine for a state; the state runs enter/update/exit. |
+| `Rig.luau` | Turns a template into a mob once per type: strips AnimSaves, scales, adds a collider `HumanoidRootPart` + R15 Humanoid, disables unused Humanoid states. Spawns clone that prototype. |
+| `Motion.luau` | Per-frame easing, turning (an AlignOrientation, AutoRotate off) and arrival braking. |
+| `Team.luau` | Packs: a shared target, one attack slot handed to the nearest teammate, the rest circling. |
+| `Spacing.luau` | Body-shaped separation between all mobs, via a per-frame spatial grid. |
+| `Scheduler.luau` / `Telemetry.luau` | Distance tiers for brain rate and animation culling; a cost readout on `JLoader.Services.MobService` attributes. |
+
+What keeps a mob aggressive (all in `Defaults`): it chases where you are *going* (`chase_lead`), bursts
+in from mid range (`pounce`), rotates attackers quickly (`pack.bites_per_turn`, `pack.rest_time`), stays on
+whoever hits it (`provoke_time`) and holds the pack's target while any packmate is near it.
+
+Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
+removes them.
+
+---
+
+## Adding a mob
+
+1. **Model.** Put the rig at `ServerStorage.Mobs.<Name>`. It needs a `PrimaryPart` facing forward
+   (look vector = head). Any rig works: skinned (AnimationController + Bones) or Motor6D.
+2. **Animations.** Publish them to the **group that owns the game** (otherwise they will not play live) and put the
+   `Animation` instances in `ReplicatedStorage.Storage.Animations.Mobs.<Name>`. Until then, Studio plays them from
+   the template's `AnimSaves`. Keep big AnimSaves models out of the Workspace: they hang play-test teardown.
+3. **Entry.** Copy `Libraries/MobLibrary/Wolf.luau` to `<Name>.luau` and change only what differs:
+
+   ```lua
+   return {
+       template = "Bear",            --@ ServerStorage.Mobs model
+       scale = 1,
+       health = 200,
+       run_speed = 22,               --@ Anything in Defaults can be overridden
+       attack = {
+           damage = 18,
+           animations = { "Swipe1", "Swipe2" },   --@ Played in order, one per attack
+       },
+       pounce = false,               --@ Turn a shared behaviour off
+       pack = false,                 --@ A solo hunter: same brain, no circling or turns
+       hurt_animations = { "Hurt1" },
+       animations = {                --@ Key -> Animation name; Idle/Walk/Run drive locomotion
+           Idle = "BearIdle", Walk = "BearWalk", Run = "BearRun",
+           WalkLeft = "BearWalkL", WalkRight = "BearWalkR", WalkBack = "BearWalkB",
+           Swipe1 = "BearSwipe1", Swipe2 = "BearSwipe2", Hurt1 = "BearHurt",
+       },
+   }
+   ```
+
+4. **Spawn it.** `mob Bear` in the Konsole, or a Part tagged `MobZone` with attributes `Mob = "Bear"`, `Cap`,
+   `Interval` (and `Team` to share one pack across zones).
+5. **Check it.** Reach and spacing come from the body size; set `attack.reach` if the head sits far ahead
+   of the body's middle. If two directional clips swing the body around when they cross-fade, list them in
+   `animation_exclusive`.
+
+A new *behaviour* (not a new mob) is a new state/condition/action module under `Brain/`, used from a tree.
 
 ---
 
