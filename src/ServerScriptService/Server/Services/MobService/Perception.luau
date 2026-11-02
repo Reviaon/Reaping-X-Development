@@ -32,8 +32,17 @@ function Perception.NearestPlayer(origin: Vector3, range: number): (Model?, numb
 end
 
 function Perception.NearestPlayerDistance(origin: Vector3): number
-	local _, distance = Perception.NearestPlayer(origin, math.huge)
-	return distance
+	local best = math.huge
+
+	for _, player in Players:GetPlayers() do
+		local root = Perception.RootOf(player.Character)
+
+		if root then
+			best = math.min(best, (root.Position - origin).Magnitude)
+		end
+	end
+
+	return best
 end
 
 local function segmentDistance(point: Vector3, from: Vector3, to: Vector3): number

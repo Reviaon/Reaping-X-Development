@@ -19,10 +19,24 @@ return function(B)
 					B.State("Return"),
 				}),
 				B.Sequence({
+					B.Condition("Regrouping"),
+					B.State("Dash", { args = { kind = "regroup" } }),
+				}),
+				B.Sequence({
+					B.Condition("AbilityReady"),
+					B.Condition("AttackReady"),
+					B.State("Attack", { args = { ability = true } }),
+				}),
+				B.Sequence({
 					B.Action("ClaimAttackSlot"),
+					B.Condition("TargetOpen"),
 					B.Selector({
 						B.Sequence({
-							B.Condition("TargetInRange", { range = "attack_range" }),
+							B.Condition("FlankReady"),
+							B.State("Dash", { args = { kind = "flank" } }),
+						}),
+						B.Sequence({
+							B.Condition("AttackInRange"),
 							B.Condition("AttackReady"),
 							B.State("Attack"),
 						}),
@@ -35,6 +49,11 @@ return function(B)
 				}),
 				B.State("Orbit"),
 			}),
+		}),
+
+		B.Sequence({
+			B.Condition("FoodNearby"),
+			B.State("Feed"),
 		}),
 
 		B.State("Wander"),

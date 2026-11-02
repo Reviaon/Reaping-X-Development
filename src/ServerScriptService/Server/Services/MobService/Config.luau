@@ -49,6 +49,14 @@ function Config.Derive(config, body)
 		config.pounce.range = config.pounce.range or config.attack_range * settings.PounceRangeRatio
 	end
 
+	for _, ability in config.abilities or {} do
+		local throw = ability.cinematic and ability.cinematic.Throw
+
+		if throw then
+			throw.Launch = merge(config.launch, throw.Launch or {})
+		end
+	end
+
 	if config.pack then
 		config.pack.clearance = config.pack.clearance or attack.reach + settings.ClearanceMargin
 		config.pack.orbit_radius = config.pack.orbit_radius or math.max(attack.reach * settings.OrbitReachRatio, settings.MinOrbitRadius)

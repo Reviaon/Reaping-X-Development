@@ -59,7 +59,7 @@ local function resolve(kind, name: string)
 	local published = folder and folder:FindFirstChild(kind.Name)
 	local animation = published and published:FindFirstChild(name)
 
-	if not animation or not animation:IsA("Animation") then
+	if not animation or not animation:IsA("Animation") or not string.match(animation.AnimationId, "%d") then
 		animation = fromSaves(kind, name)
 	end
 
@@ -100,7 +100,7 @@ function Animation:Track(key: string): AnimationTrack?
 	return track
 end
 
-function Animation:PlayAction(key: string, speed: number?): AnimationTrack?
+function Animation:PlayAction(key: string, speed: number?, position: number?): AnimationTrack?
 	if self.Culled then return nil end
 
 	local track = self:Track(key)
@@ -110,7 +110,16 @@ function Animation:PlayAction(key: string, speed: number?): AnimationTrack?
 	track.Looped = false
 	track:Play(Animation.Settings.ActionFade, 1, speed or 1)
 
+	if position then
+		track.TimePosition = position
+	end
+
 	return track
+end
+
+function Animation:Position(key: string): number?
+	local track = self.Tracks[key]
+	return if track and track.IsPlaying then track.TimePosition else nil
 end
 
 function Animation:Stop(key: string, fade: number?)

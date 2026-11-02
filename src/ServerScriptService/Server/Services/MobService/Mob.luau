@@ -14,6 +14,7 @@ local Mob = {}
 Mob.__index = Mob
 
 local DISABLING = { IsStunned = true, InPairScene = true, IsRagdolled = true }
+local LAUNCH_STUN_ATTRIBUTE = "LaunchStun"
 
 local random = Random.new()
 
@@ -65,6 +66,10 @@ function Mob.new(kind, model: Model, home: Vector3)
 	if self.Facing then
 		self.Facing.CFrame = self.Root.CFrame.Rotation
 		self.Facing.Enabled = true
+	end
+
+	if self.Config.launch_stun then
+		model:SetAttribute(LAUNCH_STUN_ATTRIBUTE, self.Config.launch_stun)
 	end
 
 	self.Machine = StateMachine.new(self)
@@ -130,6 +135,10 @@ function Mob:SetTarget(target: Model?)
 		self.Team:ReleaseSlot(self)
 	end
 
+	if target and not self.Target then
+		self.Blackboard.AggroAt = os.clock()
+	end
+
 	self.Target = target
 end
 
@@ -174,20 +183,24 @@ function Mob:LeadPoint(seconds: number): Vector3
 	return root.Position + Vector3.new(velocity.X, 0, velocity.Z) * seconds
 end
 
-function Mob:EngagePoint(target: Vector3): Vector3
+function Mob:EngagePoint(target: Vector3, distance: number?): Vector3
 	local config = self.Config
 	local offset = target - self.Root.Position
 	local planar = Vector3.new(offset.X, 0, offset.Z)
 
 	if planar.Magnitude <= 1e-3 then return target end
 
-	local engage = config.engage_distance or config.attack.reach
+	local engage = distance or config.engage_distance or config.attack.reach
 
 	return target - planar.Unit * math.min(engage, planar.Magnitude)
 end
 
-function Mob:Burst(speed: number)
+function Mob:Burst(speed: number, unbraked: number?)
 	self.Speed = math.max(self.Speed, speed)
+
+	if unbraked then
+		self.FreeUntil = os.clock() + unbraked
+	end
 end
 
 function Mob:DistanceTo(position: Vector3): number

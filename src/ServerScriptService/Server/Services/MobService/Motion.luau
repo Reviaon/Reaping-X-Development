@@ -35,6 +35,7 @@ end
 local function arrivalCap(mob): number
 	local deceleration = mob.Config.deceleration
 	if not deceleration or not mob.Moving or mob.Stopping or not mob.Destination then return math.huge end
+	if mob.FreeUntil and os.clock() < mob.FreeUntil then return math.huge end
 
 	local remaining = flat(mob.Destination - mob.Root.Position).Magnitude - Motion.Settings.ArriveDistance
 
