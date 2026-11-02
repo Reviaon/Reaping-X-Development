@@ -4,6 +4,7 @@ local KnockbackHandler = Jloader.CreateHandler({ Name = script.Name })
 
 local CombatService = Jloader.GetService("CombatService")
 local KnockbackService = Jloader.GlobalFunctions.KnockbackService
+local PairSceneService = Jloader.GlobalFunctions.PairSceneService
 local RagdollService = Jloader.GlobalFunctions.RagdollService
 local TrajectoryService = Jloader.GlobalFunctions.TrajectoryService
 
@@ -29,6 +30,7 @@ function KnockbackHandler:Launch(victim, velocity, landing, motion)
 	end
 
 	if victim ~= Players.LocalPlayer.Character then return true end
+	if PairSceneService.IsCarried(victim) then return true end
 
 	return RagdollService.Launch(victim, velocity, motion)
 end
@@ -46,6 +48,12 @@ function KnockbackHandler:Init()
 
 	CombatService.Launch:Connect(function(victim, velocity, landing, motion)
 		KnockbackHandler:Launch(victim, velocity, landing, motion)
+	end)
+
+	CombatService.KnockbackCancel:Connect(function(victim)
+		if typeof(victim) == "Instance" then
+			KnockbackService.Cancel(victim)
+		end
 	end)
 end
 

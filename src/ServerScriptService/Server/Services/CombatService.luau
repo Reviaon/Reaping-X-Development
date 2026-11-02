@@ -5,8 +5,8 @@ local GlobalFunctions = Jloader.GlobalFunctions
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
 	Signals = {
-		Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch" },
-		Basic = { "Provoked" },
+		Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch", "KnockbackCancel" },
+		Basic = { "Provoked", "Swung" },
 	},
 })
 
@@ -41,6 +41,7 @@ CombatService.Settings = {
 	GroundLaunch = {
 		Duration = 0.9, --@ Seconds the slide lasts while its speed decays to zero
 		RampIn = 0.05, --@ Seconds to reach full speed
+		StunAttribute = "LaunchStun", --@ Number attribute capping the stun on the victim (mobs set it from launch_stun)
 	},
 }
 
@@ -104,7 +105,10 @@ function CombatService:ApplyGroundLaunch(victim: Model, direction: Vector3, fini
 
 	if not recipe then return false end
 
-	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
+	local cap = victim:GetAttribute(launch.StunAttribute)
+	local stun = if typeof(cap) == "number" then math.min(cap, finisher.ragdoll) else finisher.ragdoll
+
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, stun)
 
 	self.Knockback:FireAll(victim, recipe)
 	KnockbackService.Apply(victim, recipe)
@@ -147,17 +151,18 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 	end
 
 	local motion = { spin = finisher.spin, twist = finisher.twist, flail = finisher.flail }
+	local carried = GlobalFunctions.PairSceneService.Carry(victim, velocity, landing, motion)
 
 	self.Launch:FireAll(victim, velocity, landing, motion)
 
-	if not Players:GetPlayerFromCharacter(victim) then
+	if not carried and not Players:GetPlayerFromCharacter(victim) then
 		RagdollService.Launch(victim, velocity, motion)
 	end
 
 	return true
 end
 
-function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number)
+function CombatService:CanHit(attacker: Model, victim: Model, profile): boolean
 	profile = profile or GlobalFunctions.ServerController:GetProfile(victim)
 	if not profile then return false end
 
@@ -173,6 +178,47 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 		return false
 	end
 	if getBlockService():Absorb(attacker, victim) then return false end
+
+	return true
+end
+
+local THROW_DIRECTIONS = {
+	Left = function(frame: CFrame) return -frame.RightVector end,
+	Right = function(frame: CFrame) return frame.RightVector end,
+	Forward = function(frame: CFrame) return frame.LookVector end,
+	Back = function(frame: CFrame) return -frame.LookVector end,
+}
+
+function CombatService:ApplyThrow(thrower: Model, victim: Model, throw): boolean
+	local throwerRoot, victimRoot = rootOf(thrower), rootOf(victim)
+	if not throwerRoot or not victimRoot then return false end
+	if not GlobalFunctions.StatusService:IsAlive(victim) then return false end
+
+	local pick = THROW_DIRECTIONS[throw.Direction]
+	local direction = if pick then pick(throwerRoot.CFrame) else GlobalFunctions.PositionService.Aim(thrower, victim)
+	direction = Vector3.new(direction.X, 0, direction.Z)
+
+	if direction.Magnitude <= 0 then return false end
+	if not self:ApplyFinisher(victim, direction.Unit, throw.Launch) then return false end
+
+	if throw.Damage and throw.Damage > 0 then
+		self:SceneStrike(victim, { Damage = throw.Damage })
+	end
+
+	return true
+end
+
+function CombatService:ApplyLaunch(attacker: Model, victim: Model, launch): boolean
+	if not self:CanHit(attacker, victim) then return false end
+
+	local direction = GlobalFunctions.PositionService.Aim(attacker, victim)
+	if direction.Magnitude <= 0 then return false end
+
+	return self:ApplyFinisher(victim, direction, launch)
+end
+
+function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, hitstun: number?)
+	if not self:CanHit(attacker, victim, profile) then return false end
 
 	local direction, away = GlobalFunctions.PositionService.Aim(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
@@ -202,12 +248,7 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 
 	if not recipe then return false end
 
-	local hitstun = Hitstun.Resolve(weaponId, comboIndex)
-
-	if hitstun and hitstun > 0 then
-		GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, hitstun)
-		getBlockService():Lock(victim, hitstun)
-	end
+	self:Stun(victim, hitstun or Hitstun.Resolve(weaponId, comboIndex))
 
 	--@ Every client draws it; the server drives only what it owns. Fired before Apply so the
 	--@ recipe is serialised exactly as built.
@@ -371,6 +412,7 @@ function CombatService:HandleSwingReport(player: Player, weaponId, comboIndex)
 	local timing = CombatConfig:ResolveAttackTiming(nil, math.floor(comboIndex), weaponConfig)
 
 	getBlockService():BeginSwing(character, timing.duration)
+	self.Swung:Fire(character, weaponId, comboIndex)
 end
 
 function CombatService:HandleRootReport(player: Player, payload)
@@ -431,6 +473,18 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 	self:LandHit(attacker, victim, profile, weaponId, math.floor(comboIndex), player)
 end
 
+function CombatService:CancelKnockback(victim: Model)
+	GlobalFunctions.KnockbackService.Cancel(victim)
+	self.KnockbackCancel:FireAll(victim)
+end
+
+function CombatService:Stun(victim: Model, seconds: number?)
+	if not seconds or seconds <= 0 then return end
+
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, seconds)
+	getBlockService():Lock(victim, seconds)
+end
+
 function CombatService:SceneStrike(target: Model, hit)
 	local humanoid = target:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
@@ -459,6 +513,14 @@ function CombatService:Init()
 
 	self.ReportSwing:Connect(function(player, weaponId, comboIndex)
 		self:HandleSwingReport(player, weaponId, comboIndex)
+	end)
+
+	GlobalFunctions.PairSceneService.Launched:Connect(function(scene, character, partner)
+		local throw = scene.Definition.Throw
+
+		if throw then
+			self:ApplyThrow(partner, character, throw)
+		end
 	end)
 
 	GlobalFunctions.PairSceneService.Struck:Connect(function(_, _, target, hit)

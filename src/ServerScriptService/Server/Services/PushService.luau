@@ -305,7 +305,9 @@ function PushService:Init()
 		end
 	end)
 
-	GlobalFunctions.PairSceneService.Launched:Connect(function(_, character, partner)
+	GlobalFunctions.PairSceneService.Launched:Connect(function(scene, character, partner)
+		if scene.Definition.Throw then return end
+
 		self:LaunchAway(partner, character)
 	end)
 

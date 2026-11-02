@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local StatusService = require("./StatusService")
 local AnimatorService = require("./AnimatorService")
 local DebugService = require("./DebugService")
+local TrajectoryService = require("./TrajectoryService")
 local Signal = require("../Signal")
 
 local Config = require("@self/Config")
@@ -29,8 +30,12 @@ local active = {}
 local members = {}
 local predictions = {}
 local heldRoots = {}
+local carries = {}
+local carried = setmetatable({}, { __mode = "k" })
+local heldFrames = setmetatable({}, { __mode = "k" })
 local sceneTracks = setmetatable({}, { __mode = "k" })
 local guards = {}
+local followBones = setmetatable({}, { __mode = "k" })
 local nextId = 0
 local stepper = nil
 
@@ -48,6 +53,71 @@ local function liveFolder(): Instance?
 	end
 
 	return found
+end
+
+local function boneOf(model: Model, name: string): Bone?
+	local found = model:FindFirstChild(name, true)
+	return if found and found:IsA("Bone") then found else nil
+end
+
+local function shaken(character: Model, frame: CFrame, across: Vector3): CFrame
+	local shake = character:GetAttribute(Config.FollowShakeAttribute)
+	if typeof(shake) ~= "Vector3" then return frame end
+
+	local t = workspace:GetServerTimeNow() % 1e4 * shake.Z
+	local sway = math.noise(t, 1.3) * 2
+	local twist = math.noise(t, 5.9) * 2
+	local position = frame.Position + across * (sway * shake.Y)
+
+	return CFrame.new(position) * CFrame.Angles(0, math.rad(shake.X) * twist, 0) * frame.Rotation
+end
+
+local function followFrame(character: Model, partner: Model?): CFrame?
+	local boneName = character:GetAttribute(Config.FollowAttribute)
+	local offset = character:GetAttribute(Config.FollowOffsetAttribute)
+
+	if typeof(boneName) ~= "string" or typeof(offset) ~= "CFrame" or not partner then return nil end
+
+	local partnerRoot = partner:FindFirstChild("HumanoidRootPart")
+	if not partnerRoot then return nil end
+
+	local bone = followBones[character]
+
+	if not bone or bone.Name ~= boneName or not bone:IsDescendantOf(partner) then
+		bone = boneOf(partner, boneName)
+		followBones[character] = bone
+	end
+
+	if not bone then return nil end
+
+	return shaken(character, bone.TransformedWorldCFrame * offset, partnerRoot.CFrame.RightVector)
+end
+
+local function startFollow(character: Model, partner: Model, follow): boolean
+	local partnerRoot = partner:FindFirstChild("HumanoidRootPart")
+	local bone = boneOf(partner, follow.Bone)
+
+	if not partnerRoot or not bone then return false end
+
+	local boneFrame = bone.TransformedWorldCFrame
+	local held = (partnerRoot.CFrame.Rotation + boneFrame.Position) * (follow.Offset or CFrame.identity)
+	local shake = follow.Shake
+
+	character:SetAttribute(Config.FollowAttribute, follow.Bone)
+	character:SetAttribute(Config.FollowOffsetAttribute, boneFrame:ToObjectSpace(held))
+
+	if shake then
+		character:SetAttribute(Config.FollowShakeAttribute, Vector3.new(shake.Angle or 0, shake.Offset or 0, shake.Frequency or 0))
+	end
+
+	return true
+end
+
+local function clearFollow(character: Model)
+	followBones[character] = nil
+	character:SetAttribute(Config.FollowAttribute, nil)
+	character:SetAttribute(Config.FollowOffsetAttribute, nil)
+	character:SetAttribute(Config.FollowShakeAttribute, nil)
 end
 
 local function anchorOf(character: Instance?): CFrame?
@@ -72,18 +142,201 @@ local function hold(root: BasePart, anchor: CFrame)
 	end
 end
 
+local function limbsOf(character: Model): { [Motor6D]: BasePart }
+	local torso = character:FindFirstChild("Torso")
+	local limbs = {}
+
+	if not torso then return limbs end
+
+	for _, name in Config.LooseJoints do
+		local motor = torso:FindFirstChild(name)
+
+		if motor and motor:IsA("Motor6D") and motor.Part1 then
+			limbs[motor] = motor.Part1
+		end
+	end
+
+	return limbs
+end
+
+local function torsoFrameOf(character: Model): CFrame?
+	local root = rootOf(character)
+	local rootJoint = root and root:FindFirstChild("RootJoint")
+	if not rootJoint or not rootJoint:IsA("Motor6D") then return nil end
+
+	return root.CFrame * rootJoint.C0 * rootJoint.C1:Inverse()
+end
+
+local function seat(limb: BasePart, motor: Motor6D, torsoFrame: CFrame, anchored: boolean)
+	limb.Anchored = anchored
+	limb.CFrame = torsoFrame * motor.C0 * motor.C1:Inverse()
+	limb.AssemblyLinearVelocity = Vector3.zero
+	limb.AssemblyAngularVelocity = Vector3.zero
+end
+
+local function seatLimbs(character: Model, anchored: boolean)
+	local torsoFrame = torsoFrameOf(character)
+	if not torsoFrame then return end
+
+	for motor, limb in limbsOf(character) do
+		seat(limb, motor, torsoFrame, anchored)
+	end
+end
+
+local function loosen(character: Model)
+	character:SetAttribute(Config.LooseAttribute, true)
+	seatLimbs(character, true)
+end
+
+local function loosenLocally(character: Model)
+	local torsoFrame = torsoFrameOf(character)
+	if not torsoFrame then return end
+
+	for motor, limb in limbsOf(character) do
+		if limb.Anchored then
+			seat(limb, motor, torsoFrame, false)
+		else
+			limb.CFrame += torsoFrame * motor.C0.Position - limb.CFrame * motor.C1.Position
+		end
+	end
+end
+
+local function place(character: Model, partner: Model)
+	local root = rootOf(character)
+	local followed = root and followFrame(character, partner)
+
+	if followed then
+		root.CFrame = followed
+	end
+end
+
 local function unanchor(character: Model)
 	local root = rootOf(character)
 	if not root or not root.Parent then return end
 
+	if character:GetAttribute(Config.LooseAttribute) then
+		character:SetAttribute(Config.LooseAttribute, nil)
+
+		for _, limb in limbsOf(character) do
+			limb.Anchored = false
+		end
+	end
+
 	root.Anchored = false
 
 	local player = Players:GetPlayerFromCharacter(character)
+	if not player then return end
 
-	if player and root:CanSetNetworkOwnership() then
-		root:SetNetworkOwner(player)
+	local parts = { root }
+
+	for _, limb in limbsOf(character) do
+		table.insert(parts, limb)
+	end
+
+	for _, part in parts do
+		if part:CanSetNetworkOwnership() then
+			part:SetNetworkOwner(player)
+		end
 	end
 end
+
+local function isCarried(character: Instance?): boolean
+	return character ~= nil and character:GetAttribute(Config.CarryAttribute) ~= nil
+end
+
+local function carryFrame(character: Model, elapsed: number, origin: CFrame?, duration: number?): CFrame?
+	local velocity = character:GetAttribute(Config.CarryAttribute)
+	local from = origin or character:GetAttribute(Config.CarryFromAttribute)
+	local spin = character:GetAttribute(Config.CarrySpinAttribute)
+	local flight = duration or character:GetAttribute(Config.CarryTimeAttribute)
+
+	if typeof(velocity) ~= "Vector3" or typeof(from) ~= "CFrame" or typeof(flight) ~= "number" then return nil end
+
+	local t = math.clamp(elapsed, 0, flight)
+	local position = from.Position + velocity * t + Vector3.new(0, -0.5 * workspace.Gravity * t * t, 0)
+	local rotation = from.Rotation
+
+	if typeof(spin) == "Vector3" and spin.Magnitude > 1e-4 then
+		rotation = CFrame.fromAxisAngle(spin.Unit, spin.Magnitude * t) * rotation
+	end
+
+	return rotation + position
+end
+
+local function carryEntry(character: Model, root: BasePart)
+	local from = character:GetAttribute(Config.CarryFromAttribute)
+	local entry = carried[character]
+
+	if entry and entry.From == from then return entry end
+
+	local velocity = character:GetAttribute(Config.CarryAttribute)
+	local origin = heldFrames[character] or root.CFrame
+	local _, landing = TrajectoryService.Arc(origin.Position, velocity, root.Size)
+
+	entry = {
+		From = from,
+		Origin = origin,
+		Velocity = velocity,
+		Duration = if landing then landing.Time else character:GetAttribute(Config.CarryTimeAttribute),
+		SeenAt = os.clock(),
+	}
+	carried[character] = entry
+
+	return entry
+end
+
+local function clearCarry(character: Model)
+	character:SetAttribute(Config.CarryAttribute, nil)
+	character:SetAttribute(Config.CarryFromAttribute, nil)
+	character:SetAttribute(Config.CarrySpinAttribute, nil)
+	character:SetAttribute(Config.CarryTimeAttribute, nil)
+end
+
+local function land(character: Model)
+	carries[character] = nil
+
+	local root = rootOf(character)
+	local frame = carryFrame(character, math.huge)
+
+	clearCarry(character)
+
+	if root and frame and not Players:GetPlayerFromCharacter(character) then
+		root.CFrame = frame
+	end
+
+	unanchor(character)
+end
+
+function PairSceneService.Carry(character: Model, velocity: Vector3, landing, motion): boolean
+	assert(IS_SERVER, "PairSceneService.Carry runs on the server")
+
+	local root = rootOf(character)
+	if not root or not root.Anchored or not character:GetAttribute(Config.LooseAttribute) then return false end
+
+	local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+	local spin = Vector3.zero
+
+	if typeof(motion) == "table" and typeof(motion.spin) == "number" and horizontal.Magnitude > 1e-3 then
+		spin = Vector3.new(0, 1, 0):Cross(horizontal.Unit) * math.rad(motion.spin)
+	end
+
+	local duration = if typeof(landing) == "table" and typeof(landing.Time) == "number" then landing.Time else Config.CarryTimeout
+
+	character:SetAttribute(Config.CarryFromAttribute, root.CFrame)
+	character:SetAttribute(Config.CarrySpinAttribute, spin)
+	character:SetAttribute(Config.CarryTimeAttribute, duration)
+	character:SetAttribute(Config.CarryAttribute, velocity)
+
+	if carries[character] then
+		task.cancel(carries[character])
+	end
+
+	carries[character] = task.delay(duration + Config.CarryGrace, land, character)
+
+	return true
+end
+
+PairSceneService.IsCarried = isCarried
 
 local function roleOf(scene, character: Model): string
 	return if character == scene.Attacker then "Attacker" else "Victim"
@@ -91,7 +344,7 @@ end
 
 local function configuredRagdoll(scene, character: Model): number?
 	local outcome = scene.Outcome and scene.Definition.Outcomes[scene.Outcome]
-	local ragdolls = outcome and outcome.Ragdoll
+	local ragdolls = outcome and outcome.Ragdoll or scene.Definition.ReleaseRagdoll
 
 	return ragdolls and ragdolls[roleOf(scene, character)]
 end
@@ -114,18 +367,28 @@ local function ragdoll(character: Model, duration: number)
 	StatusService:ApplyStatus(character, "IsStunned", true, duration)
 end
 
+local function launch(scene, character: Model)
+	PairSceneService.Launched:Fire(scene, character, partnerIn(scene, character))
+
+	if not isCarried(character) then
+		unanchor(character)
+	end
+end
+
 local function freeMember(scene, character: Model)
 	if not active[scene] or scene.Freed[character] then return end
 
 	if launches(scene, character) then
-		PairSceneService:Free(scene, character)
-		PairSceneService.Launched:Fire(scene, character, partnerIn(scene, character))
+		PairSceneService:Free(scene, character, true)
+		launch(scene, character)
 		return
 	end
 
 	scene.Freed[character] = true
 	character:SetAttribute(Config.AnchorAttribute, nil)
+	place(character, partnerIn(scene, character))
 	unanchor(character)
+	clearFollow(character)
 
 	ragdoll(character, configuredRagdoll(scene, character) or scene.Definition.MarkerRagdoll or Config.MarkerRagdoll)
 end
@@ -157,8 +420,11 @@ local function adopt(scene, character: Model, track: AnimationTrack)
 end
 
 local function settleMember(scene, character: Model): boolean
+	local anchor = anchorOf(character)
+	if not anchor then return false end
+
 	local root = rootOf(character)
-	local settled = root and Placement.Settled(character, anchorOf(character))
+	local settled = root and Placement.Settled(character, anchor)
 
 	if not settled then return false end
 
@@ -383,6 +649,13 @@ local function step()
 			continue
 		end
 
+		local ending = scene.EndTrack
+
+		if ending and not scene.Outcome and ending.Length > 0 and (not ending.IsPlaying or ending.TimePosition >= ending.Length - Config.HoldLastFrame) then
+			scene.EndTrack = nil
+			scene.EndsAt = os.clock()
+		end
+
 		if scene.EndsAt and os.clock() >= scene.EndsAt then
 			local timeout = scene.Definition.TimeoutOutcome
 
@@ -421,11 +694,30 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 
 	options = options or {}
 
-	if not PairSceneService.Supports(attacker) or not PairSceneService.Supports(victim) then
-		return nil, "rig can't play paired scenes"
+	if not PairSceneService.Supports(victim) then
+		return nil, "victim's rig can't play paired scenes"
+	end
+
+	if definition.AttackerRig ~= "Any" and not PairSceneService.Supports(attacker) then
+		return nil, "attacker's rig can't play paired scenes"
 	end
 
 	if members[attacker] or members[victim] then return nil, "already in a scene" end
+	if isCarried(attacker) or isCarried(victim) then return nil, "in flight" end
+
+	local RagdollService = require("./RagdollService")
+	local downed = RagdollService.IsRagdolled(victim)
+
+	if downed and definition.Victim.Ragdolled then
+		local side = table.clone(definition.Victim)
+
+		for key, value in definition.Victim.Ragdolled do
+			side[key] = value
+		end
+
+		definition = table.clone(definition)
+		definition.Victim = side
+	end
 
 	local victimPlaced, attackerPlaced = Placement.Place(definition, attacker, victim)
 	if not victimPlaced or not attackerPlaced then return nil, "no clear ground for the scene" end
@@ -438,7 +730,7 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 		Attacker = attacker,
 		Victim = victim,
 		StartedAt = os.clock(),
-		EndsAt = definition.Duration and os.clock() + definition.Duration or nil,
+		EndsAt = if typeof(definition.Duration) == "number" then os.clock() + definition.Duration else nil,
 		OnRelease = options.OnRelease,
 		Predicted = options.Predicted == true,
 		Sequences = {},
@@ -457,8 +749,15 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 
 		character:SetAttribute(Config.SceneAttribute, scene.Id)
 		character:SetAttribute(Config.TracksAttribute, ids)
-		character:SetAttribute(Config.AnchorAttribute, placed)
-		hold(rootOf(character), placed)
+
+		if side.Anchor ~= false then
+			character:SetAttribute(Config.AnchorAttribute, placed)
+			hold(rootOf(character), placed)
+		end
+
+		if not side.Ragdoll and RagdollService.IsRagdolled(character) then
+			StatusService:RemoveStatus(character, RagdollService.Settings.Status)
+		end
 
 		StatusService:SetStatus(character, Config.Status, true)
 
@@ -475,12 +774,35 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 		adopt(scene, victim, track)
 	end))
 
-	table.insert(scene.Sequences, PairSceneService.Sequence(attacker, definition.Attacker, definition, age, function(track)
+	local attackerSequence = PairSceneService.Sequence(attacker, definition.Attacker, definition, age, function(track)
 		adopt(scene, attacker, track)
-	end, scene.Predicted))
+	end, scene.Predicted)
+
+	table.insert(scene.Sequences, attackerSequence)
+
+	if definition.Duration == "Attacker" then
+		scene.EndTrack = attackerSequence.Tracks[1]
+	end
 
 	guard(attacker)
 	guard(victim)
+
+	for _, member in { { attacker, definition.Attacker }, { victim, definition.Victim } } do
+		local character, side = member[1], member[2]
+		local follow = side.Follow
+
+		if follow then
+			startFollow(character, if character == attacker then victim else attacker, follow)
+		end
+
+		if side.Ragdoll then
+			ragdoll(character, side.Ragdoll)
+
+			if side.Anchor ~= false then
+				loosen(character)
+			end
+		end
+	end
 
 	active[scene] = true
 
@@ -540,11 +862,19 @@ function PairSceneService:Release(scene, reason: string?)
 		character:SetAttribute(Config.SceneAttribute, nil)
 		character:SetAttribute(Config.TracksAttribute, nil)
 		character:SetAttribute(Config.AnchorAttribute, nil)
-		character:SetAttribute(Config.OutcomeAttribute, nil)
+
+		local launching = not freed and character.Parent ~= nil and launches(scene, character)
 
 		if not freed then
-			unanchor(character)
+			place(character, partnerIn(scene, character))
+
+			if not launching then
+				unanchor(character)
+			end
 		end
+
+		clearFollow(character)
+		character:SetAttribute(Config.OutcomeAttribute, nil)
 
 		if character.Parent then
 			StatusService:RemoveStatus(character, Config.Status)
@@ -555,8 +885,8 @@ function PairSceneService:Release(scene, reason: string?)
 
 			local fallback = configuredRagdoll(scene, character)
 
-			if not freed and launches(scene, character) then
-				PairSceneService.Launched:Fire(scene, character, partnerIn(scene, character))
+			if launching then
+				launch(scene, character)
 			elseif not freed and fallback then
 				ragdoll(character, fallback)
 			end
@@ -568,7 +898,7 @@ function PairSceneService:Release(scene, reason: string?)
 	end
 end
 
-function PairSceneService:Free(scene, character: Model): boolean
+function PairSceneService:Free(scene, character: Model, held: boolean?): boolean
 	assert(IS_SERVER, "PairSceneService:Free runs on the server")
 
 	if not active[scene] or scene.Left[character] then return false end
@@ -590,8 +920,14 @@ function PairSceneService:Free(scene, character: Model): boolean
 	character:SetAttribute(Config.SceneAttribute, nil)
 	character:SetAttribute(Config.TracksAttribute, nil)
 	character:SetAttribute(Config.AnchorAttribute, nil)
+	place(character, partnerIn(scene, character))
+
+	if not held then
+		unanchor(character)
+	end
+
+	clearFollow(character)
 	character:SetAttribute(Config.OutcomeAttribute, nil)
-	unanchor(character)
 
 	if character.Parent then
 		StatusService:RemoveStatus(character, Config.Status)
@@ -639,6 +975,16 @@ function PairSceneService:Resolve(scene, outcomeName: string): boolean
 
 	PairSceneService.Resolved:Fire(scene, outcomeName)
 
+	for role, delay in outcome.ReleaseAt or {} do
+		local character = if role == "Attacker" then scene.Attacker else scene.Victim
+
+		task.delay(delay, function()
+			if active[scene] and scene.Outcome == outcomeName and not scene.Freed[character] then
+				freeMember(scene, character)
+			end
+		end)
+	end
+
 	scene.OutcomeThread = task.spawn(function()
 		local began = os.clock()
 
@@ -677,27 +1023,47 @@ function PairSceneService.HoldAnchors()
 	if live then
 		for _, character in live:GetChildren() do
 			local anchor = anchorOf(character)
-			local root = anchor and rootOf(character)
+			local root = (anchor or isCarried(character)) and rootOf(character)
+			local entry = root and not anchor and carryEntry(character, root)
+			local flight = entry and carryFrame(character, os.clock() - entry.SeenAt, entry.Origin, entry.Duration)
 
-			if root then
+			if root and (anchor or flight) then
+				local frame = flight or followFrame(character, (PairSceneService.PartnerOf(character))) or anchor
+
 				heldRoots[root] = true
-				hold(root, anchor)
+				heldFrames[character] = frame
+				hold(root, frame)
+
+				if character:GetAttribute(Config.LooseAttribute) then
+					loosenLocally(character)
+				end
 			end
 		end
 	end
 
+	local own = Players.LocalPlayer and Players.LocalPlayer.Character
+
 	for root in heldRoots do
 		local character = root.Parent
-		if anchorOf(character) or (character and predictions[character]) then continue end
+		if anchorOf(character) or isCarried(character) or (character and predictions[character]) then continue end
 
 		heldRoots[root] = nil
 
-		if character then
-			root.Anchored = false
+		if not character then continue end
+
+		root.Anchored = false
+
+		local thrown = carried[character]
+		carried[character] = nil
+
+		if thrown and character == own then
+			local t = os.clock() - thrown.SeenAt
+
+			root.AssemblyLinearVelocity = if t < thrown.Duration
+				then thrown.Velocity + Vector3.new(0, -workspace.Gravity * t, 0)
+				else Vector3.new(thrown.Velocity.X, 0, thrown.Velocity.Z) * Config.LandingCarry
 		end
 	end
-
-	local own = Players.LocalPlayer and Players.LocalPlayer.Character
 
 	if own then
 		guard(own)

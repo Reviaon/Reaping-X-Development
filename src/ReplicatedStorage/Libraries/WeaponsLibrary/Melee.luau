@@ -6,7 +6,7 @@ return{
 	--@ Primary tuning knob: animation playback multiplier (1 = as authored). Every timing
 	--@ in this file is written at 1x and divided by this at runtime - see
 	--@ CombatHandler.Config:ResolveAttackTiming. Number, or a table keyed by combo index.
-	attack_speed = 1,
+	attack_speed = 1.35,
 
 	attack_cooldown = 0.5,
 	attack_cooldown_final = 1,
