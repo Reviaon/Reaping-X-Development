@@ -106,6 +106,23 @@ local TackleLibrary = {
 		},
 	},
 
+	Impact = {
+		Variant = "Impact",
+		ConfirmWindow = 1,
+		Damage = 10,
+		SkidCarry = 0.25,
+
+		Launch = {
+			ragdoll = 1.2,
+			recovery = 0,
+			speed = 34,
+			lift = 0,
+			spin = 0,
+			twist = 0,
+			flail = 0,
+		},
+	},
+
 	Report = {
 		MaxAge = 0.5,
 		MaxDistance = 14,
