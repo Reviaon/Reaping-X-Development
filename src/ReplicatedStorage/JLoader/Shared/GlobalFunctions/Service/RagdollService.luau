@@ -292,6 +292,42 @@ function RagdollService.Ragdoll(character: Model, duration: number)
 	return handle
 end
 
+function RagdollService.Sever(character: Model, limb: BasePart)
+	local rig = rigs[character]
+
+	if rig then
+		for index = #rig.joints, 1, -1 do
+			if rig.joints[index].limb == limb then
+				table.remove(rig.joints, index)
+			end
+		end
+	end
+
+	local folder = character:FindFirstChild(RagdollService.Settings.RigName)
+
+	for _, item in folder and folder:GetChildren() or {} do
+		if item:IsA("BallSocketConstraint") then
+			local attached = (item.Attachment0 and item.Attachment0.Parent == limb) or (item.Attachment1 and item.Attachment1.Parent == limb)
+
+			if attached then
+				item:Destroy()
+			end
+		elseif item:IsA("BasePart") then
+			local weld = item:FindFirstChildOfClass("WeldConstraint")
+
+			if weld and weld.Part0 == limb then
+				item:Destroy()
+			end
+		end
+	end
+
+	for _, joint in character:GetDescendants() do
+		if joint:IsA("Motor6D") and joint.Part1 == limb then
+			joint:Destroy()
+		end
+	end
+end
+
 function RagdollService.IsRagdolled(character: Model): boolean
 	return character:GetAttribute(RagdollService.Settings.Status) == true
 end
