@@ -14,7 +14,7 @@ PushService.Settings = {
 	--@ Seconds. A push is accepted this much sooner than PushLibrary.Cooldown, for jitter.
 	CooldownLeniency = 0.2,
 
-	--@ Studs. A push reported on a victim further than this is dropped as implausible.
+	--@ Studs from the pusher's root to the victim's body. A push reported from further is dropped as implausible.
 	MaxReportDistance = 14,
 }
 
@@ -238,12 +238,14 @@ function PushService:HandleHit(player: Player, victim)
 	local attackerRoot, victimRoot = rootOf(attacker), rootOf(victim)
 	if not attackerRoot or not victimRoot then return end
 
-	if (victimRoot.Position - attackerRoot.Position).Magnitude > self.Settings.MaxReportDistance then return end
+	if GlobalFunctions.PositionService.SurfaceDistance(attackerRoot.Position, victim) > self.Settings.MaxReportDistance then return end
 
 	push.Hit = true
 
 	if self:StartGrab(attacker, victim) then return end
 	if not self:Apply(attacker, victim) then return end
+
+	getCombatService().Provoked:Fire(attacker, victim)
 
 	local payload = GlobalFunctions.AttackService:HitPayload(attacker, victim, variant.Hitbox.effect, "Push", 1, PushLibrary.Reaction)
 

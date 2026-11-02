@@ -112,4 +112,17 @@ function PositionService.Aim(attacker, victim): (Vector3, Vector3)
 	return direction, away or direction
 end
 
+function PositionService.SurfaceDistance(position: Vector3, model: Model): number
+	local frame, size = model:GetBoundingBox()
+	local relative = frame:PointToObjectSpace(position)
+	local half = size / 2
+	local clamped = Vector3.new(
+		math.clamp(relative.X, -half.X, half.X),
+		math.clamp(relative.Y, -half.Y, half.Y),
+		math.clamp(relative.Z, -half.Z, half.Z)
+	)
+
+	return (relative - clamped).Magnitude
+end
+
 return PositionService

@@ -46,7 +46,8 @@ function TackleService:CheckHit(player: Player, victim, hitAt, variant): (string
 	local report = TackleLibrary.Report
 	local tackle = tackles[player]
 	local attacker = player and player.Character
-	local definition = typeof(variant) == "string" and TackleLibrary.Grapples[variant]
+	local definition = typeof(variant) == "string"
+		and (TackleLibrary.Grapples[variant] or (variant == TackleLibrary.Impact.Variant and TackleLibrary.Impact))
 
 	if not attacker then return "no character" end
 	if not definition then return `unknown variant {tostring(variant)}` end
@@ -74,10 +75,29 @@ function TackleService:CheckHit(player: Player, victim, hitAt, variant): (string
 	if PairSceneService.SceneOf(attacker) then return "tackler is already in a scene" end
 	if PairSceneService.SceneOf(victim) then return `{victim.Name} is already in a scene` end
 
-	local distance = (victimRoot.Position - attackerRoot.Position).Magnitude
+	local impact = definition == TackleLibrary.Impact
+	if impact and PairSceneService.Supports(victim) then return `{victim.Name} can be grappled, not knocked down` end
+	if not impact and not PairSceneService.Supports(victim) then return `{victim.Name} can't be grappled` end
+
+	local distance = GlobalFunctions.PositionService.SurfaceDistance(attackerRoot.Position, victim)
 	if distance > report.MaxDistance then return `{victim.Name} is {math.floor(distance)} studs away on the server` end
 
 	return nil, attacker, math.max(age, 0), definition
+end
+
+function TackleService:Impact(attacker: Model, victim: Model)
+	local impact = TackleLibrary.Impact
+	local CombatService = Jloader.GetService("CombatService")
+	local offset = rootOf(victim).Position - rootOf(attacker).Position
+	local direction = Vector3.new(offset.X, 0, offset.Z)
+
+	if direction.Magnitude <= 0 then
+		direction = rootOf(attacker).CFrame.LookVector * Vector3.new(1, 0, 1)
+	end
+
+	CombatService:SceneStrike(victim, { Damage = impact.Damage })
+	CombatService:ApplyFinisher(victim, direction.Unit, impact.Launch)
+	CombatService.Provoked:Fire(attacker, victim)
 end
 
 function TackleService:HandleHit(player: Player, victim, hitAt, variant)
@@ -85,6 +105,11 @@ function TackleService:HandleHit(player: Player, victim, hitAt, variant)
 
 	if not rejection then
 		tackles[player].Hit = true
+
+		if definition == TackleLibrary.Impact then
+			self:Impact(attacker, victim)
+			return
+		end
 
 		local scene, problem = GlobalFunctions.PairSceneService:Begin(definition, attacker, victim, { Age = age, Predicted = true })
 		if scene then return end

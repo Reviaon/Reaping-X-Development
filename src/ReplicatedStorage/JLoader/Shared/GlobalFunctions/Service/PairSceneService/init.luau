@@ -410,10 +410,20 @@ local function step()
 	releaseGuards()
 end
 
+function PairSceneService.Supports(character: Model): boolean
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	return humanoid ~= nil and humanoid.RigType == Enum.HumanoidRigType.R6 and character:FindFirstChild("Torso") ~= nil
+end
+
 function PairSceneService:Begin(definition, attacker: Model, victim: Model, options)
 	assert(IS_SERVER, "PairSceneService:Begin runs on the server")
 
 	options = options or {}
+
+	if not PairSceneService.Supports(attacker) or not PairSceneService.Supports(victim) then
+		return nil, "rig can't play paired scenes"
+	end
 
 	if members[attacker] or members[victim] then return nil, "already in a scene" end
 

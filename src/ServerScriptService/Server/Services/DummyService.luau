@@ -50,6 +50,9 @@ DummyService.Settings = {
 
 	--@ NPCLibrary entry for an NPC with none of its own.
 	FallbackConfig = "Template",
+
+	--@ Models carrying this attribute belong to MobService and get no dummy brain.
+	MobAttribute = "Mob",
 }
 
 local SWING = "DummySwing"
@@ -586,6 +589,7 @@ local function heartbeat()
 	for _, character in living:GetChildren() do
 		if not character:IsA("Model") then continue end
 		if Players:GetPlayerFromCharacter(character) then continue end
+		if character:GetAttribute(DummyService.Settings.MobAttribute) ~= nil then continue end
 		if not GlobalFunctions.ServerController:GetProfile(character) then continue end
 
 		local brain = Brains[character] or createBrain(character)

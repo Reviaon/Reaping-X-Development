@@ -4,7 +4,10 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local CombatService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch" } },
+	Signals = {
+		Remote = { "ReportHit", "Knockback", "ReportRoot", "ReportLunge", "ReportDive", "ReportSwing", "Launch" },
+		Basic = { "Provoked" },
+	},
 })
 
 local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
@@ -13,7 +16,7 @@ local WeaponTiers = require("@game/ReplicatedStorage/Libraries/TierLibrary/Weapo
 local DiveConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/MovementHandler/@Components/DiveComponent/Config")
 
 CombatService.Settings = {
-	--@ Studs. A hit reported from further than this is dropped as implausible.
+	--@ Studs from the attacker's root to the victim's body. A hit reported from further is dropped as implausible.
 	MaxReportDistance = 60,
 
 	--@ Seconds. Floor on how often one attacker may report a hit on the same victim.
@@ -33,6 +36,12 @@ CombatService.Settings = {
 
 	--@ Seconds. A dive report is accepted this much sooner than the dive's own cooldown, for jitter.
 	DiveReportLeniency = 0.2,
+
+	--@ A finisher on a rig with no ragdoll slides it along the ground at the finisher's speed instead.
+	GroundLaunch = {
+		Duration = 0.9, --@ Seconds the slide lasts while its speed decays to zero
+		RampIn = 0.05, --@ Seconds to reach full speed
+	},
 }
 
 local lastReport = {}
@@ -82,6 +91,27 @@ function CombatService:ResolveFinisher(weaponId: string, comboIndex: number)
 	return CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).finisher
 end
 
+function CombatService:ApplyGroundLaunch(victim: Model, direction: Vector3, finisher): boolean
+	local KnockbackService = GlobalFunctions.KnockbackService
+	local launch = self.Settings.GroundLaunch
+
+	local recipe = KnockbackService.Build(victim, direction, {
+		speed = finisher.speed,
+		duration = launch.Duration,
+		falloff = launch.Duration,
+		rampIn = launch.RampIn,
+	}, nil)
+
+	if not recipe then return false end
+
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
+
+	self.Knockback:FireAll(victim, recipe)
+	KnockbackService.Apply(victim, recipe)
+
+	return true
+end
+
 function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher)
 	local RagdollService = GlobalFunctions.RagdollService
 	local TrajectoryService = GlobalFunctions.TrajectoryService
@@ -89,6 +119,10 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 	local velocity = direction * finisher.speed + Vector3.yAxis * finisher.lift
 
 	GlobalFunctions.KnockbackService.Cancel(victim)
+
+	if not RagdollService.Setup(victim) then
+		return self:ApplyGroundLaunch(victim, direction, finisher)
+	end
 
 	local landing = TrajectoryService.PredictLanding(root.Position, velocity, root.Size)
 
@@ -226,6 +260,7 @@ function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId
 	end
 
 	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except)
+	self.Provoked:Fire(attacker, victim)
 
 	return true
 end
@@ -373,7 +408,7 @@ function CombatService:HandleReport(player: Player, victim, weaponId, comboIndex
 	local victimRootPart = rootOf(victim)
 	if not attackerRootPart or not victimRootPart then return end
 
-	if (victimRootPart.Position - attackerRootPart.Position).Magnitude > settings.MaxReportDistance then
+	if GlobalFunctions.PositionService.SurfaceDistance(attackerRootPart.Position, victim) > settings.MaxReportDistance then
 		return
 	end
 
