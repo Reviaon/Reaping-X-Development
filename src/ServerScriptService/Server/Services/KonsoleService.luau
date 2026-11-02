@@ -35,6 +35,10 @@ KonsoleService.Settings = {
 
 	--@ Most NPCs one command may spawn at once.
 	MaxSpawnCount = 25,
+
+	--@ Studs in front of the caller a forced mob lands, and between mobs spawned together.
+	MobSpawnDistance = 24,
+	MobSpacing = 8,
 }
 
 local function weaponNames()
@@ -462,6 +466,81 @@ function Implementations.spawnNpcServer(context)
 		count, name, weapon and (" holding " .. weapon) or "", settings.SpawnDistance))
 end
 
+local function groundBelow(position, living)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { living }
+
+	local result = workspace:Raycast(position + Vector3.new(0, 20, 0), Vector3.new(0, -200, 0), params)
+
+	return result and result.Position
+end
+
+function Implementations.spawnMobServer(context)
+	local settings = KonsoleService.Settings
+	local MobService = Jloader.GetService("MobService")
+	local caller = context.entity
+
+	local character = caller and caller.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return context.err("no-character", "you need a character to spawn in front of")
+	end
+
+	local living = livingFolder()
+	if not living then
+		return context.err("no-live-folder", "workspace.World.Live is missing")
+	end
+
+	local tokens = argumentsOf(context)
+
+	local count = 1
+	local last = tokens[#tokens]
+	if #tokens > 1 and tonumber(last) then
+		count = math.clamp(math.floor(tonumber(last)), 1, settings.MaxSpawnCount)
+		table.remove(tokens)
+	end
+
+	local roster = MobService:GetNames()
+	if #roster == 0 then
+		return context.err("no-mobs", "Libraries.MobLibrary holds no entries")
+	end
+
+	local name, why = resolve(#tokens > 0 and table.concat(tokens, " ") or roster[1], roster)
+	if not name then
+		return context.err("unknown-mob", why)
+	end
+
+	local _, problem = MobService:ResolveKind(name)
+	if problem then
+		return context.err("invalid-mob", problem)
+	end
+
+	local facing = root.CFrame
+	local yaw = math.atan2(facing.LookVector.X, facing.LookVector.Z)
+	local team = {}
+	local spawned = 0
+
+	for index = 1, count do
+		local sideways = (index - 1) * settings.MobSpacing - ((count - 1) * settings.MobSpacing) / 2
+		local point = (facing * CFrame.new(sideways, 0, -settings.MobSpawnDistance)).Position
+		local ground = groundBelow(point, living)
+
+		if ground then
+			local mob = MobService:Spawn(name, ground, { Yaw = yaw, Team = team })
+			mob.Model:SetAttribute(SPAWNED_ATTRIBUTE, true)
+			spawned += 1
+		end
+	end
+
+	if spawned == 0 then
+		return context.err("no-ground", "there is no ground in front of you to spawn on")
+	end
+
+	return context.reply(("spawned %d %s %d studs ahead"):format(spawned, name, settings.MobSpawnDistance))
+end
+
 function Implementations.armServer(context)
 	local living = livingFolder()
 	if not living then
@@ -685,6 +764,27 @@ function KonsoleService:Init()
 				type = "string",
 				required = false,
 				suggestions = weaponNames(),
+			},
+			{
+				name = "count",
+				type = "string",
+				required = false,
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "mob",
+		rank = settings.CommandRank,
+		aliases = { "spawnmob", "summon" },
+		description = "Force-spawns a mob from Libraries.MobLibrary in front of you, ignoring zones and caps.",
+		server = "spawnMobServer",
+		args = {
+			{
+				name = "mob",
+				type = "string",
+				required = false,
+				suggestions = Jloader.GetService("MobService"):GetNames(),
 			},
 			{
 				name = "count",
