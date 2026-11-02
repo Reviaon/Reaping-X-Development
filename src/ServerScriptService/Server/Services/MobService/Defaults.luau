@@ -35,7 +35,7 @@ return {
 		step_in = 12, --@ Studs per second it walks into the target during the windup to keep them in reach; 0 holds still
 		hitstun = nil, --@ Seconds a hit stuns and locks blocking; nil lasts until its next swing starts, which then holds it through its windup
 		hitstun_slack = 0.2, --@ Seconds added to every derived stun to cover the brain's tick; negative leaves a window to escape
-		back_off = nil, --@ { speed, animation } for a hit with min_range: how it gets back out to range; nil walks back at pack.retreat_speed
+		back_off = nil, --@ { speed, animation, visual } for a hit with min_range: how it gets back out to range; nil walks back at pack.retreat_speed
 		reaction_weapon = "Melee", --@ WeaponsLibrary entry whose knockback and hit effect an attack borrows
 		reaction_combo = 1,
 		combo_reset = 2.5, --@ Seconds without an attack before its combo starts over
@@ -68,6 +68,7 @@ return {
 		speed = 46, --@ Dash speed
 		recovery = 0.12, --@ Seconds after landing before it acts again
 		playback = 1.6, --@ Speed the dash clips play at
+		visual = nil, --@ Timeline in its visuals module played with every dash clip
 		animations = { Left = "DashLeft", Right = "DashRight", Back = "DashBack" }, --@ Animation key per direction relative to its facing; a missing one plays none
 		dodge = { --@ Hopping out of a player's swing; false turns it off
 			chance = 0.3, --@ Chance it reacts to a swing aimed at it
@@ -94,7 +95,7 @@ return {
 		regroup = true, --@ After a hit stuns it, it hops back out to the ring, or straight back in if it holds the attack turn
 	},
 
-	abilities = nil, --@ Named special attacks: an attack spec plus range/min_range, users {passive, fresh}, ability_cooldown, team_cooldown, chance, retry, cinematic, targets_ragdolled (may pick a ragdolled player; otherwise they are skipped) and ragdolled_chance (its chance on one)
+	abilities = nil, --@ Named special attacks: an attack spec plus range/min_range, users {passive, fresh}, ability_cooldown, team_cooldown, chance, retry, cinematic, visual (a timeline in its visuals module played when the cinematic starts), targets_ragdolled (may pick a ragdolled player; otherwise they are skipped) and ragdolled_chance (its chance on one)
 
 	pack = { --@ Teammates share one target, take turns attacking, and the rest circle it
 		max_attackers = 1, --@ Teammates allowed to engage the target at once
@@ -116,7 +117,9 @@ return {
 		},
 	},
 
-	feed = false, --@ Eating corpses when nothing is left to hunt: { animation, range, distance, feeders, speed, swallow_chance, duration, carry = { bone, offset } }; false never feeds
+	rally = false, --@ Calling for help when badly hurt: { health, animation, at, radius, visual, shake = { visual, from, to }, flee = { duration, speed, distance } }; it stands still through the call (hits don't interrupt it), alerts every nearby mob of its kind to its target, then flees; false never calls
+
+	feed = false, --@ Eating corpses when nothing is left to hunt: { animation, range, distance, feeders, speed, swallow_chance, duration, visual, carry = { bone, offset } }; false never feeds
 
 	visuals = nil, --@ Effects module path (under ReplicatedStorage.Modules.Effects) whose Attack plays each combo hit's visual on every client
 

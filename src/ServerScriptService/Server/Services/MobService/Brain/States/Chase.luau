@@ -20,6 +20,7 @@ local function backOff(mob, spec)
 
 	if animation then
 		mob.Animation:PlayAction(animation)
+		Combat.Shot(mob, spec.back_off.visual)
 	end
 end
 

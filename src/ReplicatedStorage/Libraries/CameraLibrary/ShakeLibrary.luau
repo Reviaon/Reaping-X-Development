@@ -9,5 +9,6 @@ return {
 		GuardBroken = {Amplifier = 0.06, Damper = 0.75},
 		HeavyLand = {Amplifier = 0.07, Damper = 0.78},
 		GrappleHit = {Amplifier = 0.025, Damper = 0.65},
+		Screech = {Amplifier = 0.045, Damper = 0.7},
 	},
 }

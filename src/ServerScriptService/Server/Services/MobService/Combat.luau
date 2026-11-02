@@ -153,6 +153,7 @@ function Combat.Grab(mob, target: Model, spec): boolean
 
 	if scene then
 		CombatService.Provoked:Fire(attacker, target)
+		Combat.Shot(mob, spec.visual)
 	end
 
 	return scene ~= nil
@@ -194,6 +195,17 @@ function Combat.Visual(mob, spec)
 		Effect = path,
 		Method = "Attack",
 		Info = { Character = mob.Model, ComboIndex = spec.index, Speed = spec.speed or 1 },
+	})
+end
+
+function Combat.Shot(mob, name: string?, speed: number?)
+	local path = mob.Config.visuals
+	if not path or not name then return end
+
+	effects():SpawnVisual(nil, {
+		Effect = path,
+		Method = name,
+		Info = { Character = mob.Model, Shot = name, Speed = speed or 1 },
 	})
 end
 

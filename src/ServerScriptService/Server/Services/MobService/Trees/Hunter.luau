@@ -6,6 +6,11 @@ return function(B)
 		}),
 
 		B.Sequence({
+			B.Condition("Fleeing"),
+			B.State("Flee"),
+		}),
+
+		B.Sequence({
 			B.Condition("IsReturning"),
 			B.State("Return"),
 		}),
@@ -17,6 +22,10 @@ return function(B)
 					B.Condition("BeyondLeash"),
 					B.Action("BeginReturn"),
 					B.State("Return"),
+				}),
+				B.Sequence({
+					B.Condition("RallyReady"),
+					B.State("Rally"),
 				}),
 				B.Sequence({
 					B.Condition("Regrouping"),

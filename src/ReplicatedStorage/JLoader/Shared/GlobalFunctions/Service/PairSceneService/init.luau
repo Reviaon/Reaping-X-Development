@@ -414,6 +414,8 @@ local function adopt(scene, character: Model, track: AnimationTrack)
 		freeMember(scene, character)
 	end))
 
+	if scene.Definition.HitTimes then return end
+
 	table.insert(scene.Connections, track:GetMarkerReachedSignal((scene.Definition.Hit or Config.Hit).Marker):Connect(function()
 		strike(scene, character, track)
 	end))
@@ -782,6 +784,14 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 
 	if definition.Duration == "Attacker" then
 		scene.EndTrack = attackerSequence.Tracks[1]
+	end
+
+	for _, at in definition.HitTimes or {} do
+		task.delay(at, function()
+			if not active[scene] or scene.Outcome or scene.Left[victim] then return end
+
+			PairSceneService.Struck:Fire(scene, attacker, victim, definition.Hit or Config.Hit)
+		end)
 	end
 
 	guard(attacker)

@@ -6,7 +6,9 @@ local function within(mob, target: Model, range: number): boolean
 end
 
 local function packTarget(mob, team, lose: number, detect: number): Model?
-	for _, player in Perception.PlayersNear(mob.Root.Position, detect) do
+	local noticed = Perception.PlayersNear(mob.Root.Position, detect)
+
+	for _, player in noticed do
 		team:Share(player)
 	end
 
@@ -14,8 +16,12 @@ local function packTarget(mob, team, lose: number, detect: number): Model?
 
 	if provoker then
 		team:Share(provoker)
+		team:Engage(mob, true)
 		return provoker
 	end
+
+	local current = mob:GetTarget()
+	team:Engage(mob, #noticed > 0 or (current ~= nil and within(mob, current, lose)))
 
 	return team:Assign(mob, lose)
 end

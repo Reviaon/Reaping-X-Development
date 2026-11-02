@@ -1,3 +1,5 @@
+local Combat = require("../../Combat")
+
 local IFRAMES = "IFrames"
 local UP = Vector3.new(0, 1, 0)
 local MIN_TRAVEL = 2.5
@@ -48,6 +50,7 @@ local function animate(mob, dash, data, direction: Vector3, now: number)
 		data.Animation = animation
 		data.AnimatedAt = now
 		mob.Animation:PlayAction(animation, dash.playback)
+		Combat.Shot(mob, dash.visual, dash.playback)
 	end
 end
 

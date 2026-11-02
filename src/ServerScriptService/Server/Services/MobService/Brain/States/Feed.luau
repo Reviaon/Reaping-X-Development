@@ -1,4 +1,5 @@
 local CorpseLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/CorpseLibrary")
+local Combat = require("../../Combat")
 local Feeding = require("../../Feeding")
 
 local REFRESH = 0.25
@@ -6,6 +7,7 @@ local ARRIVE_DISTANCE = 2
 local DRIFT_DISTANCE = 4
 local REMOVE_MARKER = "RemoveLimb"
 local RELEASE_MARKER = "ReleaseLimb"
+local FEEDING = "IsFeeding"
 
 local random = Random.new()
 
@@ -55,25 +57,34 @@ local function stopEating(mob, data)
 
 	data.Markers = nil
 
-	if data.Eating then
+	if data.Track then
 		mob.Animation:Stop(mob.Config.feed.animation)
+		data.Track = nil
 	end
 
 	data.Eating = false
+	mob.Model:SetAttribute(FEEDING, nil)
 	letGo(mob, data)
 end
 
 local function startEating(mob, data)
 	local track = mob.Animation:PlayAction(mob.Config.feed.animation)
-
-	data.Eating = true
-	data.EatingSince = os.clock()
-
 	if not track then return end
 
+	local visual = mob.Config.feed.visual
+
+	data.Eating = true
+	data.Track = track
+	data.EatingSince = data.EatingSince or os.clock()
+	mob.Model:SetAttribute(FEEDING, true)
+
 	track.Looped = true
+	Combat.Shot(mob, visual)
 
 	data.Markers = {
+		track.DidLoop:Connect(function()
+			Combat.Shot(mob, visual)
+		end),
 		track:GetMarkerReachedSignal(REMOVE_MARKER):Connect(function()
 			bite(mob, data)
 		end),
@@ -118,7 +129,7 @@ return {
 		if data.Eating then
 			mob:Face(torso.Position)
 
-			if mob:DistanceTo(point) > DRIFT_DISTANCE then
+			if not data.Track.IsPlaying or mob:DistanceTo(point) > DRIFT_DISTANCE then
 				stopEating(mob, data)
 			elseif not CorpseLibrary.Dismember and now - data.EatingSince >= (feed.duration or 0) then
 				finish(mob, corpse)

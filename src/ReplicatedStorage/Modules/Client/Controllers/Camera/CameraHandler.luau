@@ -66,6 +66,12 @@ local kickFov = Spring.new(0)
 kickFov.Speed = DynamicLibrary.Kick.RiseSpeed
 kickFov.Damper = 1
 
+local heldFov = Spring.new(0)
+heldFov.Speed = DynamicLibrary.HoldFovSpeed
+heldFov.Damper = 1
+
+local fovHolds = {}
+
 local kickToken = 0
 
 local swayOffset = Spring.new(Vector3.zero)
@@ -245,7 +251,9 @@ function CameraHandler:Cleanup(controller)
 
 	kickToken += 1
 
-	for _, spring in { punchFov, punchRoll, sceneFov, swayRoll, kickFov } do
+	table.clear(fovHolds)
+
+	for _, spring in { punchFov, punchRoll, sceneFov, swayRoll, kickFov, heldFov } do
 		spring.Target = 0
 		spring.Position = 0
 		spring.Velocity = 0
@@ -311,6 +319,18 @@ function CameraHandler:Punch(name: string, scale: number?)
 
 	punchFov.Position += (shape.Fov or 0) * scale
 	punchRoll.Position += (shape.Roll or 0) * scale * (math.random() < 0.5 and -1 or 1)
+end
+
+function CameraHandler:HoldFov(key: any, fov: number?)
+	fovHolds[key] = fov
+
+	local total = 0
+
+	for _, held in fovHolds do
+		total += held
+	end
+
+	heldFov.Target = total
 end
 
 function CameraHandler:Kick(name: string)
@@ -542,7 +562,7 @@ function CameraHandler:UpdateCamera(DeltaTime, controller)
 		* CFrame.Angles(0, 0, math.rad(punchRoll.Position + swayRoll.Position))
 		+ Vector3.new(0, USE_DYNAMIC_INFLUENCE and SUBJECT_HEIGHT_OFFSET or 0, 0)
 
-	Camera.FieldOfView = DynamicLibrary.BaseFov + sceneFov.Position + punchFov.Position + kickFov.Position
+	Camera.FieldOfView = DynamicLibrary.BaseFov + sceneFov.Position + punchFov.Position + kickFov.Position + heldFov.Position
 end
 
 return CameraHandler

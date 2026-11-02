@@ -40,6 +40,7 @@ function Team.Join(mob, key: any)
 			Reservations = {},
 			Turns = {},
 			BreakIns = {},
+			Engaged = {},
 			Assaults = setmetatable({}, { __mode = "k" }),
 		}, Team)
 
@@ -65,6 +66,7 @@ function Team:Leave(mob)
 	self.Assignment[mob] = nil
 	self.Turns[mob] = nil
 	self.BreakIns[mob] = nil
+	self.Engaged[mob] = nil
 
 	if next(self.Members) == nil then
 		teams[self.Key] = nil
@@ -129,7 +131,7 @@ function Team:Balance()
 	end
 
 	for member in self.Members do
-		if not member.Dead and member.Root then
+		if not member.Dead and member.Root and self.Engaged[member] then
 			table.insert(members, member)
 		end
 	end
@@ -177,6 +179,17 @@ function Team:Balance()
 	self.Assignment = assignment
 	self.BalancedTargets = table.clone(self.Targets)
 	self.NextBalanceAt = os.clock() + settings.BalanceInterval
+end
+
+function Team:Engage(mob, engaged: boolean)
+	if (self.Engaged[mob] == true) == engaged then return end
+
+	self.Engaged[mob] = if engaged then true else nil
+	self.NextBalanceAt = 0
+
+	if not engaged then
+		self.Assignment[mob] = nil
+	end
 end
 
 function Team:Assign(mob, range: number): Model?

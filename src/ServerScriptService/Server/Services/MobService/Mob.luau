@@ -14,6 +14,7 @@ local Mob = {}
 Mob.__index = Mob
 
 local DISABLING = { IsStunned = true, InPairScene = true, IsRagdolled = true }
+local HELD = { InPairScene = true, IsRagdolled = true }
 local LAUNCH_STUN_ATTRIBUTE = "LaunchStun"
 
 local random = Random.new()
@@ -85,7 +86,7 @@ function Mob.new(kind, model: Model, home: Vector3)
 		local reactions = self.Config.hurt_animations
 
 		if health < self.LastHealth and health > 0 then
-			if reactions and #reactions > 0 then
+			if reactions and #reactions > 0 and not self:IsArmored() then
 				self.Animation:PlayAction(reactions[random:NextInteger(1, #reactions)])
 			end
 
@@ -211,9 +212,18 @@ function Mob:HomeDistance(): number
 	return self:DistanceTo(self.Home)
 end
 
+function Mob:IsArmored(): boolean
+	local machine = self.Machine
+	return machine ~= nil and machine.State ~= nil and machine.State.Armored == true and not machine:IsDone()
+end
+
 function Mob:IsDisabled(): boolean
 	if self.Humanoid.Health <= 0 then return true end
-	if GlobalFunctions.StatusService:CheckStatuses(self.Model, DISABLING) then return true end
+
+	local armored = self:IsArmored()
+
+	if GlobalFunctions.StatusService:CheckStatuses(self.Model, if armored then HELD else DISABLING) then return true end
+	if armored then return false end
 
 	local recipe = GlobalFunctions.KnockbackService.Active(self.Model)
 

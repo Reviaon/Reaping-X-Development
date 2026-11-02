@@ -2,30 +2,31 @@ return {
 	template = "Wolf", --@ ServerStorage.Mobs model it clones
 	scale = 0.8, --@ Model:ScaleTo factor applied once to the prototype
 	health = 120,
+	run_speed = 32, --@ Chase speed; faster than the default
 
 	attack = {
 		speed = 1.2,
 		damage = 12,
-		reach = 14, --@ Studs ahead of its root the bite reaches, and where it stops to bite from
+		reach = 14, --@ Studs ahead of its root the bite reaches
 		radius = 5, --@ Studs around that line that get hit
-		recovery = 0.12, --@ Short, so the later bite landings keep the combo's rhythm
+		recovery = 0.12, --@ Short, so the late bite landings keep the rhythm
 		animations = { "Bite1", "Bite2", "Bite3", "Bite4" }, --@ Played in order, one per bite
 
-		combo = { --@ Each windup is its clip's visual marker frame / 60 (Moon Animator saves in wolf1.rbxl), so the hit lands with WolfVisuals
+		combo = { --@ Windups are each clip's visual frame / 60, so hits land with the visuals
 			[1] = { windup = 29 / 60 },
 			[2] = { windup = 28 / 60 },
 			[3] = { windup = 32 / 60 },
-			[4] = { --@ Final bite: it backs off, then leaps in and launches the target
-				min_range = 18, --@ Studs root to root it backs off to before leaping
-				range = 28, --@ Studs root to root it starts the leap from
-				back_off = { speed = 42, animation = "DashBack" }, --@ A quick hop back, so the leap follows the third bite without a lull
-				windup = 24 / 60, --@ Seconds from the start of the attack to the bite landing
+			[4] = { --@ Final bite: backs off, then leaps in and launches
+				min_range = 18, --@ Studs root to root it backs off to
+				range = 28, --@ Studs root to root it leaps from
+				back_off = { speed = 42, animation = "DashBack", visual = "Dash" }, --@ Quick hop back before the leap
+				windup = 24 / 60, --@ Seconds until the bite lands
 				recovery = 0.8,
 				damage = 16,
 				radius = 6,
 				leap = {
 					delay = 0.1, --@ Seconds into the attack it leaves the ground
-					speed = 69, --@ Fast enough to cover the same ground in the shorter windup
+					speed = 69, --@ Covers the back-off gap within the windup
 					lead = 0.25, --@ Seconds of the target's movement it aims ahead
 				},
 				launch = {
@@ -38,17 +39,17 @@ return {
 	},
 
 	abilities = {
-		leap_grab = { --@ Long leap from the edge of the fight; landing on the target grabs and throws it, missing lands it
+		leap_grab = { --@ Long leap from the fight's edge; a hit grabs and throws, a miss lands
 			min_range = 30, --@ Studs root to root it may leap from, at least
 			range = 55, --@ and at most
 			users = {
-				passive = true, --@ A circling packmate, not the current attacker, may use it
-				fresh = 3, --@ Seconds after locking onto a target it may open with it
+				passive = true, --@ A circling packmate may use it
+				fresh = 3, --@ Seconds after aggro it may open with it
 			},
 			ability_cooldown = 15, --@ Seconds before this wolf may use it again
-			team_cooldown = 12, --@ Seconds before any packmate may use it on the same player again
-			chance = 0.4, --@ Chance it takes the leap each time it is in position
-			retry = 2, --@ Seconds before it rolls again after passing on it
+			team_cooldown = 12, --@ Seconds before any packmate may use it on the same player
+			chance = 0.4, --@ Chance per check it leaps
+			retry = 2, --@ Seconds before it rolls again after passing
 			animation = "Leap",
 			miss_animation = "LeapLand",
 			windup = 0.95, --@ Seconds into the leap clip it lands
@@ -61,24 +62,24 @@ return {
 				lead = 0.45, --@ Seconds of the target's movement it aims ahead
 				homing = true, --@ Keeps steering at the target while airborne
 			},
-			cinematic = { --@ PairSceneService scene played on contact
+			cinematic = { --@ PairScene played on contact
 				Name = "WolfGrab",
 				AttackerRig = "Any",
 				Facing = "Face",
-				Spacing = 12, --@ Studs from the held player to the wolf's root
-				Duration = 1.0, --@ Seconds the grab holds before the throw starts (the Grab clip is 1.08s)
+				Spacing = 12, --@ Studs from the held player to its root
+				Duration = 1.0, --@ Seconds held before the throw (Grab clip is 1.08s)
 				IntroFade = 0.05,
 				LoopFade = 0.15,
 				ReleaseFade = 0.3,
 				TimeoutOutcome = "Throw",
-				BreakOn = {}, --@ The held player is ragdolled on purpose, so that must not end the scene
+				BreakOn = {}, --@ The hold ragdolls the player on purpose
 				Attacker = { Intro = "Grab" },
 				Victim = {
 					Status = "IsGrappled",
-					Ragdoll = 3.2, --@ Seconds the held player hangs ragdolled: the grab plus the throw up to the release, which carries it on
-					Follow = { --@ The held player's root rides this bone of the wolf, turning with it
+					Ragdoll = 3.2, --@ Seconds ragdolled through the release
+					Follow = { --@ The held player rides this bone
 						Bone = "Bone18", --@ The lower jaw
-						Offset = CFrame.new(0, -1.5, -1.5) * CFrame.Angles(0, 0, math.rad(90)), --@ Ahead of and below the jaw, lying crosswise: spine horizontal across the mouth
+						Offset = CFrame.new(0, -1.5, -1.5) * CFrame.Angles(0, 0, math.rad(90)), --@ Ahead of and below the jaw, crosswise
 
 						--[[ --@ Potential origin of bounciness in the held player's motion while attached to the wolf's jaw
 						
@@ -94,7 +95,7 @@ return {
 					Throw = {
 						Attacker = "M1s_Grab n throw",
 						Launch = { Victim = true },
-						ReleaseAt = { Victim = 1.9 }, --@ Seconds into the throw clip the player is let go
+						ReleaseAt = { Victim = 1.9 }, --@ Seconds into the throw clip it lets go
 					},
 				},
 				Throw = {
@@ -104,14 +105,15 @@ return {
 				},
 			},
 		},
-		maul = { --@ Pins its target and claws at them: a ragdolled player is mauled where they lie, a standing one is knocked onto their back first
-			range = 28, --@ Studs root to root it may pounce on them from
+		maul = { --@ Pounce that pins and claws; a ragdolled player is mauled where they lie
+			range = 28, --@ Studs root to root it pounces from
 			targets_ragdolled = true,
-			chance = 0.2, --@ Chance it mauls a standing target each time it is in position
-			ragdolled_chance = 0.75, --@ Chance it mauls a ragdolled one
-			retry = 1.5, --@ Seconds before it rolls again after passing on it
+			chance = 0.2, --@ Chance per check on a standing target
+			ragdolled_chance = 0.75, --@ Chance per check on a ragdolled one
+			visual = "Maul", --@ WolfVisuals timeline played on contact
+			retry = 1.5, --@ Seconds before it rolls again after passing
 			ability_cooldown = 14, --@ Seconds before this wolf may maul again
-			team_cooldown = 8, --@ Seconds before any packmate may maul the same player again
+			team_cooldown = 8, --@ Seconds before any packmate may maul the same player
 			animation = "Leap",
 			miss_animation = "LeapLand",
 			windup = 0.95, --@ Seconds into the leap clip it lands
@@ -124,43 +126,69 @@ return {
 				lead = 0.3, --@ Seconds of the target's movement it aims ahead
 				homing = true, --@ Keeps steering at the target while airborne
 			},
-			cinematic = { --@ PairSceneService scene played on contact
+			cinematic = { --@ PairScene played on contact
 				Name = "WolfMaul",
 				AttackerRig = "Any",
 				Facing = "Face",
-				Spacing = 15, --@ Studs from the victim's root to the wolf's root: its snout is ~11 ahead, so ~4 in front of it
-				Duration = "Attacker", --@ Ends when ClawingBitingCombo does
+				Spacing = 15, --@ Studs from the victim to its root (~4 past its snout)
+				Duration = "Attacker", --@ Ends with ClawingBitingCombo
 				IntroFade = 0.1,
 				LoopFade = 0.15,
 				ReleaseFade = 0.3,
-				BreakOn = {}, --@ Mauling a ragdolled player must not end the scene
+				BreakOn = {}, --@ Must not end on the victim's ragdoll
 				Attacker = { Intro = "ClawingBitingCombo" },
-				Hit = { Marker = "Hit", Damage = 6 }, --@ Damage dealt at each "Hit" marker in ClawingBitingCombo
-				Victim = { --@ Placeholder until the victim clips exist on R6: left ragdolled on the ground where they are
+				Hit = { Damage = 6 }, --@ Damage per hit time
+				HitTimes = { 12 / 60, 94 / 60, 137 / 60, 184 / 60 }, --@ Seconds into the combo each hit lands (the visual frames)
+				Victim = { --@ Placeholder until R6 victim clips exist: ragdolled where they fall
 					Status = "IsGrappled",
-					Anchor = false, --@ Not held in place: the ragdoll lies wherever it falls
-					Ragdoll = 4.2, --@ Seconds ragdolled from the pounce through the end of ClawingBitingCombo
+					Anchor = false, --@ Not held in place
+					Ragdoll = 4.2, --@ Seconds ragdolled through the combo
 				},
-				ReleaseRagdoll = { Victim = 2 }, --@ Seconds the victim stays ragdolled afterwards before getting up
+				ReleaseRagdoll = { Victim = 2 }, --@ Seconds ragdolled after, before getting up
 			},
 		},
 	},
 
-	feed = { --@ Eats players' corpses once nothing is left to hunt, tearing limbs off one at a time (CorpseLibrary.Dismember)
-		animation = "Eat", --@ Looped; its RemoveLimb marker tears a limb into the jaw and ReleaseLimb lets it go
+	dash = {
+		visual = "Dash", --@ WolfVisuals dust played with every dash
+	},
+
+	rally = { --@ Screeches when badly hurt, aggroing nearby wolves, then flees
+		health = 0.3, --@ Fraction of max health it screeches at, once per life
+		animation = "Screech",
+		at = 132 / 60, --@ Seconds into the screech nearby wolves are alerted
+		radius = 250, --@ Studs it is heard from
+		visual = "Screech", --@ WolfVisuals timeline
+
+		shake = { --@ Shake and FOV for nearby players between these markers
+			visual = "ScreechShake",
+			from = "Begin",
+			to = "End",
+		},
+
+		flee = {
+			duration = 4, --@ Seconds it runs before heading home
+			speed = "run_speed",
+			distance = 30, --@ Studs ahead it aims while running
+		},
+	},
+
+	feed = { --@ Eats corpses once nothing is left to hunt (CorpseLibrary.Dismember)
+		animation = "Eat", --@ Looped; RemoveLimb tears a limb into the jaw, ReleaseLimb drops it
 		range = 70, --@ Studs a corpse is noticed from
-		distance = 10, --@ Studs from its root to the corpse's torso it eats from; its snout is ~11 ahead
-		feeders = 2, --@ Most wolves eating one corpse at once
+		distance = 10, --@ Studs from its root to the torso it eats from
+		feeders = 2, --@ Most wolves on one corpse
 		speed = "walk_speed",
-		swallow_chance = 0.35, --@ Chance a torn-off limb is swallowed (it disappears) instead of dropped
-		duration = 12, --@ Seconds it eats one corpse when Dismember is off and limbs never run out
+		swallow_chance = 0.35, --@ Chance a limb is swallowed instead of dropped
+		visual = "Eat", --@ WolfVisuals timeline played every loop
+		duration = 12, --@ Seconds it eats when Dismember is off
 		carry = { --@ Where a torn-off limb sits in its mouth
 			bone = "Bone18", --@ The lower jaw
 			offset = CFrame.Angles(0, 0, math.rad(90)),
 		},
 	},
 
-	visuals = "Combat.Mobs.WolfVisuals", --@ Bite1, Slash2, Slash3, Bite4 in Storage.Particles.CombatVFX.Mobs.Wolf, timed to the clips' markers
+	visuals = "Combat.Mobs.WolfVisuals", --@ Effects module for its combo, maul, eat, screech and dash visuals
 
 	idle_actions = { "Inspect" }, --@ Animations it may play while idling between roams
 	hurt_animations = { "Hurt1", "Hurt2", "Hurt3" }, --@ One plays at random when it takes damage
@@ -170,7 +198,7 @@ return {
 		hip_ratio = 0.3, --@ HipHeight as a fraction of the scaled height
 	},
 
-	animation_exclusive = { --@ Locomotion keys whose clips swing the body around when blended, so they never overlap
+	animation_exclusive = { --@ Locomotion keys that never blend together
 		{ "WalkLeft", "WalkRight" },
 	},
 

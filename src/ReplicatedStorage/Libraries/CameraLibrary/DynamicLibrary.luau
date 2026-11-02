@@ -6,6 +6,7 @@ return {
 	ReturnSpeed = 20,
 	FovSpeed = 5,
 	ReturnFovSpeed = 12,
+	HoldFovSpeed = 8, --@ How fast a held FOV change (HoldFov) eases in and back out
 
 	Punch = {
 		Speed = 16,

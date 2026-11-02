@@ -1,4 +1,7 @@
 
+local RunService = game:GetService("RunService")
+
+local Jloader = require("@game/ReplicatedStorage/JLoader")
 local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
 
 local VisualsCore = {}
@@ -7,6 +10,7 @@ local DEFAULT_FPS = 60
 local DEFAULT_LIFETIME = 3
 
 local DEFAULT_PREFIXES = { "Attack", "Hit" }
+local DEFAULT_KNOCK_INTERVAL = 0.08
 local RIG_ATTRIBUTE = "EquippedWeapon"
 
 local function ReadAssets(controller, settings)
@@ -182,6 +186,20 @@ function VisualsCore.WatchInterrupt(controller, settings)
 
 	if IsInterrupted(controller, cancelOn) then
 		cancel()
+	end
+
+	local active = settings.ActiveAttribute
+
+	if typeof(active) == "string" then
+		table.insert(watch.Connections, character:GetAttributeChangedSignal(active):Connect(function()
+			if character:GetAttribute(active) ~= true then
+				cancel(true)
+			end
+		end))
+
+		if character:GetAttribute(active) ~= true then
+			cancel(true)
+		end
 	end
 
 	return watch
@@ -419,11 +437,52 @@ function VisualsCore.Attack(controller, settings)
 	VisualsCore.Play(events, controller.Speed, settings.FPS, watch)
 end
 
+function VisualsCore.Shake(controller, settings)
+	local character = controller.Character
+	local shake = settings.Shake
+	local camera = Jloader.GetHandler("CameraHandler")
+	if not character or not shake or not camera then return end
+
+	local active = settings.ActiveAttribute
+	local source = (settings.Host and character:FindFirstChild(settings.Host)) or character:FindFirstChild("HumanoidRootPart")
+	local key = {}
+	local knockAt = 0
+	local connection = nil
+
+	local function reach(): number
+		local view = workspace.CurrentCamera
+		if not view or not source or not shake.Range then return 1 end
+
+		return math.clamp(1 - (view.Focus.Position - source.Position).Magnitude / shake.Range, 0, 1)
+	end
+
+	connection = RunService.Heartbeat:Connect(function()
+		if not character.Parent or (typeof(active) == "string" and character:GetAttribute(active) ~= true) then
+			camera:HoldFov(key, nil)
+			connection:Disconnect()
+			return
+		end
+
+		local scale = reach()
+
+		if shake.Fov then
+			camera:HoldFov(key, shake.Fov * scale)
+		end
+
+		local now = os.clock()
+
+		if shake.Shape and now >= knockAt and scale > 0 then
+			knockAt = now + (shake.Interval or DEFAULT_KNOCK_INTERVAL)
+			camera:Shake(shake.Shape, scale)
+		end
+	end)
+end
+
 function VisualsCore.OneShot(controller, settings)
 	local character = controller.Character
 	if not character then return end
 
-	local root = character:FindFirstChild("HumanoidRootPart")
+	local root = (settings.Host and character:FindFirstChild(settings.Host)) or character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
 	local watch = VisualsCore.WatchInterrupt(controller, settings)
