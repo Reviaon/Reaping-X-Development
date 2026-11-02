@@ -178,6 +178,12 @@ CharacterProfile.__newindex = function(self, key, value)
 	end
 end
 
+--@ Characters with this attribute load no shared animation package (mobs bring their own clips).
+CharacterProfile.NoPackageAttribute = "NoAnimationPackage"
+
+--@ Storage.Animations folders never loaded as a character's package.
+CharacterProfile.PackageExclude = { Mobs = true }
+
 --@ Default humanoid properties applied to every character on spawn
 CharacterProfile.DefaultSettings = {
 	WalkSpeed = 10,
@@ -260,7 +266,14 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 
 	GlobalFunctions.AnimatorService:CreateProfile(Character)
 	GlobalFunctions.CooldownService:CreateProfile(Character)
-	GlobalFunctions.AnimatorService:LoadPackage(Character, Storage.Animations)
+
+	if not Character:GetAttribute(CharacterProfile.NoPackageAttribute) then
+		for _, Package in Storage.Animations:GetChildren() do
+			if Package:IsA("Folder") and not CharacterProfile.PackageExclude[Package.Name] then
+				GlobalFunctions.AnimatorService:LoadPackage(Character, Package)
+			end
+		end
+	end
 
 	self:RigCharacter(Character)
 	GlobalFunctions.RagdollService.Setup(Character)
