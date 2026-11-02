@@ -18,8 +18,13 @@ function StateMachine:IsLocked(): boolean
 	return state ~= nil and state.Locked ~= nil and state.Locked(self.Mob, self.Data) == true
 end
 
+function StateMachine:IsDone(): boolean
+	local state = self.State
+	return state ~= nil and state.Done ~= nil and state.Done(self.Mob, self.Data) == true
+end
+
 function StateMachine:Request(name: string, args, force: boolean?): boolean
-	if self.Name == name then return true end
+	if self.Name == name and not self:IsDone() then return true end
 	if not force and self:IsLocked() then return false end
 
 	self:Exit()

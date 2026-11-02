@@ -1,5 +1,8 @@
 local random = Random.new()
 
+local HELD = { InPairScene = true }
+local RAGDOLLED = "IsRagdolled"
+
 local function usable(mob, ability): boolean
 	local users = ability.users
 	if not users then return true end
@@ -9,6 +12,18 @@ local function usable(mob, ability): boolean
 	local passive = users.passive and team ~= nil and not team:IsAttacker(mob)
 
 	return fresh or passive or false
+end
+
+local function open(mob, ability): (boolean, boolean)
+	local target = mob:GetTarget()
+	if not target then return false, false end
+
+	local services = mob.Services
+	if services.StatusService:CheckStatuses(target, HELD) or services.PairSceneService.IsCarried(target) then return false, false end
+
+	local downed = target:GetAttribute(RAGDOLLED) == true
+
+	return not downed or ability.targets_ragdolled == true, downed
 end
 
 local function ready(mob, name: string, ability): boolean
@@ -23,10 +38,15 @@ local function ready(mob, name: string, ability): boolean
 	if not distance or distance > ability.range or distance < (ability.min_range or 0) then return false end
 	if not usable(mob, ability) then return false end
 
+	local targetable, downed = open(mob, ability)
+	if not targetable then return false end
+
 	local key = ability.reserve or name
 	if mob.Team and mob.Team:Reserved(mob.Target, key) then return false end
 
-	if ability.chance and random:NextNumber() > ability.chance then
+	local chance = if downed and ability.ragdolled_chance then ability.ragdolled_chance else ability.chance
+
+	if chance and random:NextNumber() > chance then
 		readyAt[name] = now + (ability.retry or 1.5)
 		return false
 	end
