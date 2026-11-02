@@ -14,7 +14,7 @@ local function ReadAssets(controller, settings)
 end
 
 local function FindAsset(assets, settings, comboIndex)
-	local prefixes = settings.Prefix and { settings.Prefix } or DEFAULT_PREFIXES
+	local prefixes = if typeof(settings.Prefix) == "table" then settings.Prefix elseif settings.Prefix then { settings.Prefix } else DEFAULT_PREFIXES
 
 	for _, prefix in prefixes do
 		local asset = assets:FindFirstChild(prefix .. comboIndex)
@@ -248,7 +248,17 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 	})
 
 	attack_vfx:SetParent(controller.GetPath:ReadPath(Resolve(spec, settings, "Parent", nil)))
-	
+
+	local character = controller.Character
+
+	if Resolve(spec, settings, "ScaleWithCharacter", false) and character and attack_vfx.Effect:IsA("Model") then
+		local scale = character:GetScale()
+
+		if scale ~= 1 then
+			attack_vfx.Effect:ScaleTo(attack_vfx.Effect:GetScale() * scale)
+		end
+	end
+
 	local pivot = host:GetPivot()
 
 	if typeof(spec.CFrame) == "CFrame" then
@@ -378,7 +388,7 @@ function VisualsCore.Attack(controller, settings)
 	local character = controller.Character
 	if not character then return end
 
-	local root = character:FindFirstChild("HumanoidRootPart")
+	local root = (settings.Host and character:FindFirstChild(settings.Host)) or character:FindFirstChild("HumanoidRootPart")
 	local comboIndex = controller.ComboIndex
 
 	local frame = settings.Frames and settings.Frames[comboIndex]
