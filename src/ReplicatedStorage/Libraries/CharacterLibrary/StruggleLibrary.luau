@@ -19,14 +19,16 @@ return {
 			EndScale = 0.3,
 
 			Waves = {
-				{ Count = 1, Weight = 5 },
-				{ Count = 3, Weight = 1 },
+				{ Count = 1, Weight = 8 },
+				{ Count = 2, Weight = 1 },
 			},
+
 			WaveSpacing = 0.9,
 
 			Keys = { "Q", "E", "R", "F", "Z", "X" },
 			Area = { Min = Vector2.new(0.28, 0.32), Max = Vector2.new(0.72, 0.78) },
-			MinSpacing = 0.16,
+
+			MinSpacing = 0.25,
 			PlacementTries = 12,
 
 			Npc = {
@@ -35,7 +37,7 @@ return {
 			},
 
 			Style = {
-				Accent = Color3.fromRGB(240, 176, 92),
+				Accent = Color3.fromRGB(32, 170, 85),
 				Miss = Color3.fromRGB(212, 70, 70),
 				Expire = Color3.fromRGB(104, 104, 112),
 
