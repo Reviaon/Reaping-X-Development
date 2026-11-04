@@ -78,6 +78,8 @@ local inputActions = {
 		[Enum.UserInputType.MouseButton2] = {
 			canHold = false,
 			action = function(controller)
+				if CombatHandler:CancelProjectile(controller) then return end
+
 				if controller and controller.StatusService:CheckStatuses(controller.Character, { ShiftLock = true }) then 
 					CombatHandler:TryPush(controller)
 				end
@@ -242,12 +244,18 @@ function CombatHandler:TryProjectile(controller)
 end
 
 function CombatHandler:ReleaseProjectile(controller)
+	local component = CombatHandler.components["ProjectileAttackComponent"]
+
+	if component then
+		component:Release(controller, CombatHandler:StateFor(controller))
+	end
+end
+
+function CombatHandler:CancelProjectile(controller): boolean
 	local state = CombatHandler:StateFor(controller)
 	local component = CombatHandler.components["ProjectileAttackComponent"]
 
-	if component and state.CurrentBranch == "Projectile" then
-		component:Release(controller, state)
-	end
+	return component ~= nil and state.CurrentBranch == "Projectile" and component:Cancel(controller, state)
 end
 
 function CombatHandler:TryHeavyAttack(controller)

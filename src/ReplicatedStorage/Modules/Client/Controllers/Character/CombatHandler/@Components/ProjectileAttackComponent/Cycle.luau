@@ -17,15 +17,17 @@ local function stopTrack(state, key: string, fade: number)
 end
 
 local function play(controller, state, id: string, projectile, key: string, loop: boolean, fade: number): number
+	local speed = Weapon.Speed(controller.Character, projectile, key)
 	local track = controller.AnimatorService:PlayTrack(controller.Character, Weapon.AnimationName(id, projectile, key), {
 		Priority = Config.Priority,
 		FadeTime = fade,
 		Loop = loop,
+		Speed = speed,
 	})
 
 	state.tracks[key] = track
 
-	return if track.Length > 0 then track.Length else Config.FallbackLength
+	return (if track.Length > 0 then track.Length else Config.FallbackLength) / speed
 end
 
 local function broadcast(controller, state)

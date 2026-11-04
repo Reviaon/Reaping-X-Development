@@ -8,22 +8,23 @@ local Observe = {}
 local views = setmetatable({}, { __mode = "k" })
 local clipLengths = {}
 
-local function clipLength(controller, id: string, projectile, phase: string): number
+local function clipLength(controller, character: Model, id: string, projectile, phase: string): number
 	local key = Config.ClipKey[phase]
 	if not key or not controller.Character then return math.huge end
 
 	local name = Weapon.AnimationName(id, projectile, key)
+	local speed = Weapon.Speed(character, projectile, key)
 
 	if not clipLengths[name] then
 		local ok, track = pcall(controller.AnimatorService.GetTrack, controller.AnimatorService, controller.Character, name)
 		local length = ok and track and track.Length or 0
 
-		if length <= 0 then return Config.FallbackLength end
+		if length <= 0 then return Config.FallbackLength / speed end
 
 		clipLengths[name] = length
 	end
 
-	return clipLengths[name]
+	return clipLengths[name] / speed
 end
 
 function Observe.Step(controller, dt: number)
@@ -63,7 +64,7 @@ function Observe.Step(controller, dt: number)
 			view.at = at
 			view.phase = phase
 			view.phaseStart = os.clock() - math.max(0, workspace:GetServerTimeNow() - at)
-			view.clipLength = clipLength(controller, id, projectile, phase)
+			view.clipLength = clipLength(controller, character, id, projectile, phase)
 		end
 
 		view.nocked = character:GetAttribute("ProjectileNocked") == true

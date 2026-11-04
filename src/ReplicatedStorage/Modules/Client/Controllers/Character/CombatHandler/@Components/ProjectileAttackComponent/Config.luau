@@ -32,6 +32,8 @@ return {
 		reload = "ArrowEquip",
 	},
 
+	TierClips = { draw = true, reload = true },
+
 	FallbackLength = 0.5,
 	FallbackRange = 400,
 	FallbackOriginHeight = 1.5,

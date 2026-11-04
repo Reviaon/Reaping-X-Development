@@ -28,10 +28,12 @@ Schema.Projectile = {
 	nock = "table",
 	release_at = "number",
 	model = "string",
+	trail = "string",
 	speed = "number",
 	gravity = "number",
 	max_range = "number",
 	fire_interval = "number",
+	tiers = "table",
 	face_rate = "number",
 	markers = "table",
 	obstacle_effect = "string",
@@ -45,6 +47,12 @@ Schema.ProjectileArmPitch = {
 	joints = "table",
 	max = "number",
 	rate = "number",
+}
+
+Schema.ProjectileTier = {
+	draw = "number",
+	speed = "number",
+	gravity = "number",
 }
 
 Schema.ProjectileMarkers = {
@@ -264,6 +272,14 @@ function Schema.Validate(weapon: string, data)
 
 		if typeof(projectile.arm_pitch) == "table" then
 			validateShape(weapon, "projectile.arm_pitch.", projectile.arm_pitch, Schema.ProjectileArmPitch)
+		end
+
+		if typeof(projectile.tiers) == "table" then
+			for tier, entry in projectile.tiers do
+				if typeof(entry) == "table" then
+					validateShape(weapon, `projectile.tiers.{tier}.`, entry, Schema.ProjectileTier)
+				end
+			end
 		end
 
 		if typeof(projectile.markers) == "table" then

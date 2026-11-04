@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local PartCache = require(script.Parent.Parent:WaitForChild("PartCache"))
 local DebugService = require(script.Parent:WaitForChild("DebugService"))
 local Config = require("@self/Config")
+local WeaponTiers = require("@game/ReplicatedStorage/Libraries/TierLibrary/WeaponTiers")
 
 local pools = {}
 
@@ -47,16 +48,33 @@ local function debugSegment(a: Vector3, b: Vector3, color: Color3)
 	Debris:AddItem(part, Config.Debug.Lifetime)
 end
 
+local function pick(tier, projectile, key: string, fallback: number): number
+	local value = if typeof(tier) == "table" then tier[key] else nil
+
+	if typeof(value) == "number" then return value end
+
+	return if typeof(projectile[key]) == "number" then projectile[key] else fallback
+end
+
+function ProjectileService.Tier(projectile, shooter: Model?)
+	local tiers = projectile.tiers
+	local name = shooter and shooter:GetAttribute(WeaponTiers.EquippedAttribute)
+
+	return if typeof(tiers) == "table" and name ~= nil then tiers[name] else nil
+end
+
 function ProjectileService.NewShot(origin: Vector3, direction: Vector3, projectile, shooter: Model?)
-	local gravity = if typeof(projectile.gravity) == "number" then projectile.gravity else Config.Defaults.Gravity
+	local tier = ProjectileService.Tier(projectile, shooter)
+	local gravity = pick(tier, projectile, "gravity", Config.Defaults.Gravity)
 
 	return {
 		Origin = origin,
 		Direction = direction.Unit,
-		Speed = if typeof(projectile.speed) == "number" then projectile.speed else Config.Defaults.Speed,
+		Speed = pick(tier, projectile, "speed", Config.Defaults.Speed),
 		Gravity = Vector3.new(0, -workspace.Gravity * gravity, 0),
 		MaxRange = if typeof(projectile.max_range) == "number" then projectile.max_range else Config.Defaults.Range,
 		Model = projectile.model,
+		Trail = projectile.trail,
 		Shooter = shooter,
 		FiredAt = workspace:GetServerTimeNow(),
 	}
@@ -116,6 +134,43 @@ local function orient(position: Vector3, velocity: Vector3): CFrame
 	return CFrame.lookAt(position, position + velocity) * Config.TipRotation
 end
 
+local function trailOf(part: BasePart?, name: string?): Trail?
+	local trail = part and typeof(name) == "string" and part:FindFirstChild(name, true)
+	return if trail and trail:IsA("Trail") then trail else nil
+end
+
+local function setTrail(trail: Trail?, enabled: boolean)
+	if not trail then return end
+
+	if not enabled or not trail.Enabled then
+		trail:Clear()
+	end
+
+	trail.Enabled = enabled
+end
+
+local function nearestBone(hit: Instance?, point: Vector3): Bone?
+	if not hit or not hit:IsA("MeshPart") then return nil end
+
+	local ok, skinned = pcall(function() return hit.HasSkinnedMesh end)
+	local model = ok and skinned and hit:FindFirstAncestorWhichIsA("Model")
+	if not model then return nil end
+
+	local best, bestDistance = nil, math.huge
+
+	for _, bone in model:GetDescendants() do
+		if bone:IsA("Bone") then
+			local distance = (bone.TransformedWorldCFrame.Position - point).Magnitude
+
+			if distance < bestDistance then
+				best, bestDistance = bone, distance
+			end
+		end
+	end
+
+	return best
+end
+
 local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vector3)
 	local reach = part.Size.X / 2 - Config.Stick.Depth
 	local placed = orient(result.Position, velocity)
@@ -123,9 +178,37 @@ local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vect
 	part.CFrame = placed * CFrame.new(-reach, 0, 0)
 
 	local hit = result.Instance
-	local weld
+	local bone = nearestBone(hit, result.Position)
+	local weld, follow
+	local returned = false
 
-	if hit and not hit.Anchored then
+	local function release()
+		if returned then return end
+		returned = true
+
+		if follow then
+			follow:Disconnect()
+		end
+
+		if weld then
+			weld:Destroy()
+		end
+
+		pool:ReturnPart(part)
+	end
+
+	if bone then
+		local offset = bone.TransformedWorldCFrame:ToObjectSpace(part.CFrame)
+
+		follow = RunService.PreRender:Connect(function()
+			if not bone:IsDescendantOf(workspace) then
+				release()
+				return
+			end
+
+			part.CFrame = bone.TransformedWorldCFrame * offset
+		end)
+	elseif hit and not hit.Anchored then
 		part.Anchored = false
 		part.Massless = true
 
@@ -135,13 +218,7 @@ local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vect
 		weld.Parent = part
 	end
 
-	task.delay(Config.Stick.Time, function()
-		if weld then
-			weld:Destroy()
-		end
-
-		pool:ReturnPart(part)
-	end)
+	task.delay(Config.Stick.Time, release)
 end
 
 function ProjectileService.Fire(shot, callbacks)
@@ -152,6 +229,7 @@ function ProjectileService.Fire(shot, callbacks)
 	local params = ProjectileService.Params(shot, callbacks.ignore)
 	local lifetime = ProjectileService.Lifetime(shot)
 	local started = os.clock() - (if typeof(callbacks.elapsed) == "number" then math.max(callbacks.elapsed, 0) else 0)
+	local trail = trailOf(part, shot.Trail)
 	local last = 0
 	local connection
 
@@ -160,6 +238,8 @@ function ProjectileService.Fire(shot, callbacks)
 		part.CanTouch = false
 		part.CFrame = orient(shot.Origin, shot.Direction)
 	end
+
+	setTrail(trail, true)
 
 	connection = RunService.Heartbeat:Connect(function()
 		local now = math.min(os.clock() - started, lifetime)
@@ -170,6 +250,7 @@ function ProjectileService.Fire(shot, callbacks)
 
 		if result then
 			connection:Disconnect()
+			setTrail(trail, false)
 
 			if part then
 				stick(pool, part, result, ProjectileService.VelocityAt(shot, at))
@@ -190,6 +271,7 @@ function ProjectileService.Fire(shot, callbacks)
 
 		if now >= lifetime then
 			connection:Disconnect()
+			setTrail(trail, false)
 
 			if part then
 				pool:ReturnPart(part)

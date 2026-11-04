@@ -75,7 +75,7 @@ function ProjectileAttackComponent:CanActivate(controller, _combatState): boolea
 	if not controller.Character then return false end
 
 	local _, projectile = Weapon.Of(controller)
-	if not projectile then return false end
+	if not projectile or stateOf(controller).blocked then return false end
 
 	return not Weapon.Cancelled(controller)
 end
@@ -101,6 +101,7 @@ function ProjectileAttackComponent:Release(controller, _combatState)
 	local state = stateOf(controller)
 
 	state.held = false
+	state.blocked = false
 
 	if state.phase == "Drawing" then
 		state.queued = true
@@ -120,6 +121,16 @@ function ProjectileAttackComponent:Deactivate(controller, _combatState)
 	end
 
 	Cycle.Finish(controller, state)
+end
+
+function ProjectileAttackComponent:Cancel(controller, combatState): boolean
+	local state = stateOf(controller)
+	if state.phase == "Idle" then return false end
+
+	state.blocked = state.held
+	ProjectileAttackComponent:Deactivate(controller, combatState)
+
+	return true
 end
 
 function ProjectileAttackComponent:Init(controller)
@@ -160,6 +171,7 @@ function ProjectileAttackComponent.Reset(controller)
 	state.phase = "Idle"
 	state.nocked = true
 	state.held = false
+	state.blocked = false
 	state.queued = false
 	state.combat = nil
 end

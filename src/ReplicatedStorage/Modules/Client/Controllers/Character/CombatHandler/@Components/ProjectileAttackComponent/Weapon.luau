@@ -1,6 +1,16 @@
 local Config = require("./Config")
+local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Service/ProjectileService")
 
 local Weapon = {}
+
+function Weapon.Speed(Character: Model?, projectile, key: string): number
+	if not Config.TierClips[key] then return 1 end
+
+	local tier = ProjectileService.Tier(projectile, Character)
+	local speed = tier and tier.draw
+
+	return if typeof(speed) == "number" and speed > 0 then speed else 1
+end
 
 function Weapon.Of(controller)
 	local config = controller.CombatConfig

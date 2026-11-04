@@ -21,7 +21,7 @@ RangedService.Settings = {
 	PathTolerance = 4,
 	EarlyReportLeniency = 0.25,
 	RewindWindow = 1,
-	VictimTolerance = 4.5,
+	VictimTolerance = 3,
 	HistoryLength = 1.2,
 	LineOfSightStep = 1 / 30,
 	ShotGrace = 2,
@@ -85,7 +85,7 @@ local function record()
 			history[model] = samples
 		end
 
-		table.insert(samples, { t = now, position = root.Position })
+		table.insert(samples, { t = now, frame = root.CFrame })
 
 		while samples[1] and samples[1].t < cutoff do
 			table.remove(samples, 1)
@@ -99,22 +99,29 @@ local function record()
 	end
 end
 
+local function boxDistance(frame: CFrame, size: Vector3, point: Vector3): number
+	local relative = frame:PointToObjectSpace(point)
+	local half = size / 2
+
+	return Vector3.new(
+		math.max(math.abs(relative.X) - half.X, 0),
+		math.max(math.abs(relative.Y) - half.Y, 0),
+		math.max(math.abs(relative.Z) - half.Z, 0)
+	).Magnitude
+end
+
 local function nearestPast(victim: Model, from: number, to: number, point: Vector3): number
-	local best = math.huge
-	local samples = history[victim]
-
-	if samples then
-		for _, sample in samples do
-			if sample.t >= from and sample.t <= to then
-				best = math.min(best, (sample.position - point).Magnitude)
-			end
-		end
-	end
-
 	local root = victim:FindFirstChild("HumanoidRootPart")
+	if not root then return math.huge end
 
-	if root then
-		best = math.min(best, (root.Position - point).Magnitude)
+	local frame, size = victim:GetBoundingBox()
+	local offset = root.CFrame:ToObjectSpace(frame)
+	local best = boxDistance(frame, size, point)
+
+	for _, sample in history[victim] or {} do
+		if sample.t >= from and sample.t <= to then
+			best = math.min(best, boxDistance(sample.frame * offset, size, point))
+		end
 	end
 
 	return best
@@ -171,7 +178,10 @@ function RangedService:HandleShot(player: Player, weaponId, origin, direction, c
 	if (origin - root.Position).Magnitude > settings.OriginTolerance then return end
 
 	local now = workspace:GetServerTimeNow()
-	local interval = if typeof(projectile.fire_interval) == "number" then projectile.fire_interval else 0
+	local tier = GlobalFunctions.ProjectileService.Tier(projectile, character)
+	local speed = tier and tier.draw
+	local interval = (if typeof(projectile.fire_interval) == "number" then projectile.fire_interval else 0)
+		/ (if typeof(speed) == "number" and speed > 0 then speed else 1)
 
 	if lastShot[player] and now - lastShot[player] < interval - settings.FireIntervalLeniency then return end
 
@@ -287,36 +297,45 @@ function RangedService:CarryLimb(victim: Model, limb: BasePart, velocity: Vector
 	end)
 end
 
+local function refuse(reason: string)
+	if GlobalFunctions.DebugService.IsEnabled() then
+		warn(`[Ranged] Hit refused: {reason}`)
+	end
+end
+
 function RangedService:HandleHit(player: Player, localId, victim, hitPosition, flightTime, limbName)
 	local settings = self.Settings
 	local character = player and player.Character
 	if not character then return end
 
 	local shot = shots[player] and shots[player][localId]
-	if not shot or shot.Consumed or shot.Shooter ~= character then return end
+	if not shot or shot.Consumed or shot.Shooter ~= character then return refuse("unknown or spent shot") end
 
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") or victim == character then return end
 	if typeof(hitPosition) ~= "Vector3" or typeof(flightTime) ~= "number" then return end
 
 	local living = livingFolder()
-	if not living or victim.Parent ~= living then return end
-	if not victim:FindFirstChildOfClass("Humanoid") then return end
+	if not living or victim.Parent ~= living then return refuse(`{victim.Name} is not under World.Live`) end
+	if not victim:FindFirstChildOfClass("Humanoid") then return refuse(`{victim.Name} has no Humanoid`) end
 
 	local lifetime = GlobalFunctions.ProjectileService.Lifetime(shot)
-	if flightTime < 0 or flightTime > lifetime then return end
+	if flightTime < 0 or flightTime > lifetime then return refuse("flight time out of range") end
 
 	local now = workspace:GetServerTimeNow()
 	local landed = shot.FiredAt + flightTime
 
-	if now < landed - settings.EarlyReportLeniency then return end
-	if now - landed > settings.RewindWindow + settings.ShotGrace then return end
+	if now < landed - settings.EarlyReportLeniency then return refuse("reported before the arrow could land") end
+	if now - landed > settings.RewindWindow + settings.ShotGrace then return refuse("report too late") end
 
-	if (GlobalFunctions.ProjectileService.PathAt(shot, flightTime) - hitPosition).Magnitude > settings.PathTolerance then return end
-	if nearestPast(victim, landed - settings.RewindWindow, landed + settings.EarlyReportLeniency, hitPosition) > settings.VictimTolerance then return end
-	if not pathClear(shot, flightTime, victim) then return end
+	local offPath = (GlobalFunctions.ProjectileService.PathAt(shot, flightTime) - hitPosition).Magnitude
+	if offPath > settings.PathTolerance then return refuse(string.format("%.1f studs off the path", offPath)) end
+
+	local offBody = nearestPast(victim, landed - settings.RewindWindow, landed + settings.EarlyReportLeniency, hitPosition)
+	if offBody > settings.VictimTolerance then return refuse(string.format("%.1f studs from %s", offBody, victim.Name)) end
+	if not pathClear(shot, flightTime, victim) then return refuse("path blocked by the world") end
 
 	local profile = GlobalFunctions.ServerController:GetProfile(victim)
-	if not profile then return end
+	if not profile then return refuse(`{victim.Name} has no profile`) end
 
 	shot.Consumed = true
 
@@ -325,10 +344,12 @@ function RangedService:HandleHit(player: Player, localId, victim, hitPosition, f
 	local alive = humanoid.Health > 0
 	local limb = limbOf(victim, limbName, hitPosition)
 
-	getCombatService():LandHit(character, victim, profile, shot.Weapon, 1, nil, {
+	local accepted = getCombatService():LandHit(character, victim, profile, shot.Weapon, 1, nil, {
 		Point = hitPosition,
 		Normal = if velocity.Magnitude > 0 then -velocity.Unit else Vector3.yAxis,
 	})
+
+	if not accepted then return refuse(`CombatService refused the hit on {victim.Name} (immune, guarding or dodging)`) end
 
 	local data = CombatConfig.WeaponConfig[shot.Weapon]
 	local carry = data and data.projectile and data.projectile.sever_carry
