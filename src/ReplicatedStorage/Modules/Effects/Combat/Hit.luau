@@ -27,6 +27,8 @@ local Settings = {
 
 	HighlightTime = 0.35,
 	HighlightEnd = 1,
+
+	RecolorName = "Recolor",
 }
 
 local Hit = {}
@@ -105,10 +107,32 @@ function Hit.PlayReaction(Info, victim)
 	return track
 end
 
-function Hit.SpawnParticles(victim, effectName)
-	local pivot = pivotOf(victim)
-	if not pivot then return nil end
+local function surfaceFrame(template: Instance, point: Vector3, normal: Vector3?): CFrame
+	local up = if typeof(normal) == "Vector3" and normal.Magnitude > 0 then normal.Unit else Vector3.yAxis
+	local side = if math.abs(up.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
+	local right = side:Cross(up).Unit
+	local frame = CFrame.fromMatrix(point, right, up)
+	local anchor = template:FindFirstChildWhichIsA("Attachment")
 
+	return if anchor then frame * anchor.CFrame:Inverse() else frame
+end
+
+local function tint(root: Instance, color: Color3)
+	for _, emitter in root:GetDescendants() do
+		if emitter.Name ~= Settings.RecolorName or not emitter:IsA("ParticleEmitter") then continue end
+
+		local keypoints = {}
+
+		for _, keypoint in emitter.Color.Keypoints do
+			local base = keypoint.Value
+			table.insert(keypoints, ColorSequenceKeypoint.new(keypoint.Time, Color3.new(base.R * color.R, base.G * color.G, base.B * color.B)))
+		end
+
+		emitter.Color = ColorSequence.new(keypoints)
+	end
+end
+
+function Hit.SpawnParticles(victim, effectName, point: Vector3?, normal: Vector3?, color: Color3?)
 	local template = HitEffects:FindFirstChild(effectName or Settings.DefaultEffect)
 
 	if not template then
@@ -116,8 +140,24 @@ function Hit.SpawnParticles(victim, effectName)
 		return nil
 	end
 
+	local frame
+
+	if typeof(point) == "Vector3" then
+		frame = surfaceFrame(template, point, normal)
+	else
+		local pivot = pivotOf(victim)
+		if not pivot then return nil end
+
+		frame = pivot.CFrame
+	end
+
 	local effect = EffectService.new({ Effect = template })
-	effect:SetCFrame(pivot.CFrame)
+
+	if typeof(color) == "Color3" and effect.Effect then
+		tint(effect.Effect, color)
+	end
+
+	effect:SetCFrame(frame)
 	effect:SetParent(container())
 	effect:Play()
 	effect:SetRemoval(Settings.Lifetime)
@@ -170,6 +210,9 @@ function Hit.Highlight(victim)
 		end
 
 		highlight:Destroy()
+		
+		tween:Destroy()
+		tween = nil
 	end)
 
 	tween:Play()
@@ -185,7 +228,7 @@ function Hit.Emit(Info)
 	Hit.Shake(victim, Info.Attacker)
 
 	local highlight = Hit.Highlight(victim)
-	local effect = Hit.SpawnParticles(victim, Info.Effect)
+	local effect = Hit.SpawnParticles(victim, Info.Effect, rawget(Info, "Point"), rawget(Info, "Normal"))
 	local track = Hit.PlayReaction(Info, victim)
 
 	if rawget(Info, "Predicted") then
