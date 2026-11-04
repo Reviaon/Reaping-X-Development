@@ -90,13 +90,14 @@ local function ResolveTier(WeaponName : string, Requested : string?)
 
 	for _, Tier in Candidates do
 		if not WeaponTiers.Tiers[Tier] then continue end
-		if Tier == WeaponTiers.Native then return Tier, nil end
 
 		local Model = Folder and Folder:FindFirstChild(Tier)
 
 		if Model and Model:IsA("BasePart") then
 			return Tier, Model
 		end
+
+		if Tier == WeaponTiers.Native then return Tier, nil end
 	end
 
 	return WeaponTiers.Native, nil
@@ -308,13 +309,14 @@ end
 --@ and child geometry except where the model authors a child of the same name. The model is first
 --@ matched to the rig piece's position and orientation, so the rig's own joint then holds it
 --@ exactly as it holds the rig's mesh.
-local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[string]: boolean}) : BasePart
+local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[string]: boolean}) : (BasePart, CFrame?)
 	if not Variant or Variant:GetAttribute("RigPiece") ~= Piece.Name then
-		return Piece:Clone()
+		return Piece:Clone(), nil
 	end
 
-	local Offset = Variant:GetAttribute("RigOffset")
-	local Target = if typeof(Offset) == "CFrame" then Piece.CFrame * Offset else Piece.CFrame
+	local RigOffset = Variant:GetAttribute("RigOffset")
+	local Offset = if typeof(RigOffset) == "CFrame" then RigOffset else nil
+	local Target = if Offset then Piece.CFrame * Offset else Piece.CFrame
 	local Shift = Target * Variant.CFrame:Inverse()
 
 	local Clone = Variant:Clone()
@@ -349,7 +351,7 @@ local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[s
 		end
 	end
 
-	return Clone
+	return Clone, Offset
 end
 
 local function LimbAttachments(Character : Model, Template : Model, Names : {string}?) : {[string]: boolean}
@@ -467,9 +469,10 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		local CharacterLimb = Character:FindFirstChild(Limb.Name)
 
 		if not CharacterLimb or not CharacterLimb:IsA("BasePart") then continue end
-		if Character:FindFirstChild(Piece.Name) then continue end --@ Skeleton joint, the character already owns it
+		local Owned = Character:FindFirstChild(Piece.Name)
+		if Owned and Owned:IsA("BasePart") then continue end --@ Skeleton joint, the character already owns it
 
-		local PieceClone = ClonePiece(Piece, Variant, LimbOwned)
+		local PieceClone, Offset = ClonePiece(Piece, Variant, LimbOwned)
 		PieceClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
 		PieceClone.CanCollide = false
 		PieceClone.CanQuery = false
@@ -481,6 +484,11 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 
 		local JointClone = Joint:Clone()
 		JointClone:SetAttribute(RIG_PART_ATTRIBUTE, true)
+
+		if Offset then
+			JointClone.C1 = Offset:Inverse() * Joint.C1
+		end
+
 		JointClone.Part0 = CharacterLimb
 		JointClone.Part1 = PieceClone
 		JointClone.Parent = CharacterLimb
