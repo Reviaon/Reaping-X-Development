@@ -47,6 +47,11 @@ return{
 			Priority = 4;
 		};
 
+		IsAiming = {
+			WalkSpeed = 8,
+			Priority = 4;
+		};
+
 		IsDiving = {
 			WalkSpeed = 0,
 			JumpPower = 0,

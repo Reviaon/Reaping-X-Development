@@ -21,8 +21,12 @@ end
 function LightAttackComponent:CanActivate(controller, combatState): boolean
 	local Character = controller.Character
 	
-	if not Character then 
-		return false 
+	if not Character then
+		return false
+	end
+
+	if controller.CombatConfig:ResolveWeaponConfig(controller).projectile then
+		return false
 	end
 
 	if controller.CooldownService:CheckCooldown(Character, "IsAttacking") then

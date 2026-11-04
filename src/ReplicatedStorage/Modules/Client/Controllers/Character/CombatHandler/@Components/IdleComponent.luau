@@ -43,14 +43,22 @@ local function stopIdle(controller)
 	state.currentAnim = nil
 end
 
-local function shouldIdle(controller): boolean
+local function idlePriority(weapon): Enum.AnimationPriority
+	local name = weapon and weapon.idle_priority
+	if typeof(name) ~= "string" then return IDLE_PRIORITY end
+
+	local ok, priority = pcall(function() return Enum.AnimationPriority[name] end)
+	return ok and priority or IDLE_PRIORITY
+end
+
+local function shouldIdle(controller, weapon): boolean
 	local Character = controller.Character
 	local Humanoid = controller.Humanoid
 
 	if not Character or not Humanoid then return false end
 	if Humanoid.Health <= 0 then return false end
 
-	if Humanoid.MoveDirection.Magnitude > 0 then return false end
+	if Humanoid.MoveDirection.Magnitude > 0 and not (weapon and weapon.idle_while_moving) then return false end
 
 	if Humanoid.FloorMaterial == Enum.Material.Air then return false end
 	if AIRBORNE_STATES[Humanoid:GetState()] then return false end
@@ -66,21 +74,11 @@ end
 
 local function update(controller)
 	local state = controller:Scope(SCOPE)
-
-	if not shouldIdle(controller) then
-		stopIdle(controller)
-		return
-	end
-
 	local config = controller.CombatConfig
-	if not config then
-		stopIdle(controller)
-		return
-	end
+	local equipped = config and config:ResolveEquippedWeapon(controller)
+	local weapon = equipped and config.WeaponConfig[equipped]
 
-	local equipped = config:ResolveEquippedWeapon(controller)
-
-	if not equipped then
+	if not equipped or not shouldIdle(controller, weapon) then
 		stopIdle(controller)
 		return
 	end
@@ -96,7 +94,7 @@ local function update(controller)
 
 	state.track = controller.AnimatorService:PlayTrack(controller.Character, desired, {
 		Speed = 1,
-		Priority = IDLE_PRIORITY,
+		Priority = idlePriority(weapon),
 		FadeTime = FADE_TIME,
 		Loop = true,
 	})

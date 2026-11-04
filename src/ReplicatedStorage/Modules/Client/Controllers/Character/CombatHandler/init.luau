@@ -36,6 +36,14 @@ local function getBlockRelay()
 	return blockRelay
 end
 
+local rangedRelay = nil
+local shotConnection = nil
+
+local function getRangedRelay()
+	rangedRelay = rangedRelay or Jloader.GetService("RangedService")
+	return rangedRelay
+end
+
 --@ Components
 CombatHandler.components = {}
 CombatHandler.Trove = GarbageCollection.new()
@@ -70,7 +78,9 @@ local inputActions = {
 		[Enum.UserInputType.MouseButton2] = {
 			canHold = false,
 			action = function(controller)
-				CombatHandler:TryPush(controller)
+				if controller and controller.StatusService:CheckStatuses(controller.Character, { ShiftLock = true }) then 
+					CombatHandler:TryPush(controller)
+				end
 			end,
 		},
 		[Enum.KeyCode.R] = {
@@ -91,6 +101,7 @@ local inputActions = {
 		[Enum.UserInputType.MouseButton1] = {
 			canHold = false,
 			action = function(controller)
+				CombatHandler:ReleaseProjectile(controller)
 			end,
 		},
 		[Enum.KeyCode.F] = {
@@ -130,6 +141,17 @@ function CombatHandler:InitCharacter(controller)
 	controller.VisualRelay = getVisualRelay()
 	controller.CombatRelay = getCombatRelay()
 	controller.BlockRelay = getBlockRelay()
+	controller.RangedRelay = getRangedRelay()
+
+	if not shotConnection and controller.RangedRelay then
+		shotConnection = controller.RangedRelay.Shot:Connect(function(shooter, weaponId, origin, direction, firedAt)
+			local projectile = CombatHandler.components["ProjectileAttackComponent"]
+
+			if projectile then
+				projectile:ObserveShot(ClientController, shooter, weaponId, origin, direction, firedAt)
+			end
+		end)
+	end
 
 	--@ Once, here rather than in Init: the service lookup can come back empty while the server is
 	--@ still starting, and a nil there aborted the whole client load.
@@ -179,7 +201,8 @@ function CombatHandler:InitCharacter(controller)
 	end)
 
 	CombatConfig:WeaponListener(controller, CombatHandler.Trove, function(weaponId)
-		if controller.StatusService:CheckStatuses(Character, { IsAttacking = true }) then
+		if controller.StatusService:CheckStatuses(Character, { IsAttacking = true })
+			or CombatHandler:StateFor(controller).CurrentBranch == "Projectile" then
 			CombatHandler:Interrupt(controller)
 		end
 
@@ -198,7 +221,33 @@ function CombatHandler:InitCharacter(controller)
 end
 
 function CombatHandler:TryLightAttack(controller)
+	if CombatConfig:ResolveWeaponConfig(controller).projectile then
+		CombatHandler:TryProjectile(controller)
+		return
+	end
+
 	CombatHandler:TryAttackBranch(controller, "Light")
+end
+
+function CombatHandler:TryProjectile(controller)
+	local state = CombatHandler:StateFor(controller)
+	local component = CombatHandler.components["ProjectileAttackComponent"]
+
+	if component and state.CurrentBranch == "Projectile" then
+		component:Press(controller, state)
+		return
+	end
+
+	CombatHandler:TryAttackBranch(controller, "Projectile")
+end
+
+function CombatHandler:ReleaseProjectile(controller)
+	local state = CombatHandler:StateFor(controller)
+	local component = CombatHandler.components["ProjectileAttackComponent"]
+
+	if component and state.CurrentBranch == "Projectile" then
+		component:Release(controller, state)
+	end
 end
 
 function CombatHandler:TryHeavyAttack(controller)
@@ -238,6 +287,10 @@ function CombatHandler:CanBeginBranch(controller, branchName: string): boolean
 	end
 
 	if controller.StatusService:CheckStatuses(Character, { IsAttacking = true }) then
+		return false
+	end
+
+	if CombatHandler:StateFor(controller).CurrentBranch == "Projectile" and branchName ~= "Projectile" then
 		return false
 	end
 
