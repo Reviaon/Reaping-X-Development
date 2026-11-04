@@ -18,6 +18,53 @@ Schema.Weapon = {
 	knockback = "table",
 	finisher = "table|boolean",
 	hitstun = "number|table",
+	idle_while_moving = "boolean",
+	idle_priority = "string",
+	projectile = "table",
+}
+
+Schema.Projectile = {
+	animations = "table",
+	nock = "table",
+	release_at = "number",
+	model = "string",
+	speed = "number",
+	gravity = "number",
+	max_range = "number",
+	fire_interval = "number",
+	face_rate = "number",
+	markers = "table",
+	obstacle_effect = "string",
+	aim_fov = "number",
+	release_shake = "string",
+	sever_carry = "number",
+	arm_pitch = "table",
+}
+
+Schema.ProjectileArmPitch = {
+	joints = "table",
+	max = "number",
+	rate = "number",
+}
+
+Schema.ProjectileMarkers = {
+	release = "string",
+	nock = "string",
+}
+
+Schema.ProjectileAnimations = {
+	draw = "string",
+	hold = "string",
+	fire = "string",
+	reload = "string",
+}
+
+Schema.ProjectileNock = {
+	part = "string",
+	idle = "string",
+	aim = "string",
+	reload = "string",
+	reappear_at = "number",
 }
 
 Schema.Finisher = {
@@ -197,6 +244,31 @@ function Schema.Validate(weapon: string, data)
 
 	if typeof(data.finisher) == "table" then
 		validateShape(weapon, "finisher.", data.finisher, Schema.Finisher)
+	end
+
+	if typeof(data.idle_priority) == "string" and not pcall(function() return Enum.AnimationPriority[data.idle_priority] end) then
+		warn(`[CombatConfig] {weapon}.idle_priority "{data.idle_priority}" is not an AnimationPriority.`)
+	end
+
+	local projectile = data.projectile
+	if typeof(projectile) == "table" then
+		validateShape(weapon, "projectile.", projectile, Schema.Projectile)
+
+		if typeof(projectile.animations) == "table" then
+			validateShape(weapon, "projectile.animations.", projectile.animations, Schema.ProjectileAnimations)
+		end
+
+		if typeof(projectile.nock) == "table" then
+			validateShape(weapon, "projectile.nock.", projectile.nock, Schema.ProjectileNock)
+		end
+
+		if typeof(projectile.arm_pitch) == "table" then
+			validateShape(weapon, "projectile.arm_pitch.", projectile.arm_pitch, Schema.ProjectileArmPitch)
+		end
+
+		if typeof(projectile.markers) == "table" then
+			validateShape(weapon, "projectile.markers.", projectile.markers, Schema.ProjectileMarkers)
+		end
 	end
 
 	local hitbox = data.hitbox
