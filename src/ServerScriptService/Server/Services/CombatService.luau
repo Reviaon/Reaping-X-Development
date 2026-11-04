@@ -258,11 +258,16 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	return true
 end
 
-function CombatService:BroadcastHit(attacker: Model, victim: Model, weaponId: string, comboIndex: number, except: Player?)
+function CombatService:BroadcastHit(attacker: Model, victim: Model, weaponId: string, comboIndex: number, except: Player?, contact)
 	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
 	local hitbox = weaponConfig and CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).hitbox
 	local payload = GlobalFunctions.AttackService:HitPayload(attacker, victim, hitbox and hitbox.effect, weaponId, comboIndex)
 	local relay = getEffectRelay()
+
+	if typeof(contact) == "table" then
+		payload.Info.Point = contact.Point
+		payload.Info.Normal = contact.Normal
+	end
 
 	if except then
 		relay.CreateVisual:FireExcept(except, payload)
@@ -289,7 +294,7 @@ function CombatService:ApplyDamage(attacker: Model, victim: Model, weaponId: str
 	return damage
 end
 
-function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?)
+function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?, contact)
 	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
 
 	self:ApplyDamage(attacker, victim, weaponId, comboIndex)
@@ -300,7 +305,7 @@ function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId
 		GlobalFunctions.StatusService:RemoveStatus(attacker, recovery)
 	end
 
-	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except)
+	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except, contact)
 	self.Provoked:Fire(attacker, victim)
 
 	return true
