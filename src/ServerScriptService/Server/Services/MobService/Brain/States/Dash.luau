@@ -1,4 +1,5 @@
 local Combat = require("../../Combat")
+local Awareness = require("../../Awareness")
 
 local IFRAMES = "IFrames"
 local UP = Vector3.new(0, 1, 0)
@@ -205,6 +206,8 @@ return {
 		if kind == "regroup" then
 			blackboard.Staggered = nil
 			point = root and regroupPoint(mob, root)
+		elseif kind == "sidestep" then
+			point = Awareness.Sidestep.Point(mob)
 		elseif args and args.from and dash.dodge then
 			blackboard.Staggered = nil
 			point = dodgePoint(mob, dash.dodge, args.from)

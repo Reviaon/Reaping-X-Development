@@ -16,6 +16,11 @@ return {
 	PassThrough = { HumanoidRootPart = true },
 	MaxPasses = 4,
 
+	Dodge = {
+		From = "ProjectileDodgeFrom",
+		Until = "ProjectileDodgeUntil",
+	},
+
 	Debug = {
 		Lifetime = 5,
 		Color = Color3.fromRGB(255, 170, 0),

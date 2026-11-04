@@ -28,6 +28,10 @@ return function(B)
 					B.State("Rally"),
 				}),
 				B.Sequence({
+					B.Condition("ProjectileIncoming"),
+					B.State("Dash", { args = { kind = "sidestep" }, force = true }),
+				}),
+				B.Sequence({
 					B.Condition("Regrouping"),
 					B.State("Dash", { args = { kind = "regroup" } }),
 				}),

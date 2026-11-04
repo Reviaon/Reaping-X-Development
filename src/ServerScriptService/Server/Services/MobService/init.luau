@@ -14,6 +14,7 @@ local Spacing = require("@self/Spacing")
 local Config = require("@self/Config")
 local Tree = require("@self/Brain/Tree")
 local Dodge = require("@self/Dodge")
+local Awareness = require("@self/Awareness")
 
 local MobService = Jloader.CreateService({
 	Name = script.Name,
@@ -201,6 +202,10 @@ function MobService:Load()
 
 	CombatService.Swung:Connect(function(attacker)
 		Dodge.React(Mobs, attacker, CombatService)
+	end)
+
+	Jloader.GetService("RangedService").Fired:Connect(function(archer, origin, direction)
+		Awareness.Release.React(Mobs, archer, origin, direction)
 	end)
 
 	Stats = Telemetry.new(self.Folder, self.Settings.TelemetryInterval)

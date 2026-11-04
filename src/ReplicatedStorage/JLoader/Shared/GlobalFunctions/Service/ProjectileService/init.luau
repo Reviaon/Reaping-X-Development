@@ -110,14 +110,50 @@ function ProjectileService.Params(shot, ignore: { Instance }?): RaycastParams
 	return params
 end
 
+function ProjectileService.MarkDodge(model: Model, seconds: number)
+	local now = workspace:GetServerTimeNow()
+
+	model:SetAttribute(Config.Dodge.From, now)
+	model:SetAttribute(Config.Dodge.Until, now + seconds)
+end
+
+function ProjectileService.Dodging(model: Instance?, at: number, lead: number?): boolean
+	if not model then return false end
+
+	local from = model:GetAttribute(Config.Dodge.From)
+	local untilTime = model:GetAttribute(Config.Dodge.Until)
+
+	if typeof(from) ~= "number" or typeof(untilTime) ~= "number" then return false end
+
+	return at >= from + (lead or 0) and at <= untilTime
+end
+
+local function dodger(instance: Instance): Model?
+	local now = workspace:GetServerTimeNow()
+	local current = instance.Parent
+
+	while current and current ~= workspace do
+		if current:IsA("Model") and ProjectileService.Dodging(current, now) then
+			return current
+		end
+
+		current = current.Parent
+	end
+
+	return nil
+end
+
 function ProjectileService.Cast(shot, from: number, to: number, params: RaycastParams): (RaycastResult?, number)
 	local a = ProjectileService.PathAt(shot, from)
 	local b = ProjectileService.PathAt(shot, to)
 	local result = workspace:Raycast(a, b - a, params)
 	local passes = 0
 
-	while result and Config.PassThrough[result.Instance.Name] and passes < Config.MaxPasses do
-		params:AddToFilter(result.Instance)
+	while result and passes < Config.MaxPasses do
+		local through = if Config.PassThrough[result.Instance.Name] then result.Instance else dodger(result.Instance)
+		if not through then break end
+
+		params:AddToFilter(through)
 		result = workspace:Raycast(a, b - a, params)
 		passes += 1
 	end

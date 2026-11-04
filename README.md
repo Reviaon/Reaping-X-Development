@@ -384,7 +384,8 @@ same framework; a mob is data, not code.
 | `Defaults.luau` | Every tunable, shared by all mobs. Aggression is tuned **here** so it applies everywhere. |
 | `Libraries/MobLibrary/<Name>.luau` | One mob's differences from `Defaults`. Merged over them (nested tables merge, lists replace, `false` disables). |
 | `Config.luau` | Does the merge, then derives size-based values (`attack.reach`, `attack_range`, `pounce.range`, `pack.clearance`, `pack.orbit_radius`) from the measured body when an entry leaves them out. |
-| `Trees/Hunter.luau` | The shared brain: disabled → returning → acquire target → leash / attack / pounce / chase / circle → wander. |
+| `Trees/Hunter.luau` | The shared brain: disabled → returning → acquire target → leash / rally / sidestep / attack / pounce / chase / circle → wander. |
+| `Awareness/` | What a mob reads off its target, never the arrow itself. `Draw` watches the target's bow state (`ProjectileState`) and facing and decides when to sidestep a drawn aim (`ProjectileIncoming` → `Dash` kind `sidestep`). `Release` reacts to `RangedService.Fired` along the shot's line. `Sidestep` holds the shared cooldown, lock rules, hop point and `[Awareness]` debug lines. Tuned by `dash.sidestep`. |
 | `Brain/` | Behaviour-tree nodes, conditions, actions and states, each its own module found by name. A tree leaf asks the state machine for a state; the state runs enter/update/exit. |
 | `Rig.luau` | Turns a template into a mob once per type: strips AnimSaves, scales, adds a collider `HumanoidRootPart` + R15 Humanoid, disables unused Humanoid states. Spawns clone that prototype. |
 | `Motion.luau` | Per-frame easing, turning (an AlignOrientation, AutoRotate off) and arrival braking. |
@@ -394,7 +395,22 @@ same framework; a mob is data, not code.
 
 What keeps a mob aggressive (all in `Defaults`): it chases where you are *going* (`chase_lead`), bursts
 in from mid range (`pounce`), rotates attackers quickly (`pack.bites_per_turn`, `pack.rest_time`), stays on
-whoever hits it (`provoke_time`) and holds the pack's target while any packmate is near it.
+whoever hits it (`provoke_time`) and holds the pack's target while any packmate is near it. Now and then it
+reads a drawn bow aimed at it and hops off the aim line before the shot, or hops as the shot is released
+(`dash.sidestep`: one roll per draw, `release.chance` per shot, one shared cooldown). A release hop marks
+the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`ProjectileDodgeUntil`) for
+`release.dodge` seconds. Arrows pass through a marked mob on every screen (`ProjectileService.Cast`), and
+`RangedService` refuses a hit that landed inside the window, allowing for the shooter's one-way ping.
+
+`Defaults` keeps one short line per key. The table-shaped keys take:
+
+| Key | Shape |
+| --- | --- |
+| `attack.combo[i]` | Any `attack` key (`hitstun` and `back_off` included), plus `range`, `min_range`, `animation`, `hit_animation`, `miss_animation`, `marker`, `leap` and `launch`. |
+| `abilities.<name>` | An attack spec plus `range`/`min_range`, `users = { passive, fresh }`, `ability_cooldown`, `team_cooldown`, `chance`, `retry`, `cinematic`, `visual` (played when the cinematic starts), `targets_ragdolled` and `ragdolled_chance`. |
+| `rally` | `{ health, animation, at, radius, visual, shake = { visual, from, to }, flee = { duration, speed, distance } }`. It stands through the call, alerts nearby mobs of its kind, then flees. |
+| `feed` | `{ animation, range, distance, feeders, speed, swallow_chance, duration, visual, carry = { bone, offset } }`. |
+| `animations` | Key → Animation name in `Storage.Animations.Mobs.<Mob>` (the template's AnimSaves in Studio). |
 
 Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
 removes them.

@@ -8,6 +8,7 @@ local RangedService = Jloader.CreateService({
 	Name = script.Name,
 	Signals = {
 		Remote = { "ReportShot", "ReportProjectileHit", "AimState", "AimPitch", "Shot" },
+		Basic = { "Fired" },
 	},
 })
 
@@ -198,6 +199,7 @@ function RangedService:HandleShot(player: Player, weaponId, origin, direction, c
 	lastShot[player] = now
 
 	self.Shot:FireExcept(player, character, weaponId, origin, shot.Direction, shot.FiredAt)
+	self.Fired:Fire(character, origin, shot.Direction)
 end
 
 local function limbOf(victim: Model, limbName, hitPosition: Vector3): BasePart?
@@ -326,6 +328,7 @@ function RangedService:HandleHit(player: Player, localId, victim, hitPosition, f
 
 	if now < landed - settings.EarlyReportLeniency then return refuse("reported before the arrow could land") end
 	if now - landed > settings.RewindWindow + settings.ShotGrace then return refuse("report too late") end
+	if GlobalFunctions.ProjectileService.Dodging(victim, landed, player:GetNetworkPing() / 2) then return refuse(`{victim.Name} sidestepped the shot`) end
 
 	local offPath = (GlobalFunctions.ProjectileService.PathAt(shot, flightTime) - hitPosition).Magnitude
 	if offPath > settings.PathTolerance then return refuse(string.format("%.1f studs off the path", offPath)) end
