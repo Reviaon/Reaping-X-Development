@@ -3,7 +3,7 @@ local SprintComponent = {}
 local RunService = game:GetService("RunService")
 
 local SCOPE = "Sprint"
-local YIELD_TO = { IsBlocking = true }
+local YIELD_TO = { IsBlocking = true, IsAiming = true }
 local SUPPRESSED_BY = { ComboLocked = true, IsStunned = true }
 
 local function stopSprint(controller)
@@ -41,7 +41,7 @@ function SprintComponent:Activate(controller)
 
 	if Humanoid.MoveDirection.Magnitude <= 0 then return end
 
-	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true, IsBlocking = true }) then return end
+	if controller.StatusService:CheckStatuses(Character, { IsSprinting = true, IsBlocking = true, IsAiming = true }) then return end
 	if controller.StatusService:IsHitYielded(Character) or controller.StatusService:IsActionLocked(Character) then return end
 
 	controller.StatusService:SetStatus(Character, "IsSprinting", true)
