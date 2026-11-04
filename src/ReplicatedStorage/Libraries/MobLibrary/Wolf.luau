@@ -2,7 +2,7 @@ return {
 	template = "Wolf", --@ ServerStorage.Mobs model it clones
 	scale = 0.8, --@ Model:ScaleTo factor applied once to the prototype
 	health = 120,
-	run_speed = 32, --@ Chase speed; faster than the default
+	run_speed = 50, --@ Chase speed; faster than the default
 
 	attack = {
 		speed = 1.2,
