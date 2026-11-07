@@ -39,6 +39,7 @@ return {
 
 		obstacle_effect = "ProjectileHitObstacle",
 		aim_fov = -8,
+		aim_line = "Subtle",
 		release_shake = "BowRelease",
 		sever_carry = 0.35,
 		

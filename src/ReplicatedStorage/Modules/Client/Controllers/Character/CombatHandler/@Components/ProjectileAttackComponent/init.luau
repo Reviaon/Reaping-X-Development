@@ -8,6 +8,7 @@ local Aim = require("@self/Aim")
 local Nock = require("@self/Nock")
 local Shot = require("@self/Shot")
 local Observe = require("@self/Observe")
+local Line = require("@self/Line")
 
 local ProjectileAttackComponent = {}
 
@@ -61,10 +62,17 @@ local function aimStep(controller, state, dt: number)
 	end
 
 	local settings = projectile and projectile.arm_pitch or state.armSettings
-	if not settings or (not active and (state.armPitch or 0) == 0) then return end
 
-	Aim.PitchArms(Character, state, settings, if active then Aim.ShoulderPitch(Character, state.aimPoint) else 0, dt)
-	Aim.SendPitch(controller, state)
+	if settings and (active or (state.armPitch or 0) ~= 0) then
+		Aim.PitchArms(Character, state, settings, if active then Aim.ShoulderPitch(Character, state.aimPoint) else 0, dt)
+		Aim.SendPitch(controller, state)
+	end
+
+	if active then
+		Line.Update(controller, state, projectile)
+	else
+		Line.Hide(state)
+	end
 end
 
 function ProjectileAttackComponent:ObserveShot(controller, shooter, weaponId, origin, direction, firedAt)
@@ -165,6 +173,7 @@ function ProjectileAttackComponent.Reset(controller)
 	end
 
 	Nock.Reset(state)
+	Line.Destroy(state)
 	Aim.RestoreArms(state)
 	Aim.HoldFov(nil, false)
 

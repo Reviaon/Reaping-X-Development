@@ -287,6 +287,14 @@ function CharacterProfile:LoadCharacterAppearance(Character)
 end
 
 local function WeldRigGeometry(Root : Instance, Anchor : BasePart)
+	local Jointed = {}
+
+	for _, Descendant in Root:GetDescendants() do
+		if Descendant:IsA("Motor6D") and Descendant.Part1 then
+			Jointed[Descendant.Part1] = true
+		end
+	end
+
 	for _, Descendant in Root:GetDescendants() do
 		if not Descendant:IsA("BasePart") then continue end
 
@@ -295,6 +303,8 @@ local function WeldRigGeometry(Root : Instance, Anchor : BasePart)
 		Descendant.CanCollide = false
 		Descendant.CanQuery = false
 		Descendant.CanTouch = false
+
+		if Jointed[Descendant] then continue end
 
 		local GeometryWeld = Instance.new("WeldConstraint")
 		GeometryWeld.Name = "@RigGeometryWeld"
@@ -309,9 +319,39 @@ end
 --@ and child geometry except where the model authors a child of the same name. The model is first
 --@ matched to the rig piece's position and orientation, so the rig's own joint then holds it
 --@ exactly as it holds the rig's mesh.
+local function NestedPart(Root : BasePart, Name : string) : BasePart?
+	for _, Descendant in Root:GetDescendants() do
+		if Descendant:IsA("BasePart") and Descendant.Name == Name then return Descendant end
+	end
+
+	return nil
+end
+
+local function RebindNestedJoints(Clone : BasePart, Piece : BasePart, Offset : CFrame?)
+	for _, Joint in Clone:GetDescendants() do
+		if not Joint:IsA("JointInstance") then continue end
+
+		if Joint.Part0 == Piece then
+			Joint.Part0 = Clone
+
+			if Offset then
+				Joint.C0 = Offset:Inverse() * Joint.C0
+			end
+		end
+
+		local Part1 = Joint.Part1
+
+		if Part1 and Part1 ~= Clone and not Part1:IsDescendantOf(Clone) then
+			Joint.Part1 = NestedPart(Clone, Part1.Name)
+		end
+	end
+end
+
 local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[string]: boolean}) : (BasePart, CFrame?)
 	if not Variant or Variant:GetAttribute("RigPiece") ~= Piece.Name then
-		return Piece:Clone(), nil
+		local Clone = Piece:Clone()
+		RebindNestedJoints(Clone, Piece, nil)
+		return Clone, nil
 	end
 
 	local RigOffset = Variant:GetAttribute("RigOffset")
@@ -350,6 +390,8 @@ local function ClonePiece(Piece : BasePart, Variant : BasePart?, LimbOwned : {[s
 			Copy.WorldCFrame = Child.WorldCFrame
 		end
 	end
+
+	RebindNestedJoints(Clone, Piece, Offset)
 
 	return Clone, Offset
 end
@@ -465,6 +507,7 @@ function CharacterProfile:ApplyRig(Character : Model, Tool : Tool?)
 		local Piece = Joint.Part1
 
 		if not Limb or not Piece then continue end
+		if Piece.Parent ~= Template then continue end
 
 		local CharacterLimb = Character:FindFirstChild(Limb.Name)
 

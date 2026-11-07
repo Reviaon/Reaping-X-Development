@@ -41,6 +41,7 @@ Schema.Projectile = {
 	release_shake = "string",
 	sever_carry = "number",
 	arm_pitch = "table",
+	aim_line = "string",
 }
 
 Schema.ProjectileArmPitch = {

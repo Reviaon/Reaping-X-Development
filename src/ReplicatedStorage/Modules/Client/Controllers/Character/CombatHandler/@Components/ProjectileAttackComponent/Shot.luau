@@ -54,7 +54,7 @@ local function victimOf(instance: Instance?): Model?
 	return if model and model:IsA("Model") then model else nil
 end
 
-local function build(controller, state, projectile)
+function Shot.Build(controller, state, projectile)
 	local root = controller.HumanoidRootPart
 	if not root then return nil end
 
@@ -73,7 +73,7 @@ local function build(controller, state, projectile)
 end
 
 function Shot.Fire(controller, state, projectile)
-	local shot = build(controller, state, projectile)
+	local shot = Shot.Build(controller, state, projectile)
 	if not shot then return end
 
 	shotCounter += 1

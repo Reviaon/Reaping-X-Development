@@ -42,6 +42,22 @@ local function weldFor(state, piece: BasePart, arrow: BasePart, offset: CFrame):
 	return weld
 end
 
+local function motorFor(state, piece: BasePart, arrow: BasePart): Motor6D?
+	local motor = state.motor
+	if motor and motor.Parent and motor.Part1 == arrow then return motor end
+
+	state.motor = nil
+
+	for _, descendant in piece:GetDescendants() do
+		if descendant:IsA("Motor6D") and descendant.Part1 == arrow then
+			state.motor = descendant
+			return descendant
+		end
+	end
+
+	return nil
+end
+
 function Nock.Arrow(state, projectile): BasePart?
 	local nock = projectile.nock
 	local arrow = state.piece and typeof(nock) == "table" and state.piece:FindFirstChild(nock.part or "")
@@ -62,7 +78,7 @@ function Nock.Update(Character: Model, state, projectile)
 	if not arrow or not arrow:IsA("BasePart") or not idle or not idle:IsA("Attachment") then return end
 
 	local reload = nock.reload and Character:FindFirstChild(nock.reload, true)
-	local weld = weldFor(state, piece, arrow, idle.CFrame)
+	local motor = motorFor(state, piece, arrow)
 
 	local host, offset, visible = piece, idle.CFrame, state.nocked
 	local progress = if state.phase == "Idle" then 0 else math.clamp((os.clock() - state.phaseStart) / state.clipLength, 0, 1)
@@ -81,12 +97,33 @@ function Nock.Update(Character: Model, state, projectile)
 		end
 	end
 
+	arrow.LocalTransparencyModifier = if visible then 0 else 1
+
+	local animated = motor ~= nil and host == piece
+
+	if motor and motor.Enabled ~= animated then
+		motor.Enabled = animated
+	end
+
+	if animated then
+		if state.weld and state.weld.Enabled then
+			state.weld.Enabled = false
+		end
+
+		return
+	end
+
+	local weld = weldFor(state, piece, arrow, offset)
+
+	if not weld.Enabled then
+		weld.Enabled = true
+	end
+
 	if weld.Part0 ~= host then
 		weld.Part0 = host
 	end
 
 	weld.C0 = offset
-	arrow.LocalTransparencyModifier = if visible then 0 else 1
 end
 
 function Nock.Reset(state)
@@ -98,9 +135,14 @@ function Nock.Reset(state)
 		state.heldWeld.Enabled = true
 	end
 
+	if state.motor and state.motor.Parent then
+		state.motor.Enabled = true
+	end
+
 	state.piece = nil
 	state.weld = nil
 	state.heldWeld = nil
+	state.motor = nil
 end
 
 return Nock
