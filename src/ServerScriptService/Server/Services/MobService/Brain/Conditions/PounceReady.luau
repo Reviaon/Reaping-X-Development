@@ -1,10 +1,10 @@
-local Combat = require("../../Combat")
+local Attacks = require("../../Combat/Attacks")
 
 return function(mob)
 	local pounce = mob.Config.pounce
 	if not pounce then return false end
 	if os.clock() < (mob.Blackboard.NextPounceAt or 0) then return false end
-	if Combat.Spec(mob, Combat.NextIndex(mob)).min_range then return false end
+	if Attacks.Spec(mob, Attacks.NextIndex(mob)).min_range then return false end
 
 	local distance = mob:TargetDistance()
 

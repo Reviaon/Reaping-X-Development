@@ -12,6 +12,7 @@ local DebugService = GlobalFunctions.DebugService
 local Config = require("@self/Config")
 
 local displays = {}
+local waiting = {}
 local localCharacter = nil
 
 local function resolvePath(root, path)
@@ -24,7 +25,30 @@ local function resolvePath(root, path)
 	return found
 end
 
+local function hostOf(model)
+	for _, name in Config.HostParts do
+		local part = model:FindFirstChild(name)
+
+		if part then
+			return part
+		end
+	end
+
+	return model.PrimaryPart
+end
+
+local function stopWaiting(model)
+	local connection = waiting[model]
+
+	if connection then
+		waiting[model] = nil
+		connection:Disconnect()
+	end
+end
+
 local function detach(model)
+	stopWaiting(model)
+
 	local display = displays[model]
 	if not display then return end
 
@@ -42,12 +66,14 @@ end
 local function attach(model)
 	if displays[model] then return end
 
+	stopWaiting(model)
+
 	local gui = model:FindFirstChild(Config.DisplayName, true)
 	local owned = gui == nil
 
 	if owned then
 		local template = resolvePath(ReplicatedStorage, Config.TemplatePath)
-		local host = model:FindFirstChild("Head") or model.PrimaryPart
+		local host = hostOf(model)
 
 		if not template or not host then return end
 
@@ -55,7 +81,8 @@ local function attach(model)
 		gui.Parent = host
 	end
 
-	local label = gui:FindFirstChildWhichIsA("TextLabel", true)
+	local label = gui:FindFirstChild(Config.StatusLabel, true) or gui:FindFirstChildWhichIsA("TextLabel", true)
+	local overhead = gui:FindFirstChild(Config.OverheadLabel, true)
 
 	if not label then
 		if owned then gui:Destroy() end
@@ -67,6 +94,7 @@ local function attach(model)
 	displays[model] = {
 		Gui = gui,
 		Label = label,
+		Overhead = if overhead and overhead:IsA("TextLabel") and overhead ~= label then overhead else nil,
 		Owned = owned,
 		Connections = {
 			model.Destroying:Connect(function()
@@ -85,23 +113,33 @@ local function textFor(model)
 	return remaining and string.format(Config.TimedFormat, status, remaining) or status
 end
 
-local function isMob(model)
-	return model:IsA("Model")
-		and model:FindFirstChildOfClass("Humanoid") ~= nil
-		and Players:GetPlayerFromCharacter(model) == nil
+local function consider(model)
+	if displays[model] or waiting[model] then return end
+	if not model:IsA("Model") or Players:GetPlayerFromCharacter(model) then return end
+
+	if model:FindFirstChildOfClass("Humanoid") and hostOf(model) then
+		attach(model)
+		return
+	end
+
+	waiting[model] = model.ChildAdded:Connect(function()
+		if model:FindFirstChildOfClass("Humanoid") and hostOf(model) then
+			attach(model)
+		end
+	end)
 end
 
 local function watchLiving(living)
 	for _, child in living:GetChildren() do
-		if isMob(child) then attach(child) end
+		consider(child)
 	end
 
-	living.ChildAdded:Connect(function(child)
-		if isMob(child) then attach(child) end
-	end)
+	living.ChildAdded:Connect(consider)
 
 	living.ChildRemoved:Connect(function(child)
-		if child ~= localCharacter then detach(child) end
+		if child ~= localCharacter then
+			detach(child)
+		end
 	end)
 end
 
@@ -117,6 +155,13 @@ function StatusDisplayHandler:Load()
 
 		for model, display in displays do
 			display.Label.Text = textFor(model)
+
+			if display.Overhead then
+				local line = model:GetAttribute(DebugService.Settings.Overhead)
+
+				display.Overhead.Text = line or ""
+				display.Overhead.Visible = line ~= nil
+			end
 		end
 	end)
 

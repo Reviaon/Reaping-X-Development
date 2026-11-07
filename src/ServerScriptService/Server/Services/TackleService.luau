@@ -97,7 +97,7 @@ function TackleService:Impact(attacker: Model, victim: Model)
 
 	CombatService:SceneStrike(victim, { Damage = impact.Damage })
 	CombatService:ApplyFinisher(victim, direction.Unit, impact.Launch)
-	CombatService.Provoked:Fire(attacker, victim)
+	CombatService.Provoked:Fire(attacker, victim, impact.Damage)
 end
 
 function TackleService:HandleHit(player: Player, victim, hitAt, variant)

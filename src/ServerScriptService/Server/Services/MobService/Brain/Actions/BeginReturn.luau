@@ -1,5 +1,6 @@
 return function(mob)
-	mob:SetTarget(nil)
+	mob.Blackboard.Retreating = mob.Target ~= nil
 	mob.Blackboard.Returning = true
+	mob:SetTarget(nil)
 	return true
 end

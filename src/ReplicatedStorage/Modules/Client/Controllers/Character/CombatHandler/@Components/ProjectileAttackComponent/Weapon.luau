@@ -1,5 +1,5 @@
 local Config = require("./Config")
-local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Service/ProjectileService")
+local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Combat/ProjectileService")
 
 local Weapon = {}
 

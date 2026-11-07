@@ -1,4 +1,4 @@
-local Feeding = require("../../Feeding")
+local Feeding = require("../../World/Feeding")
 
 return function(mob)
 	if not mob.Config.feed then return false end

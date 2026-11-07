@@ -1,4 +1,4 @@
-local Registry = require("../Registry")
+local Registry = require("../Core/Registry")
 local Status = require("./Status")
 
 local Tree = {}

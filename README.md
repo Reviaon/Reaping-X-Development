@@ -180,11 +180,25 @@ controller.foo = value        --@ writes land in the controller's State table
 That last line is the part that surprises people. Both controllers have a `__newindex` routing
 writes into an internal `State` table, and an `__index` that resolves **methods, then State, then
 `GlobalFunctions`**. So `controller.AttackService` is not a field anybody assigned — it is the
-`GlobalFunctions` fallback finding `Service/AttackService.luau` by name.
+`GlobalFunctions` fallback finding `Combat/AttackService.luau` by name.
 
-`GlobalFunctions` is a lazily-populated registry keyed by module name. Drop a module in
-`JLoader/Shared/GlobalFunctions/Service/` and it is reachable as `controller.<ModuleName>` from both
-sides, with no registration step.
+`GlobalFunctions` is a lazily-populated registry keyed by module name. It looks at its direct
+children, then one folder down, so a module dropped into any category folder is reachable as
+`controller.<ModuleName>` from both sides, with no registration step. Names must stay unique across
+folders, and a module nested two folders deep is **not** found.
+
+```
+JLoader/Shared/GlobalFunctions/
+  Controllers/   ClientController, ServerController, InputHandler
+  Combat/        AttackService, HitboxService, KnockbackService, ProjectileService, PairSceneService,
+                 RagdollService, CooldownService, TrajectoryService, AimLineService
+  Character/     CharacterService, AnimatorService, StatusService, StatusResolver
+  Effects/       EffectService, ForgeVFX (vendored), CastVisualsService, SoundService, CameraShaker
+  World/         PhysicsService, PositionService, RaycastService, PartCache, WorldConstants, DestructionConstants
+  Debug/         DebugService
+  Utility/       Signal, Trove, Spring, Bezier, MathService, TableUtil, ValueObjectUtils, GetPath, Net,
+                 MouseModule, Components
+```
 
 **Every profile has an id.** `profile.Id` is unique per profile instance and readable —
 `Player_Sizzorsx_1`, `NPC_Dummy_4` — and is mirrored onto the character as a `ProfileId` attribute,
@@ -289,8 +303,8 @@ schedules cannot cancel each other.
 Create `ServerScriptService/Server/Services/MyService.luau`, `Jloader.CreateService({...})`, `return`
 it. Only direct children of `Services` are registered — a subfolder is not walked.
 
-A shared utility that both sides need is not a service. Put it in
-`JLoader/Shared/GlobalFunctions/Service/` and reach it as `controller.MyThing`.
+A shared utility that both sides need is not a service. Put it in the matching
+`JLoader/Shared/GlobalFunctions/<Category>/` folder and reach it as `controller.MyThing`.
 
 ---
 
@@ -379,23 +393,55 @@ Notes that are not obvious:
 Server-only, in `ServerScriptService/Server/Services/MobService/` plus `MobSpawnService`. Every mob runs the
 same framework; a mob is data, not code.
 
+```
+MobService/
+  init.luau        the service API: Spawn, Despawn, GetMob, Inspect
+  Config.luau      merge + derived sizes
+  Defaults.luau    every tunable
+  Core/            Mob, Registry, Scheduler, Telemetry
+  Body/            Rig, Animation, Motion, Spacing
+  Brain/           Tree, StateMachine, Status, Blackboard/, Nodes/, Conditions/, Actions/, States/, Trees/
+  Senses/          Perception, Sight/, Awareness/
+  Combat/          Attacks, Dodge, Threat/
+  World/           Obstacles, Feeding
+  Path/            pathfinding steering
+  Team/            packs
+  Inspect/         debugging (`ai` in the Konsole)
+```
+
+A new module goes in the folder for what it is *about*. A system with several files is its own folder
+(init + subscripts), inside the category that owns it.
+
 | Piece | Role |
 | --- | --- |
 | `Defaults.luau` | Every tunable, shared by all mobs. Aggression is tuned **here** so it applies everywhere. |
 | `Libraries/MobLibrary/<Name>.luau` | One mob's differences from `Defaults`. Merged over them (nested tables merge, lists replace, `false` disables). |
 | `Config.luau` | Does the merge, then derives size-based values (`attack.reach`, `attack_range`, `pounce.range`, `pack.clearance`, `pack.orbit_radius`) from the measured body when an entry leaves them out. |
-| `Trees/Hunter.luau` | The shared brain: disabled → returning → acquire target → leash / rally / sidestep / attack / pounce / chase / circle → wander. |
-| `Awareness/` | What a mob reads off its target, never the arrow itself. `Draw` watches the target's bow state (`ProjectileState`) and facing and decides when to sidestep a drawn aim (`ProjectileIncoming` → `Dash` kind `sidestep`). `Release` reacts to `RangedService.Fired` along the shot's line. `Sidestep` holds the shared cooldown, lock rules, hop point and `[Awareness]` debug lines. Tuned by `dash.sidestep`. |
+| `Brain/Trees/Hunter.luau` | The shared brain: disabled → returning (unless prey is noticed on the way) → acquire target → leash / rally / sidestep / stalk an unreachable target / ability / attack / pounce / chase / circle → search for lost prey → head home if away → wander. Abilities and pounce also need `LaneClear`, so nothing leaps through a wall. |
+| `Senses/Awareness/` | What a mob reads off its target, never the arrow itself. `Draw` watches the target's bow state (`ProjectileState`) and facing and decides when to sidestep a drawn aim (`ProjectileIncoming` → `Dash` kind `sidestep`). `Release` reacts to `RangedService.Fired` along the shot's line. `Sidestep` holds the shared cooldown, lock rules, hop point and `[Awareness]` debug lines. Tuned by `dash.sidestep`. |
 | `Brain/` | Behaviour-tree nodes, conditions, actions and states, each its own module found by name. A tree leaf asks the state machine for a state; the state runs enter/update/exit. |
-| `Rig.luau` | Turns a template into a mob once per type: strips AnimSaves, scales, adds a collider `HumanoidRootPart` + R15 Humanoid, disables unused Humanoid states. Spawns clone that prototype. |
-| `Motion.luau` | Per-frame easing, turning (an AlignOrientation, AutoRotate off) and arrival braking. |
-| `Team.luau` | Packs: a shared target, one attack slot handed to the nearest teammate, the rest circling. |
-| `Spacing.luau` | Body-shaped separation between all mobs, via a per-frame spatial grid. |
-| `Scheduler.luau` / `Telemetry.luau` | Distance tiers for brain rate and animation culling; a cost readout on `JLoader.Services.MobService` attributes. |
+| `Body/Rig.luau` | Turns a template into a mob once per type: strips AnimSaves, scales, adds a collider `HumanoidRootPart` + R15 Humanoid, disables unused Humanoid states. Spawns clone that prototype. |
+| `Body/Motion.luau` | Per-frame easing, turning (an AlignOrientation, AutoRotate off) and arrival braking. |
+| `Team/` | Packs: a shared target, one attack slot handed to the nearest teammate, the rest circling. One part per responsibility (`Targets`, `Balance`, `Slots`, `BreakIns`, `Reservations`, `Orbit`, `Reach`); each part owns its tables, adds its methods to the team and forgets a mob that leaves. A new pack behaviour is a new part listed in `Team/init`. |
+| `Path/` | A steering service, not a decision maker. `Path.Steer(mob, goal, target?)` returns a waypoint or nil (run straight). Running straight, a throttled lane spherecast (`Probe`) or being stuck asks for a path; following one, the lane is re-checked only when a waypoint is consumed, and a clear lane drops the path. Stuck always means replan from here. Requests go through `Queue`, one pending per mob (latest wins) and `MaxInFlight` computes at a time, with `SupportPartialPath`. A `ClosestNoPath` result, or `attempts` stuck replans without closing in, is **evidence** that the target is unreachable: kept for `recheck` seconds, shared with the pack through `Team/Reach`, read by the `TargetUnreachable` condition (which routes to `Stalk`: wait at the closest reachable point, re-testing before the evidence expires) and by threat. Used by `Chase`, `Return` and `Stalk`; tuned by `path` (`false` = straight lines). |
+| `Combat/Threat/` | Who a provoked mob fights. Every `CombatService.Provoked` (now carrying the damage) adds `threat.provoke + damage × threat.damage` to that attacker's entry in `mob.Ledger`, decaying linearly over `threat.decay`. `Select` scores entries (plus a proximity bonus, scaled by `unreachable.scale` for a target `Path` has proven unreachable or that is held `unreachable.height` above it) and keeps the focus through `min_dwell` and `switch_margin`. `Mob:Provoke` / `Mob:Provoker` / `Mob:Calm` are the API; `AcquireTarget`, `Team` balancing, rally calls, flee and the leash all read it through them. |
+| `Brain/Blackboard/` | Every per-mob blackboard key, declared in `Brain/Blackboard/Keys` with its type and owner. In Studio the board warns once on an undeclared key or a wrong type; live servers get a plain table. Declare a key before a node uses it. |
+| `Senses/Sight/` | What a mob knows about. `Eyes` casts from `sight.eye_height` above the root to the target's head, then its root, through `Obstacles` (the world minus `World.Live`/`Visuals`, non-collidable parts ignored, shared with `Path/Probe`). Each look stays fresh for `sight.interval`. A mob **notices** a player it sees or hears (within `hear_range`, walls or not), and **keeps** a target while it notices them or while its own or any packmate's last sighting (`Team/Sightings`) is within `memory`. `AcquireTarget` and `Team:Holds` read it; provoked threat ignores it (a hit is evidence). Projectile sidesteps need the mob to see the archer. `sight = false` sees through walls. |
+| `Inspect/` | Read-only debugging. `Sections/<Name>` each give a one-line `Brief` (for the overhead) and a multi-line `Report` (for the console): `State`, `Threat`, `Sight`, `Path`, `Team`. `Verbs/<Name>` act on the selection: `Reselect` (drop the threat focus and dwell, rebalance the pack, re-decide), `Calm` (clear threat), `Stats` (state counts, step cost, path queue, sight rays per second), `Zones` (each spawn zone's status). A new section or verb is a new module; `Inspect/Config` sets the radius, report order and overhead rows. Sections read through each system's own describe hooks (`Threat.Dump`, `Path.Describe`, `Team:Describe`, which asks every `Team/` part with a `Describe`). The state machine writes `MobState` on every transition; while `debug` is on, each think publishes the brief to the `DebugOverhead` attribute, only when it changes. |
+| `Body/Spacing.luau` | Body-shaped separation between all mobs, via a per-frame spatial grid. |
+| `MobSpawnService/` | Zones (Parts tagged `MobZone`) spawn **a whole group at once**, never one mob at a time. Group size comes from the mob's `spawn.group` (rolled per wave; the zone's `Cap` attribute clamps it). A zone refills only once it is empty: after `spawn.respawn` seconds from the last kill (the zone's `Respawn` attribute overrides), or right away if the group was despawned for being abandoned. `Placement` picks one anchor and lands the rest within `spawn.spread`. Each spot must be walkable ground (`MaxSlope`, no water), have a clear body-sized box (`ClearanceMargin`), sit `MinPlayerDistance` from every player, and be out of every player's sight within `ConcealRange`. Parts at least 95% transparent don't count as cover (`Obstacles.Sightline`, which wolf sight uses too). A group that doesn't fit its minimum waits `RetryDelay`. Every member's `Home` is the anchor. `Budget` fills the zones nearest a player first, under `GlobalCap`. `Population` despawns mobs left `DespawnRange` from every player for `DespawnGrace`. `ai zones` prints each zone's status. |
+| `Core/Scheduler.luau` / `Core/Telemetry.luau` | Distance tiers for brain rate and animation culling; a cost readout on `JLoader.Services.MobService` attributes. |
 
 What keeps a mob aggressive (all in `Defaults`): it chases where you are *going* (`chase_lead`), bursts
 in from mid range (`pounce`), rotates attackers quickly (`pack.bites_per_turn`, `pack.rest_time`), stays on
-whoever hits it (`provoke_time`) and holds the pack's target while any packmate is near it. Now and then it
+whoever has earned the most threat (`threat`: hits, damage and closeness, decaying over 12 s, with a dwell and a switch margin so it doesn't flip-flop)
+and holds the pack's target while any packmate is near it. **It is hard to shake:** a mob that still
+knows where its prey is (`sight`) ignores `leash_range` and gives up only past `hunt_range` (400 studs
+from home) unless it was just hit. That retreat is committed: it runs home without looking around until
+it is back inside `leash_range`. Losing the prey isn't giving up either. It runs to the last place it or
+any packmate saw them and searches there (`search`: 8 s, 14 studs) before heading home. Heading home
+from past `return_run` (60 studs) is a run, not a walk. An ordinary return still notices a survivor on
+the way and turns back. Now and then it
 reads a drawn bow aimed at it and hops off the aim line before the shot, or hops as the shot is released
 (`dash.sidestep`: one roll per draw, `release.chance` per shot, one shared cooldown). A release hop marks
 the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`ProjectileDodgeUntil`) for
@@ -413,7 +459,9 @@ the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`Projec
 | `animations` | Key → Animation name in `Storage.Animations.Mobs.<Mob>` (the template's AnimSaves in Studio). |
 
 Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
-removes them.
+removes them. `ai [state|threat|sight|path|team|reselect|calm|stats|zones] [all]` inspects the nearest mob within
+120 studs (every one with `all`); with no word it prints every section. While `debug` is on, every mob's
+status overhead adds two lines: state and target (with threat), then slot and path.
 
 ---
 
@@ -447,8 +495,9 @@ removes them.
    }
    ```
 
-4. **Spawn it.** `mob Bear` in the Konsole, or a Part tagged `MobZone` with attributes `Mob = "Bear"`, `Cap`,
-   `Interval` (and `Team` to share one pack across zones).
+4. **Spawn it.** `mob Bear` in the Konsole, or a Part tagged `MobZone` with attribute `Mob = "Bear"`. Optional
+   attributes: `Cap` (most per wave), `Respawn` (seconds after the last kill) and `Team` (share one pack
+   across zones). Group size and respawn default to the entry's `spawn` table.
 5. **Check it.** Reach and spacing come from the body size; set `attack.reach` if the head sits far ahead
    of the body's middle. If two directional clips swing the body around when they cross-fade, list them in
    `animation_exclusive`.
@@ -470,7 +519,7 @@ input -> CombatHandler:BeginBranch -> LightAttackComponent:Activate
       -> AttackService:ScheduleImpulse         lunge
 ```
 
-`HitboxService` (Voided's library, vendored under `GlobalFunctions/Service`) polls every
+`HitboxService` (Voided's library, vendored under `GlobalFunctions/Combat`) polls every
 `PreSimulation` until `Dispose`, so lifetime is a scheduled `Dispose` rather than a one-shot query.
 Two constraints worth knowing before calling it directly:
 
@@ -952,14 +1001,16 @@ through its public API from `Server/Services/KonsoleService.luau`. Open it in ga
 give <weapon> [target]     spawn [npc] [weapon] [count]
 clearweapons [target]      clearnpcs
 debug [on|off|toggle]      aggro [on|off|toggle]
-arm <weapon>
+arm <weapon>               mob [name] [count]
+ai [section|verb] [all]
 ```
 
 `spawn Dummy Sword 2` drops two sword dummies; `arm` re-equips every NPC in `World.Live` (Melee
 disarms) and `aggro` flips their `Aggressive` attribute — see "The attacking dummy".
 
 `debug` drives everything debug-gated at once — hitbox volumes, the per-swing hit report and the
-status UI — through `DebugService`, which is a replicated attribute on `ReplicatedStorage`. Unset it
+status UI (including the mob brain line any server system can set through the `DebugService.Settings.Overhead`
+attribute) — through `DebugService`, which is a replicated attribute on `ReplicatedStorage`. Unset it
 falls back to `RunService:IsStudio()`, so behaviour is unchanged until somebody sets it. Read it with
 `controller.DebugService.IsEnabled()` and follow it with `.Changed(fn)`.
 

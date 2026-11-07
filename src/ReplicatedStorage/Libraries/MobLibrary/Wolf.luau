@@ -3,6 +3,7 @@ return {
 	scale = 0.8, --@ Model:ScaleTo factor applied once to the prototype
 	health = 120,
 	run_speed = 50, --@ Chase speed; faster than the default
+	spawn = { group = { 3, 4 } }, --@ A zone spawns a whole pack at once
 
 	attack = {
 		speed = 1.2,

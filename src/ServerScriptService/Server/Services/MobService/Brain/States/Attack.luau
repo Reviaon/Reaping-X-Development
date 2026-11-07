@@ -1,4 +1,4 @@
-local Combat = require("../../Combat")
+local Attacks = require("../../Combat/Attacks")
 
 local ATTACKING = "IsAttacking"
 local MARKER_GRACE = 0.5
@@ -61,13 +61,13 @@ local function specFor(mob, args)
 
 	if name then
 		blackboard.PendingAbility = nil
-		return Combat.Ability(mob, name)
+		return Attacks.Ability(mob, name)
 	end
 
-	local index = Combat.NextIndex(mob)
+	local index = Attacks.NextIndex(mob)
 	blackboard.Combo = index
 
-	return Combat.Spec(mob, index)
+	return Attacks.Spec(mob, index)
 end
 
 local function follow(mob, data, landed: boolean)
@@ -113,8 +113,8 @@ return {
 
 		mob:Stop()
 		face(mob)
-		Combat.Press(mob, spec)
-		Combat.Visual(mob, spec)
+		Attacks.Press(mob, spec)
+		Attacks.Visual(mob, spec)
 
 		if spec.animation then
 			data.Animation = spec.animation

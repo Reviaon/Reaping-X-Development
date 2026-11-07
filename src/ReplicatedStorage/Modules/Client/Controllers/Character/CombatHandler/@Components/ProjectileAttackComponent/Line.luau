@@ -1,6 +1,6 @@
 local Shot = require("./Shot")
-local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Service/ProjectileService")
-local AimLineService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Service/AimLineService")
+local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Combat/ProjectileService")
+local AimLineService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Combat/AimLineService")
 
 local Line = {}
 

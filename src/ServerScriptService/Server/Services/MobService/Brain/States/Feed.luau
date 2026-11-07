@@ -1,6 +1,6 @@
 local CorpseLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/CorpseLibrary")
-local Combat = require("../../Combat")
-local Feeding = require("../../Feeding")
+local Attacks = require("../../Combat/Attacks")
+local Feeding = require("../../World/Feeding")
 
 local REFRESH = 0.25
 local ARRIVE_DISTANCE = 2
@@ -79,11 +79,11 @@ local function startEating(mob, data)
 	mob.Model:SetAttribute(FEEDING, true)
 
 	track.Looped = true
-	Combat.Shot(mob, visual)
+	Attacks.Shot(mob, visual)
 
 	data.Markers = {
 		track.DidLoop:Connect(function()
-			Combat.Shot(mob, visual)
+			Attacks.Shot(mob, visual)
 		end),
 		track:GetMarkerReachedSignal(REMOVE_MARKER):Connect(function()
 			bite(mob, data)

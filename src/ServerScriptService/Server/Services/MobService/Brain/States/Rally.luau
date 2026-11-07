@@ -1,5 +1,5 @@
 local Jloader = require("@game/ReplicatedStorage/JLoader")
-local Combat = require("../../Combat")
+local Attacks = require("../../Combat/Attacks")
 
 local FALLBACK_LENGTH = 3
 local SCREECHING = "IsScreeching"
@@ -33,7 +33,7 @@ return {
 			mob.Team:ReleaseSlot(mob)
 		end
 
-		Combat.Shot(mob, rally.visual)
+		Attacks.Shot(mob, rally.visual)
 
 		local shake = rally.shake
 
@@ -41,7 +41,7 @@ return {
 			data.Markers = {
 				data.Track:GetMarkerReachedSignal(shake.from):Connect(function()
 					mob.Model:SetAttribute(SCREECHING, true)
-					Combat.Shot(mob, shake.visual)
+					Attacks.Shot(mob, shake.visual)
 				end),
 				data.Track:GetMarkerReachedSignal(shake.to):Connect(function()
 					mob.Model:SetAttribute(SCREECHING, nil)

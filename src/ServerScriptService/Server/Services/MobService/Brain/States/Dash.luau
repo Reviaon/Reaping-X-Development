@@ -1,5 +1,5 @@
-local Combat = require("../../Combat")
-local Awareness = require("../../Awareness")
+local Attacks = require("../../Combat/Attacks")
+local Awareness = require("../../Senses/Awareness")
 
 local IFRAMES = "IFrames"
 local UP = Vector3.new(0, 1, 0)
@@ -51,7 +51,7 @@ local function animate(mob, dash, data, direction: Vector3, now: number)
 		data.Animation = animation
 		data.AnimatedAt = now
 		mob.Animation:PlayAction(animation, dash.playback)
-		Combat.Shot(mob, dash.visual, dash.playback)
+		Attacks.Shot(mob, dash.visual, dash.playback)
 	end
 end
 

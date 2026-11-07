@@ -541,6 +541,24 @@ function Implementations.spawnMobServer(context)
 	return context.reply(("spawned %d %s %d studs ahead"):format(spawned, name, settings.MobSpawnDistance))
 end
 
+function Implementations.inspectMobServer(context)
+	local caller = context.entity
+	local character = caller and caller.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return context.err("no-character", "you need a character to inspect from")
+	end
+
+	local text, problem = Jloader.GetService("MobService"):Inspect(root.Position, argumentsOf(context))
+
+	if not text then
+		return context.err("no-mob", problem)
+	end
+
+	return context.reply(text)
+end
+
 function Implementations.armServer(context)
 	local living = livingFolder()
 	if not living then
@@ -790,6 +808,28 @@ function KonsoleService:Init()
 				name = "count",
 				type = "string",
 				required = false,
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "ai",
+		rank = settings.CommandRank,
+		aliases = { "mobai", "brain" },
+		description = "Inspects the nearest mob's brain (state, threat, path, team), or every mob near you with 'all'; reselect, calm and stats act on them.",
+		server = "inspectMobServer",
+		args = {
+			{
+				name = "what",
+				type = "string",
+				required = false,
+				suggestions = Jloader.GetService("MobService"):InspectWords(),
+			},
+			{
+				name = "all",
+				type = "string",
+				required = false,
+				suggestions = { "all" },
 			},
 		},
 	})

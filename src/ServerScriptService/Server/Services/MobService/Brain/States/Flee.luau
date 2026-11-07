@@ -1,4 +1,4 @@
-local Perception = require("../../Perception")
+local Perception = require("../../Senses/Perception")
 
 local REFRESH = 0.3
 
@@ -23,7 +23,7 @@ return {
 		end
 
 		mob:SetTarget(nil)
-		mob.Blackboard.Provoker = nil
+		mob:Calm()
 		mob:Unface()
 	end,
 
@@ -40,5 +40,6 @@ return {
 	Exit = function(mob)
 		mob:Stop()
 		mob.Blackboard.Returning = true
+		mob.Blackboard.Retreating = true
 	end,
 }

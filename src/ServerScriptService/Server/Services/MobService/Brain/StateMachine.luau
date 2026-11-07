@@ -1,4 +1,5 @@
 local Tree = require("./Tree")
+local InspectConfig = require("../Inspect/Config")
 
 local StateMachine = {}
 StateMachine.__index = StateMachine
@@ -27,7 +28,7 @@ function StateMachine:Request(name: string, args, force: boolean?): boolean
 	if self.Name == name and not self:IsDone() then return true end
 	if not force and self:IsLocked() then return false end
 
-	self:Exit()
+	self:Leave()
 
 	local state = Tree.States[name]
 
@@ -35,6 +36,8 @@ function StateMachine:Request(name: string, args, force: boolean?): boolean
 	self.State = state
 	self.Data = {}
 	self.EnteredAt = os.clock()
+
+	self.Mob.Model:SetAttribute(InspectConfig.StateAttribute, name)
 
 	if state.Enter then
 		state.Enter(self.Mob, self.Data, args)
@@ -51,6 +54,13 @@ function StateMachine:Update(dt: number)
 end
 
 function StateMachine:Exit()
+	if not self.State then return end
+
+	self:Leave()
+	self.Mob.Model:SetAttribute(InspectConfig.StateAttribute, nil)
+end
+
+function StateMachine:Leave()
 	local state = self.State
 	if not state then return end
 

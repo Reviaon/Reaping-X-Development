@@ -1,5 +1,5 @@
 return {
-	tree = "Hunter", --@ MobService.Trees module
+	tree = "Hunter", --@ MobService.Brain.Trees module
 	scale = 1, --@ Model:ScaleTo factor
 	health = 100,
 	corpse_time = 3, --@ Seconds the body stays
@@ -13,9 +13,50 @@ return {
 
 	detect_range = 75, --@ Studs it notices players from
 	lose_range = 110, --@ Studs it drops its target past
-	leash_range = 150, --@ Studs from home it returns past
+	leash_range = 150, --@ Studs from home a mob with no prey heads back past
+	hunt_range = 400, --@ Studs from home a hunt gives up past unless it was just hit; it then retreats without looking until back within leash_range
+	return_run = 60, --@ Studs from home past which a returning mob runs instead of walking
 	home_radius = 6, --@ Studs from home that count as home
-	provoke_time = 12, --@ Seconds it stays on whoever hit it
+	search = { --@ What it does after losing its prey; false gives up on the spot
+		time = 8, --@ Seconds it hunts around the last place it or a packmate saw the prey
+		radius = 14, --@ Studs around that place it sniffs through
+	},
+	spawn = { --@ How MobSpawnService zones spawn it; a zone's Cap and Respawn attributes override
+		group = { 1, 1 }, --@ How many spawn together, rolled per wave
+		respawn = 45, --@ Seconds after the last kill before a cleared zone spawns again
+		spread = 16, --@ Studs around the first spawn point the rest of the group lands within
+	},
+	sight = { --@ Line of sight for noticing and keeping targets; false sees through everything
+		interval = 0.3, --@ Seconds one look at a target stays fresh
+		memory = 6, --@ Seconds it keeps a target it can't see; any packmate's sighting renews it
+		hear_range = 18, --@ Studs it senses players within, walls or not
+		eye_height = 1.5, --@ Studs above its root it looks from
+	},
+	threat = { --@ Who it fights once provoked: a decaying ledger per player
+		decay = 12, --@ Seconds a player's threat takes to fade to zero
+		provoke = 60, --@ Threat for any hostile act (hit, push, tackle, rally call)
+		damage = 10, --@ Extra threat per point of damage dealt
+		proximity = 30, --@ Most bonus for standing close; fades out at detect_range
+		min_dwell = 1.5, --@ Seconds it keeps a new focus before it may switch
+		switch_margin = 0.3, --@ A challenger needs this much more threat to take focus
+		unreachable = { height = 10, after = 3, scale = 0.25 }, --@ Scales threat of a target it can't path to, or held height above it for after seconds
+	},
+
+	path = { --@ Pathfinding for chase, return and stalk; false keeps straight lines only
+		min_distance = 12, --@ Closer than this it runs straight without probing
+		probe_range = 12, --@ Studs past its nose the lane probe reaches
+		probe_scale = 0.6, --@ Lane probe radius as a share of the body radius
+		probe_interval = 0.4, --@ Seconds between lane probes while running straight
+		stuck_time = 1, --@ Seconds without covering stuck_step that count as stuck
+		stuck_step = 2, --@ Studs of travel that reset the stuck timer
+		repath = 0.75, --@ Fewest seconds between path requests
+		retarget = 10, --@ Studs the goal may drift before the path is replanned
+		waypoint_reach = 4, --@ Studs that consume a waypoint (at least body radius + 1.5)
+		attempts = 3, --@ Stuck replans in a row without closing in before the target counts as unreachable
+		recheck = 4, --@ Seconds before an unreachable target is tested again
+		agent_height = 6, --@ Pathfinding agent height
+		can_jump = false, --@ Pathfinding agent may jump
+	},
 	chase_lead = 0.45, --@ Seconds of target movement it cuts ahead of
 
 	wander_radius = 28,

@@ -1,4 +1,5 @@
-local Combat = require("../../Combat")
+local Attacks = require("../../Combat/Attacks")
+local Path = require("../../Path")
 
 local REFRESH = 0.2
 
@@ -16,11 +17,11 @@ end
 local function backOff(mob, spec)
 	local animation = spec.back_off and spec.back_off.animation
 
-	mob:Burst(Combat.BackOffSpeed(mob, spec))
+	mob:Burst(Attacks.BackOffSpeed(mob, spec))
 
 	if animation then
 		mob.Animation:PlayAction(animation)
-		Combat.Shot(mob, spec.back_off.visual)
+		Attacks.Shot(mob, spec.back_off.visual)
 	end
 end
 
@@ -30,7 +31,7 @@ return {
 		if not root then return end
 
 		local distance = mob:TargetDistance()
-		local spec = Combat.Spec(mob, Combat.NextIndex(mob))
+		local spec = Attacks.Spec(mob, Attacks.NextIndex(mob))
 		local now = os.clock()
 
 		if spec.min_range and distance < spec.min_range then
@@ -44,7 +45,7 @@ return {
 			if data.MovedAt and now - data.MovedAt < REFRESH then return end
 
 			data.MovedAt = now
-			mob:MoveTo(backOffPoint(mob, root.Position, Combat.StandOff(spec)), Combat.BackOffSpeed(mob, spec))
+			mob:MoveTo(backOffPoint(mob, root.Position, Attacks.StandOff(spec)), Attacks.BackOffSpeed(mob, spec))
 			return
 		end
 
@@ -52,6 +53,7 @@ return {
 
 		if distance <= spec.range then
 			data.MovedAt = nil
+			Path.Reached(mob)
 			mob:Stop()
 			mob:Face(root.Position)
 			return
@@ -62,13 +64,15 @@ return {
 		if data.MovedAt and now - data.MovedAt < REFRESH then return end
 
 		local lead = math.min(mob:Setting("chase_lead"), distance / math.max(mob:Setting("run_speed"), 1))
+		local waypoint = Path.Steer(mob, root.Position, mob:GetTarget())
 
 		data.MovedAt = now
-		mob:MoveTo(mob:EngagePoint(mob:LeadPoint(lead), Combat.StandOff(spec)), "run_speed")
+		mob:MoveTo(waypoint or mob:EngagePoint(mob:LeadPoint(lead), Attacks.StandOff(spec)), "run_speed")
 	end,
 
 	Exit = function(mob)
 		mob:Stop()
 		mob:Unface()
+		Path.Drop(mob)
 	end,
 }

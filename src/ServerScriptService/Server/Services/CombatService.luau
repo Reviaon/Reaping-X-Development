@@ -297,7 +297,7 @@ end
 function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?, contact)
 	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
 
-	self:ApplyDamage(attacker, victim, weaponId, comboIndex)
+	local damage = self:ApplyDamage(attacker, victim, weaponId, comboIndex)
 
 	local recovery = self.Settings.RecoveryStatus
 
@@ -306,7 +306,7 @@ function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId
 	end
 
 	self:BroadcastHit(attacker, victim, weaponId, comboIndex, except, contact)
-	self.Provoked:Fire(attacker, victim)
+	self.Provoked:Fire(attacker, victim, damage)
 
 	return true
 end

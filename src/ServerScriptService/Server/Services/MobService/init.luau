@@ -5,16 +5,17 @@ local RunService = game:GetService("RunService")
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local GlobalFunctions = Jloader.GlobalFunctions
 
-local Mob = require("@self/Mob")
-local Rig = require("@self/Rig")
-local Scheduler = require("@self/Scheduler")
+local Mob = require("@self/Core/Mob")
+local Rig = require("@self/Body/Rig")
+local Scheduler = require("@self/Core/Scheduler")
 local Team = require("@self/Team")
-local Telemetry = require("@self/Telemetry")
-local Spacing = require("@self/Spacing")
+local Telemetry = require("@self/Core/Telemetry")
+local Spacing = require("@self/Body/Spacing")
 local Config = require("@self/Config")
 local Tree = require("@self/Brain/Tree")
-local Dodge = require("@self/Dodge")
-local Awareness = require("@self/Awareness")
+local Dodge = require("@self/Combat/Dodge")
+local Awareness = require("@self/Senses/Awareness")
+local Inspect = require("@self/Inspect")
 
 local MobService = Jloader.CreateService({
 	Name = script.Name,
@@ -74,7 +75,7 @@ function MobService:GetKind(name: string)
 		Config = config,
 		Template = template,
 		Prototype = prototype,
-		Tree = Tree.Get(script.Trees, config.tree),
+		Tree = Tree.Get(script.Brain.Trees, config.tree),
 	}
 
 	Kinds[name] = kind
@@ -175,6 +176,14 @@ function MobService:Count(name: string?): number
 	return count
 end
 
+function MobService:Inspect(origin: Vector3, words: { string }): (string?, string?)
+	return Inspect.Run(Mobs, origin, words, { Folder = self.Folder })
+end
+
+function MobService:InspectWords(): { string }
+	return Inspect.Words()
+end
+
 function MobService:Clear()
 	for mob in Mobs do
 		mob:Destroy()
@@ -186,11 +195,11 @@ function MobService:Load()
 		Connection:Disconnect()
 	end
 
-	Jloader.GetService("CombatService").Provoked:Connect(function(attacker, victim)
+	Jloader.GetService("CombatService").Provoked:Connect(function(attacker, victim, damage)
 		local mob = ByModel[victim]
 
 		if mob then
-			mob:Provoke(attacker)
+			mob:Provoke(attacker, damage)
 
 			if mob.Team then
 				mob.Team:NoteAssault(mob, attacker)
