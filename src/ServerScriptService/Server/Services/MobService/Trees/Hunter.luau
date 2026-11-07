@@ -36,8 +36,14 @@ return function(B)
 					B.State("Dash", { args = { kind = "regroup" } }),
 				}),
 				B.Sequence({
+					B.Condition("TargetUnreachable"),
+					B.Inverter(B.Condition("AttackInRange")),
+					B.State("Stalk"),
+				}),
+				B.Sequence({
 					B.Condition("AbilityReady"),
 					B.Condition("AttackReady"),
+					B.Condition("LaneClear"),
 					B.State("Attack", { args = { ability = true } }),
 				}),
 				B.Sequence({
@@ -55,6 +61,7 @@ return function(B)
 						}),
 						B.Sequence({
 							B.Condition("PounceReady"),
+							B.Condition("LaneClear"),
 							B.State("Pounce"),
 						}),
 						B.State("Chase"),
