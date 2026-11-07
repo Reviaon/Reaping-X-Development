@@ -16,7 +16,7 @@ function Memory.Entry(mob, target: Model)
 	local entry = memory[target]
 
 	if not entry then
-		entry = { CheckedAt = -math.huge, Visible = false, SeenAt = -math.huge }
+		entry = { CheckedAt = -math.huge, Visible = false, SeenAt = -math.huge, SeenPosition = nil }
 		memory[target] = entry
 	end
 

@@ -1,5 +1,5 @@
-local Perception = require("../Perception")
-local Sight = require("../Sight")
+local Perception = require("../Senses/Perception")
+local Sight = require("../Senses/Sight")
 
 local Targets = {}
 

@@ -8,8 +8,8 @@ function Sightings.Describe(team): { string }
 	local lines = {}
 	local now = os.clock()
 
-	for target, at in team.Sightings do
-		table.insert(lines, string.format("pack last saw %s %.1fs ago", target.Name, now - at))
+	for target, sighting in team.Sightings do
+		table.insert(lines, string.format("pack last saw %s %.1fs ago", target.Name, now - sighting.At))
 	end
 
 	return lines
@@ -17,11 +17,11 @@ end
 
 Sightings.Methods = {}
 
-function Sightings.Methods:NoteSighting(target: Model, now: number)
-	self.Sightings[target] = now
+function Sightings.Methods:NoteSighting(target: Model, now: number, position: Vector3)
+	self.Sightings[target] = { At = now, Position = position }
 end
 
-function Sightings.Methods:LastSighting(target: Model): number?
+function Sightings.Methods:LastSighting(target: Model)
 	return self.Sightings[target]
 end
 

@@ -1,4 +1,4 @@
-local Obstacles = require("../Obstacles")
+local Obstacles = require("../../World/Obstacles")
 local Perception = require("../Perception")
 
 local Eyes = {}
@@ -17,7 +17,7 @@ function Eyes.Clear(mob, target: Model, settings): boolean
 
 		casts += 1
 
-		if workspace:Raycast(origin, part.Position - origin, Obstacles.Params()) == nil then
+		if Obstacles.Sightline(origin, part.Position) then
 			return true
 		end
 	end

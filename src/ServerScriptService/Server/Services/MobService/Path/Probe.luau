@@ -1,4 +1,4 @@
-local Obstacles = require("../Obstacles")
+local Obstacles = require("../World/Obstacles")
 
 local Probe = {}
 

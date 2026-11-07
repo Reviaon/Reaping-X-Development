@@ -1,4 +1,4 @@
-local Perception = require("../Perception")
+local Perception = require("../Senses/Perception")
 local Geometry = require("./Geometry")
 
 local BreakIns = {}

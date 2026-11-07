@@ -31,9 +31,10 @@ function Sight.Sees(mob, target: Model): boolean
 
 	if entry.Visible then
 		entry.SeenAt = now
+		entry.SeenPosition = Perception.RootOf(target).Position
 
 		if mob.Team then
-			mob.Team:NoteSighting(target, now)
+			mob.Team:NoteSighting(target, now, entry.SeenPosition)
 		end
 	end
 
@@ -44,12 +45,21 @@ function Sight.Notices(mob, target: Model): boolean
 	return Sight.Hears(mob, target) or Sight.Sees(mob, target)
 end
 
-function Sight.LastSeen(mob, target: Model): number
+function Sight.LastSeen(mob, target: Model): (number, Vector3?)
 	local entry = Memory.Peek(mob, target)
-	local own = if entry then entry.SeenAt else -math.huge
-	local shared = if mob.Team then mob.Team:LastSighting(target) else nil
+	local at, position = -math.huge, nil
 
-	return math.max(own, shared or -math.huge)
+	if entry then
+		at, position = entry.SeenAt, entry.SeenPosition
+	end
+
+	local shared = mob.Team and mob.Team:LastSighting(target)
+
+	if shared and shared.At > at then
+		at, position = shared.At, shared.Position
+	end
+
+	return at, position
 end
 
 function Sight.Knows(mob, target: Model): boolean
@@ -57,7 +67,7 @@ function Sight.Knows(mob, target: Model): boolean
 	if not settings then return true end
 	if Sight.Notices(mob, target) then return true end
 
-	return os.clock() - Sight.LastSeen(mob, target) <= settings.memory
+	return os.clock() - (Sight.LastSeen(mob, target)) <= settings.memory
 end
 
 function Sight.Noticed(mob, range: number): { Model }
@@ -98,8 +108,8 @@ function Sight.Describe(mob): { string }
 
 		local shared = mob.Team and mob.Team:LastSighting(target)
 
-		if shared and shared > entry.SeenAt then
-			table.insert(senses, string.format("pack saw %.1fs ago", now - shared))
+		if shared and shared.At > entry.SeenAt then
+			table.insert(senses, string.format("pack saw %.1fs ago", now - shared.At))
 		end
 
 		if Sight.Hears(mob, target) then
