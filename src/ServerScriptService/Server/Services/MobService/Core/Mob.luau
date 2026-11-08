@@ -3,6 +3,7 @@ local GlobalFunctions = Jloader.GlobalFunctions
 
 local Animation = require("../Body/Animation")
 local Blackboard = require("../Brain/Blackboard")
+local Healing = require("../Body/Healing")
 local Attacks = require("../Combat/Attacks")
 local Inspect = require("../Inspect")
 local Motion = require("../Body/Motion")
@@ -61,6 +62,8 @@ function Mob.new(kind, model: Model, home: Vector3)
 		LastThinkAt = now,
 		NextThinkAt = now + random:NextNumber(0, 0.25),
 		LastHealth = humanoid.Health,
+		HurtAt = nil,
+		Healing = false,
 		Overhead = nil,
 		Dead = false,
 		Destroyed = false,
@@ -91,6 +94,8 @@ function Mob.new(kind, model: Model, home: Vector3)
 		local reactions = self.Config.hurt_animations
 
 		if health < self.LastHealth and health > 0 then
+			self.HurtAt = os.clock()
+
 			if reactions and #reactions > 0 and not self:IsArmored() then
 				self.Animation:PlayAction(reactions[random:NextInteger(1, #reactions)])
 			end
@@ -325,6 +330,7 @@ function Mob:Think(dt: number)
 
 	Tree.Tick(self.Tree, self, dt)
 	self.Machine:Update(dt)
+	Healing.Step(self, dt)
 	self:KeepSpace()
 	self.Animation:UpdateLocomotion()
 	Inspect.Publish(self)

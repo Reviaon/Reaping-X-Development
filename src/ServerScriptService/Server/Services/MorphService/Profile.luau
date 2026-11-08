@@ -1,5 +1,3 @@
---!strict
-
 local HttpService = game:GetService("HttpService")
 
 local MorphTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MorphTypes")
@@ -13,7 +11,7 @@ local Profile = {}
 
 local CLIENT_BITE = { "animation", "speed", "windup", "recovery", "cooldown", "reach", "reach_from", "radius", "step_in", "final" }
 local CLIENT_DASH = { "speed", "playback", "recovery", "visual", "animations" }
-local CLIENT_ABILITY = { "animation", "miss_animation", "speed", "windup", "recovery", "cooldown", "ability_cooldown" }
+local CLIENT_ABILITY = { "animation", "miss_animation", "speed", "windup", "recovery", "cooldown", "ability_cooldown", "reach", "range", "leap" }
 
 local SHOT_SLOTS = 10
 

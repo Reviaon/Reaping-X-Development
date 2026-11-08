@@ -56,9 +56,14 @@ Load.LoadRunners = function(List, controllerFactory)
 
 		local controller = controllerFactory and controllerFactory(Character) or Character
 		local IsLocal = Players.LocalPlayer ~= nil and Character == Players.LocalPlayer.Character
+		local Morphed = require(script.Parent.GlobalFunctions).CharacterService.MorphOf(Character) ~= nil
 
 		for _, Runner in ipairs(EventInits.Characters) do
 			if controllerFactory and not IsLocal and not Runner.RemoteCharacters then
+				continue
+			end
+
+			if Morphed and not Runner.Morphs then
 				continue
 			end
 

@@ -9,6 +9,7 @@ local Konsole = require(ReplicatedStorage:WaitForChild("Utilities"):WaitForChild
 local Libraries = ReplicatedStorage:WaitForChild("Libraries")
 
 local WeaponsLibrary = Libraries:WaitForChild("WeaponsLibrary")
+local MorphLibrary = Libraries:WaitForChild("MorphLibrary")
 local WeaponTiers = require(Libraries:WaitForChild("TierLibrary"):WaitForChild("WeaponTiers"))
 
 local ServerStorage = game:GetService("ServerStorage")
@@ -51,6 +52,20 @@ local function weaponNames()
 	end
 
 	table.sort(names)
+	return names
+end
+
+local function morphNames()
+	local names = {}
+
+	for _, module in MorphLibrary:GetChildren() do
+		if module:IsA("ModuleScript") then
+			table.insert(names, module.Name)
+		end
+	end
+
+	table.sort(names)
+	table.insert(names, "off")
 	return names
 end
 
@@ -559,6 +574,59 @@ function Implementations.inspectMobServer(context)
 	return context.reply(text)
 end
 
+local UNMORPH_WORDS = { off = true, human = true, none = true, back = true }
+
+local function unmorph(context, target)
+	local done, problem = Jloader.GetService("MorphService"):Unmorph(target)
+
+	if not done then
+		return context.err("not-morphed", problem)
+	end
+
+	return context.reply(target == context.entity and "you are yourself again" or ("%s is themselves again"):format(target.Name))
+end
+
+function Implementations.morphServer(context)
+	local MorphService = Jloader.GetService("MorphService")
+	local target, rest = targetOf(context, argumentsOf(context))
+
+	if not target then
+		return context.err("no-target", "nobody to morph")
+	end
+
+	local wanted = table.concat(rest, " ")
+
+	if UNMORPH_WORDS[string.lower(wanted)] then
+		return unmorph(context, target)
+	end
+
+	local name, why = resolve(wanted, MorphService:GetNames())
+
+	if not name then
+		return context.err("unknown-morph", why)
+	end
+
+	local done, problem = MorphService:Morph(target, name)
+
+	if not done then
+		return context.err("morph-failed", problem)
+	end
+
+	local who = target == context.entity and "you are" or ("%s is"):format(target.Name)
+
+	return context.reply(("%s a %s: %s; 'unmorph' turns back"):format(who, name, MorphService:Describe(name) or ""))
+end
+
+function Implementations.unmorphServer(context)
+	local target = targetOf(context, argumentsOf(context))
+
+	if not target then
+		return context.err("no-target", "nobody to turn back")
+	end
+
+	return unmorph(context, target)
+end
+
 function Implementations.armServer(context)
 	local living = livingFolder()
 	if not living then
@@ -830,6 +898,42 @@ function KonsoleService:Init()
 				type = "string",
 				required = false,
 				suggestions = { "all" },
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "morph",
+		rank = settings.CommandRank,
+		aliases = { "become", "shapeshift" },
+		description = "Turns you into a mob from Libraries.MorphLibrary to test its clips, visuals and sounds first-hand; 'morph off' or 'unmorph' turns back.",
+		server = "morphServer",
+		args = {
+			{
+				name = "mob",
+				type = "string",
+				required = true,
+				suggestions = morphNames(),
+			},
+			{
+				name = "target",
+				type = "string",
+				required = false,
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "unmorph",
+		rank = settings.CommandRank,
+		aliases = { "demorph", "human" },
+		description = "Turns a morphed player back, where the morph stood, with their weapons.",
+		server = "unmorphServer",
+		args = {
+			{
+				name = "target",
+				type = "string",
+				required = false,
 			},
 		},
 	})

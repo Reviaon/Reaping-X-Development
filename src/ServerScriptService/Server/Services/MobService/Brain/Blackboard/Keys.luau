@@ -15,7 +15,7 @@ return {
 	Staggered = { Type = "boolean", Owner = "States/Disabled, States/Dash" },
 	DodgeReadyAt = { Type = "number", Owner = "Combat/Dodge" },
 
-	Rallied = { Type = "boolean", Owner = "States/Rally" },
+	Rallied = { Type = "boolean", Owner = "States/Rally, Body/Healing" },
 	FleeUntil = { Type = "number", Owner = "States/Rally" },
 
 	Food = { Type = "Instance", Owner = "Conditions/FoodNearby" },

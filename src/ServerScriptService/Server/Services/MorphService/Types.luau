@@ -1,5 +1,3 @@
---!strict
-
 local MorphTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MorphTypes")
 
 export type Settings = {

@@ -1,5 +1,3 @@
---!strict
-
 local ServerStorage = game:GetService("ServerStorage")
 
 local Jloader = require("@game/ReplicatedStorage/JLoader")

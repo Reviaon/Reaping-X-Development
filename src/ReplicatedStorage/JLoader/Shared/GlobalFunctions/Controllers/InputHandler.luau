@@ -70,6 +70,8 @@ function InputHandler.HandleInput(Input, GPE, Began, actionTable, controller)
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid or Humanoid.Health <= 0 then table.clear(heldInputs) return end
 
+	if not actionTable.Morphs and require(script.Parent.Parent).CharacterService.MorphOf(Character) then return end
+
 	local payload = controller or Character
 
 	local isKeyInWhitelist = table.find(KeybindList.WhiteList, Key) or table.find(KeybindList.WhiteList, InputType)

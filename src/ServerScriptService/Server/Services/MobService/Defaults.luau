@@ -21,6 +21,11 @@ return {
 		time = 8, --@ Seconds it hunts around the last place it or a packmate saw the prey
 		radius = 14, --@ Studs around that place it sniffs through
 	},
+	healing = { --@ Slow healing at home once calm (no prey, not returning or searching); false never heals
+		rate = 0.02, --@ Share of max health regained per second
+		delay = 10, --@ Seconds after its last hurt before healing starts
+		range = nil, --@ Studs from home it heals within; nil is wander_radius
+	},
 	spawn = { --@ How MobSpawnService zones spawn it; a zone's Cap and Respawn attributes override
 		group = { 1, 1 }, --@ How many spawn together, rolled per wave
 		respawn = 45, --@ Seconds after the last kill before a cleared zone spawns again

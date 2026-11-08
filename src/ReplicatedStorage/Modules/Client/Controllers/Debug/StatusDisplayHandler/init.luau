@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local StatusDisplayHandler = Jloader.CreateHandler({ Name = script.Name })
+StatusDisplayHandler.Morphs = true
 
 local GlobalFunctions = Jloader.GlobalFunctions
 local StatusService = GlobalFunctions.StatusService

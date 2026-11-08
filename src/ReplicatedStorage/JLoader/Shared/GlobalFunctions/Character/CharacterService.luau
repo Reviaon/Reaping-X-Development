@@ -28,6 +28,16 @@ local FLING_STATES = {
 	Enum.HumanoidStateType.PlatformStanding,
 }
 
+Utils.MorphAttribute = "Morph"
+Utils.MorphProfileAttribute = "MorphProfile"
+Utils.MorphAbilityAttribute = "MorphAbility"
+Utils.MorphReadyAttribute = "MorphReadyAt"
+
+function Utils.MorphOf(character: Instance?): string?
+	local name = character and character:GetAttribute(Utils.MorphAttribute)
+	return if typeof(name) == "string" then name else nil
+end
+
 function Utils.DisableFlingStates(humanoid: Humanoid)
 	for _, state in FLING_STATES do
 		humanoid:SetStateEnabled(state, false)

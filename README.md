@@ -14,6 +14,8 @@ Team Create; `src/` is synced into it with Rojo.
 - [Adding a weapon](#adding-a-weapon)
 - [Mobs](#mobs)
 - [Adding a mob](#adding-a-mob)
+- [Morphs](#morphs)
+- [Adding a morph](#adding-a-morph)
 - [Combat](#combat)
 - [Effects](#effects)
 - [The console](#the-console)
@@ -399,7 +401,7 @@ MobService/
   Config.luau      merge + derived sizes
   Defaults.luau    every tunable
   Core/            Mob, Registry, Scheduler, Telemetry
-  Body/            Rig, Animation, Motion, Spacing
+  Body/            Rig, Animation, Motion, Spacing, Healing
   Brain/           Tree, StateMachine, Status, Blackboard/, Nodes/, Conditions/, Actions/, States/, Trees/
   Senses/          Perception, Sight/, Awareness/
   Combat/          Attacks, Dodge, Threat/
@@ -429,6 +431,7 @@ A new module goes in the folder for what it is *about*. A system with several fi
 | `Senses/Sight/` | What a mob knows about. `Eyes` casts from `sight.eye_height` above the root to the target's head, then its root, through `Obstacles` (the world minus `World.Live`/`Visuals`, non-collidable parts ignored, shared with `Path/Probe`). Each look stays fresh for `sight.interval`. A mob **notices** a player it sees or hears (within `hear_range`, walls or not), and **keeps** a target while it notices them or while its own or any packmate's last sighting (`Team/Sightings`) is within `memory`. `AcquireTarget` and `Team:Holds` read it; provoked threat ignores it (a hit is evidence). Projectile sidesteps need the mob to see the archer. `sight = false` sees through walls. |
 | `Inspect/` | Read-only debugging. `Sections/<Name>` each give a one-line `Brief` (for the overhead) and a multi-line `Report` (for the console): `State`, `Threat`, `Sight`, `Path`, `Team`. `Verbs/<Name>` act on the selection: `Reselect` (drop the threat focus and dwell, rebalance the pack, re-decide), `Calm` (clear threat), `Stats` (state counts, step cost, path queue, sight rays per second), `Zones` (each spawn zone's status). A new section or verb is a new module; `Inspect/Config` sets the radius, report order and overhead rows. Sections read through each system's own describe hooks (`Threat.Dump`, `Path.Describe`, `Team:Describe`, which asks every `Team/` part with a `Describe`). The state machine writes `MobState` on every transition; while `debug` is on, each think publishes the brief to the `DebugOverhead` attribute, only when it changes. |
 | `Body/Spacing.luau` | Body-shaped separation between all mobs, via a per-frame spatial grid. |
+| `Body/Healing.luau` | Slow healing at home: only with no prey, no return or search, and nothing hurting it for `healing.delay` seconds. A full heal lets it rally again. |
 | `MobSpawnService/` | Zones (Parts tagged `MobZone`) spawn **a whole group at once**, never one mob at a time. Group size comes from the mob's `spawn.group` (rolled per wave; the zone's `Cap` attribute clamps it). A zone refills only once it is empty: after `spawn.respawn` seconds from the last kill (the zone's `Respawn` attribute overrides), or right away if the group was despawned for being abandoned. `Placement` picks one anchor and lands the rest within `spawn.spread`. Each spot must be walkable ground (`MaxSlope`, no water), have a clear body-sized box (`ClearanceMargin`), sit `MinPlayerDistance` from every player, and be out of every player's sight within `ConcealRange`. Parts at least 95% transparent don't count as cover (`Obstacles.Sightline`, which wolf sight uses too). A group that doesn't fit its minimum waits `RetryDelay`. Every member's `Home` is the anchor. `Budget` fills the zones nearest a player first, under `GlobalCap`. `Population` despawns mobs left `DespawnRange` from every player for `DespawnGrace`. `ai zones` prints each zone's status. |
 | `Core/Scheduler.luau` / `Core/Telemetry.luau` | Distance tiers for brain rate and animation culling; a cost readout on `JLoader.Services.MobService` attributes. |
 
@@ -441,7 +444,8 @@ from home) unless it was just hit. That retreat is committed: it runs home witho
 it is back inside `leash_range`. Losing the prey isn't giving up either. It runs to the last place it or
 any packmate saw them and searches there (`search`: 8 s, 14 studs) before heading home. Heading home
 from past `return_run` (60 studs) is a run, not a walk. An ordinary return still notices a survivor on
-the way and turns back. Now and then it
+the way and turns back. Back home and calm, a wounded mob heals slowly (`healing`: 2% of max health a
+second, starting 10 s after its last hurt, within `wander_radius` of home; `false` never heals). Now and then it
 reads a drawn bow aimed at it and hops off the aim line before the shot, or hops as the shot is released
 (`dash.sidestep`: one roll per draw, `release.chance` per shot, one shared cooldown). A release hop marks
 the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`ProjectileDodgeUntil`) for
@@ -503,6 +507,168 @@ status overhead adds two lines: state and target (with threat), then slot and pa
    `animation_exclusive`.
 
 A new *behaviour* (not a new mob) is a new state/condition/action module under `Brain/`, used from a tree.
+
+---
+
+## Morphs
+
+A morph lets a tester play a mob first-hand, to line up its sounds, check its visuals and feel its
+timings from the player's side. `morph Wolf` in the Konsole turns you into the wolf; `unmorph` (or
+`morph off`) turns you back where the wolf stood, with the weapons you had.
+
+| Piece | Where | Does |
+|---|---|---|
+| Entry | `Libraries/MorphLibrary/<Name>.luau` | Which mob it borrows from, its controls, test clips and morph-only tuning |
+| Types | `GlobalFunctions/Character/MorphTypes.luau` | `Entry`, `Shot`, `Hold`, `ClientProfile`, `Ability`, `AbilityResult` and the bite/dash specs, shared by server, client and every entry |
+| Server | `Services/MorphService/` | `init` (Morph/Unmorph, remotes), `Profile` (entry + resolved mob config, cached), `Swap` (body, possession, weapon stash and guard, placement), `Strike` (checks and lands reported bites; shared swing gate and victim sweep), `Abilities` (ability tools and their server-run use), `Types` |
+| Client | `Controllers/Character/MorphHandler/` | `Session` (one per morph), `Animator`, `Locomotion`, `Properties` (speed and jump under statuses), `Landing`, `Burst` (dash and leap mover), `Input`, `Abilities` (tool clicks, leap steering, miss follow-up, cooldown labels), `Hurt`, `Visuals`, `Targets`, `Types`, and `Actions/<Name>` found by name |
+
+Morph modules are annotated (no `--!strict` header) and pass `luau-lsp analyze` with no errors (see "Type checking a morph").
+
+How it works:
+
+- **The body is the mob's own prototype** (`MobService:GetKind(...).Prototype`, via `Rig.Spawn`), so its
+  collider, HipHeight, clips and scale are exactly what the AI wolf uses. It becomes `player.Character`
+  and the player owns its physics, so Roblox's own controls move it, Space jumps (`jump` is the push), and
+  Chrono replicates it like any player.
+- **The human is destroyed, not parked.** Chrono destroys a player's previous character model when a new
+  one registers, so the morph can't swap back to it. `unmorph` calls `LoadCharacter` and places the new
+  body where the morph stood. Weapons wait in `ServerStorage.MorphStash.<userId>` in between.
+- **Player systems step aside.** The character carries a `Morph` attribute (`CharacterService.MorphAttribute`).
+  `Load` only runs `InitCharacter` on runners with `Morphs = true` (Camera, Position, Knockback,
+  StatusDisplay, Morph), and `InputHandler` drops every action table without `Morphs = true`. Movement,
+  combat and properties handlers don't touch a morph.
+- **`LoadCharacterAppearance` resets every character to player defaults**, so the morph re-applies its
+  body when `CharacterLoaded` (`CharacterProfile.LoadedAttribute`) is stamped.
+- **Numbers come from the mob.** The server resolves the MobLibrary entry over `Defaults` (bite specs
+  through `Attacks.Spec`, speed-scaled windups) and hands the client what it needs as JSON in the
+  `MorphProfile` attribute. Walk and run default to the mob's, so footsteps match the AI's gait.
+- **Bites go through the same server checks as a player's swing.** The client times each bite from its
+  windup, finds victims along the reach line in `World.Live`, and reports them with its root (`PositionService.Pack`).
+  `Strike.Swing` refuses while hit-yielded, opens the swing with `BlockService:BeginSwing` and fires
+  `Swung`; `Strike.Land` takes only victims in `World.Live` that aren't hit-immune, accepts the reported
+  root for lag compensation, checks `PositionService.SurfaceDistance` against reach + radius, then lands
+  through `Attacks.Hit` (knockback or launch, damage, hit broadcast) and fires `Provoked`, so mobs react.
+- **Visuals play through the mob's own visuals module**: locally at once, relayed to everyone else
+  through `EffectService` (`SkipSender`). A shot's `hold` sets its attribute (e.g. `IsScreeching`)
+  locally and on the server, so attribute-gated visuals like the screech shake run for everyone.
+- **Statuses act on a morph as they would on a player, scaled to its own speeds** (`Properties`).
+  `StatusLibrary` speeds are absolute human values (ShiftLock 10, IsSprinting 30), so each frame the morph
+  resolves the same statuses at the player's base speeds twice: once with everything, once with only its
+  own movement statuses (`Config.OwnStatuses`: ShiftLock, IsSprinting, IsAttacking). The ratio scales its
+  own walk, run or step-in. A stun stops it, a guard break slows a walking wolf to 4/10, sprinting still
+  outranks the guard break, and no jump while biting (IsAttacking's JumpPower 0).
+- **Jumps decay like a player's**, using `PropertiesHandler/Config.Jump`: each jump drops 10 of 50, below
+  25 jumping stops for `ResetCooldown`, and 2 s on the ground restores it (the wolf: 45 → 36 → 27 → 0).
+- **Heavy landings root it like a player** (`Landing`, using `LandComponent/Config`): 3 s or more in the air
+  sets `IsLanding`, shakes the camera (`HeavyLand`) and plays the entry's `land_animation`.
+- **Actions stop like a player's attacks:** hit-yields, action locks and ragdoll cancel a bite or dash and
+  block new ones; death halts every clip and mover.
+- **The dash steers like a player's dodge.** It starts in the held move direction (back when standing
+  still) and keeps turning toward whatever direction is held, at the player dive's `SprintTurnRate`
+  (`DiveComponent/Config`). The clip follows: turning from right to left swaps `DashRight` for `DashLeft`
+  at the same point in the clip.
+- **Abilities are Tools that run the mob's own ability.** Every entry in the mob's `abilities` table
+  (or the entry's `abilities` list) becomes a Tool in the hotbar, named from its key (`leap_grab` →
+  "Leap Grab"). Clicking with one equipped uses it; M1 bites only while no ability tool is held.
+  The server builds the spec with `Attacks.Ability`, the same call the AI's `Attack` state makes. It
+  holds `ability_cooldown` per morph (shown as a countdown on the tool) and sets `IsAttacking` for windup
+  + recovery. At the windup it sweeps the reach line and lands through `Attacks.Hit`, so a cinematic
+  ability starts the mob's real `PairScene` (WolfGrab with its throw, WolfMaul with its hits). The client
+  roots the morph's own walking for the swing, plays the clip, and on a miss crossfades into `miss_animation`
+  from the same point, as the AI does.
+- **A leap ability carries the mob's momentum.** At `leap.delay` the client looks for a living target in
+  `World.Live` within the ability's `range` and `Config.LeapCone` degrees of the morph's facing (so the camera
+  aims it). With one, it leaps as the AI's `Attack` state does: it aims `leap.lead` seconds ahead of the target,
+  lands `reach` short of it, picks the speed to arrive in `Config.LeapArrival` of `leap.airtime` (capped
+  at `max_speed`), keeps steering while `homing`, and stops on arrival. With none, it leaps straight ahead at
+  `max_speed` for the airtime (Leap Grab 55 studs, Maul 40). It faces its travel, then the target, under
+  a `NoRotate` status (source `Config.LeapFacing`) until the bite lands; a miss or hit ends the leap, and an
+  interrupt stops it dead. AI-only knobs stay skipped: `min_range`, `chance`/`retry`, `users` and the
+  pack's `team_cooldown`. The server answers each use with an
+  `AbilityResult` (`Rejected`, `Interrupted`, `Missed`, `Landed`). An ability and a bite can't overlap,
+  on the client (`Busy`) or the server (`Strike.Free`).
+- **A morph can't hold weapons.** A Tool given while morphed goes to the stash; on unmorph the stashed
+  weapon replaces the fresh StarterPack copy (a weapon is an identity, not a stack). Setting
+  `player.Character` hands the player a new Backpack refilled from StarterPack, so the guard is connected
+  after the swap and sweeps that backpack: a copy whose name the stash already holds is destroyed, so
+  the original comes back on unmorph. Ability tools are exempt, and `RigCharacter` skips morphs, so equipping
+  one never tries to rig a weapon.
+
+Wolf controls: walk in any direction (it faces the camera in shift lock, and runs facing its travel),
+**LeftShift** run, **Space** jump, **M1** bite combo (hold to keep biting; the 4th launches),
+**Q** dash (left/right/back clip by direction, steered by the held keys; standing still hops back),
+ability tools **1** Leap Grab (15 s) and **2** Maul (14 s), each used by clicking while equipped, and clips **3-0** Growl, Howl, Screech (with its shake), Inspect, Eat,
+Maul combo, Grab n throw, Hurt. The tools take the first hotbar slots and the clip keys follow them
+(`Config.ShotKeys`, up to 0).
+
+## Adding a morph
+
+A morph needs a working mob first (see "Adding a mob"): it borrows the rig, clips, bites and visuals.
+
+1. **Entry.** Copy `Libraries/MorphLibrary/Wolf.luau` to `<Name>.luau`. Keep the `MorphTypes.Entry`
+   annotation so a typo in a key shows up in the type check:
+
+   ```lua
+   local MorphTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MorphTypes")
+
+   local entry: MorphTypes.Entry = {
+       mob = "Bear",                 --@ MobLibrary entry it borrows from
+       walk_speed = nil,             --@ nil keeps the mob's, so footsteps line up
+       run_speed = nil,
+       jump = 40,                    --@ JumpPower; 0 turns jumping off
+       land_animation = nil,         --@ Clip on a heavy landing
+       dash = { distance = 12, cooldown = 0.6 },
+       controls = {                  --@ Action -> inputs; each action is MorphHandler/Actions/<Action>
+           Bite = { Enum.UserInputType.MouseButton1 },
+           Run = { Enum.KeyCode.LeftShift },
+       },
+       abilities = nil,              --@ Mob abilities as hotbar Tools, in this order; nil gives them all, sorted
+       shots = {                     --@ Number keys after the tools, in order: clip (+ visual) for lining up SFX/VFX
+           { animation = "Roar", visual = "Roar" },
+           { animation = "Swipe2" },
+       } :: { MorphTypes.Shot },     --@ The old solver needs this cast for an array of differently shaped shots
+   }
+
+   return entry
+   ```
+
+   - `Bite` plays the mob's `attack.animations` combo with its `attack.combo` timings, so a mob whose attack
+     isn't a bite still uses `Bite`.
+   - `Dash` needs the mob's `dash` table: `dash.animations` `Left`/`Right`/`Back` (and optional `Forward`).
+     Leave `Dash` out of `controls` if the mob has no dash.
+   - A shot's `animation` is an `animations` key or a raw clip name in `Storage.Animations.Mobs.<mob>`;
+     `visual` is a method on the mob's `visuals` module; `hold = { attribute, from, to, visual }` sets an
+     attribute between two markers (or for the whole clip) for attribute-gated visuals.
+   - Abilities need nothing in the entry: each key under the mob's `abilities` becomes a Tool running
+     that ability on its own spec, `leap` and cooldown. List names in `abilities` only to reorder them or leave
+     some out; a name the mob lacks fails the morph with a message.
+
+2. **Check the clips and tools.** `morph Bear`, then press each key and use each ability tool on a dummy. A missing clip warns once in the output
+   (`[MorphHandler] Bear has no clip ...`) and a missing visual method warns from `ClientEffects`.
+3. **A new kind of action** (a pounce, a grab, a howl that buffs) is a new module in
+   `MorphHandler/Actions/` with `Began(session, argument)`, optional `Ended` and per-frame `Step`; bind it
+   by its module name in an entry's `controls`. If it must hit, report victims to the server the way
+   `Bite` does through a new `MorphService` remote, and check it there.
+4. **No framework edits** for a new morph: `MorphService` and the `morph` suggestions list it by name.
+5. **Type-check it** (below). A new action module types its `session` as `Types.Session` from
+   `MorphHandler/Types`.
+
+### Type checking a morph
+
+The `luau-lsp` that ships with the VS Code extension can check from a shell. Build a sourcemap, then
+analyze the morph folders:
+
+```
+rojo sourcemap default.project.json -o sourcemap.json
+"%USERPROFILE%/.vscode/extensions/johnnymorganz.luau-lsp-<version>-win32-x64/bin/server.exe" analyze --platform=roblox --sourcemap=sourcemap.json --definitions=@roblox="%APPDATA%/Code/User/globalStorage/johnnymorganz.luau-lsp/globalTypes.None.d.luau" src/ServerScriptService/Server/Services/MorphService src/ReplicatedStorage/Modules/Client/Controllers/Character/MorphHandler src/ReplicatedStorage/Libraries/MorphLibrary
+```
+
+Rojo can't read Argon's `$keepUnknowns` key; if `default.project.json` has it, build the sourcemap from a
+copy with it renamed to `$ignoreUnknownInstances`. It also reports errors in `MobService/Body/Rig` and
+`Senses/Perception`; those are older and not the morph's. Two old-solver habits keep morph code clean: give a local its type
+before iterating `x or {}` (`local shots: { Shot } = entry.shots or {}`), and cast arrays of differently
+shaped tables.
 
 ---
 
@@ -1002,7 +1168,8 @@ give <weapon> [target]     spawn [npc] [weapon] [count]
 clearweapons [target]      clearnpcs
 debug [on|off|toggle]      aggro [on|off|toggle]
 arm <weapon>               mob [name] [count]
-ai [section|verb] [all]
+ai [section|verb] [all]    morph <mob|off> [target]
+unmorph [target]
 ```
 
 `spawn Dummy Sword 2` drops two sword dummies; `arm` re-equips every NPC in `World.Live` (Melee

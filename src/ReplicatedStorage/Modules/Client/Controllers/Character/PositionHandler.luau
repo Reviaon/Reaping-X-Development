@@ -1,6 +1,7 @@
 local RunService = game:GetService("RunService")
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local PositionHandler = Jloader.CreateHandler({ Name = script.Name })
+PositionHandler.Morphs = true
 
 local GlobalFunctions = Jloader.GlobalFunctions
 local GarbageCollection = GlobalFunctions.Trove

@@ -1,5 +1,6 @@
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local CameraHandler = Jloader.CreateHandler({Name = script.Name})
+CameraHandler.Morphs = true
 
 --@ Services
 local RunService = game:GetService("RunService")
@@ -98,6 +99,7 @@ local shiftLockEnabled = false
 local inputConnections = {};
 
 local inputActions = {
+	Morphs = true,
 	Began = {
 		[Enum.KeyCode.LeftControl] = {
 			canHold = false,
@@ -227,6 +229,8 @@ function CameraHandler:InitCharacter(controller)
 	CameraHandler:CreateCameraObject(controller)
 
 	_trove:Add(_humanoid.Died:Connect(function()
+		if controller.Character ~= Character then return end
+
 		CameraHandler:OnCharacterRemoved(controller)
 	end))
 

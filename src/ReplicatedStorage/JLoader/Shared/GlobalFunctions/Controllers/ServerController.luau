@@ -181,6 +181,7 @@ end
 
 --@ Characters with this attribute load no shared animation package (mobs bring their own clips).
 CharacterProfile.NoPackageAttribute = "NoAnimationPackage"
+CharacterProfile.LoadedAttribute = "CharacterLoaded"
 
 --@ Storage.Animations folders never loaded as a character's package.
 CharacterProfile.PackageExclude = { Mobs = true }
@@ -244,7 +245,7 @@ function CharacterProfile.new(Character)
 
 	self:LoadCharacterAppearance(Character)
 	CharacterProfile.ProfileCache[Character] = self
-	Character:SetAttribute("CharacterLoaded", os.clock())
+	Character:SetAttribute(CharacterProfile.LoadedAttribute, os.clock())
 	return self
 end
 
@@ -555,6 +556,7 @@ end
 
 function CharacterProfile:RigCharacter(Character : Model)
 	if not Character then return end
+	if GlobalFunctions.CharacterService.MorphOf(Character) then return end
 
 	self:ApplyRig(Character, Character:FindFirstChildOfClass("Tool"))
 

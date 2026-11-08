@@ -1,5 +1,3 @@
---!strict
-
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 
 local Attacks = require("../MobService/Combat/Attacks")

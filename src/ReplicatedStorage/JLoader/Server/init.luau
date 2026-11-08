@@ -16,6 +16,7 @@ local Net = Server.GlobalFunctions.Net
 local Services = {}
 local Handlers = {}
 local RawServices = {}
+local InitedServices = {}
 
 local Inited = false
 Server.Started = false
@@ -43,6 +44,9 @@ end
 --@ Initialize a service module
 Server.InitService = function(module)
 	local Service = require(module)
+
+	if InitedServices[module] then return Service end
+	InitedServices[module] = true
 
 	--@ Add shared functions to the service
 	for Name, Item in pairs(Service.Shared) do

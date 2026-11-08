@@ -1,5 +1,3 @@
---!strict
-
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 
 local MorphTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MorphTypes")

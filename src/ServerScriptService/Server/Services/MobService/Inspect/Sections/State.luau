@@ -5,7 +5,9 @@ function State.Brief(mob): string?
 
 	local name = mob.Machine.Name or "idle"
 
-	return if mob.Blackboard.Retreating then `{name} (retreat)` else name
+	if mob.Blackboard.Retreating then return `{name} (retreat)` end
+
+	return if mob.Healing then `{name} (healing)` else name
 end
 
 function State.Report(mob, now: number): { string }
@@ -30,7 +32,7 @@ function State.Report(mob, now: number): { string }
 	end
 
 	table.insert(lines, string.format("tree %s, thinks every %.2fs%s", mob.Config.tree, tier and tier.interval or 0, if mob:IsDisabled() then ", disabled" else ""))
-	table.insert(lines, string.format("hp %d/%d, %.0f studs from home", mob.Humanoid.Health, mob.Humanoid.MaxHealth, mob:HomeDistance()))
+	table.insert(lines, string.format("hp %d/%d%s, %.0f studs from home", mob.Humanoid.Health, mob.Humanoid.MaxHealth, if mob.Healing then " (healing)" else "", mob:HomeDistance()))
 
 	local search = mob.Blackboard.Search
 

@@ -169,7 +169,7 @@ function CombatHandler:InitCharacter(controller)
 	end)
 
 	CombatHandler.Trove:Connect(Character.AncestryChanged, function()
-		if not Character:IsDescendantOf(game) then
+		if not Character:IsDescendantOf(game) and controller.Character == Character then
 			controller:ClearCharacter()
 		end
 	end)
