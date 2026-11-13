@@ -18,6 +18,13 @@ export type DashTuning = {
 	cooldown: number?,
 }
 
+export type BiteTuning = {
+	lunge: number?,
+	track: number?,
+	cone: number?,
+	range: number?,
+}
+
 export type Input = Enum.KeyCode | Enum.UserInputType
 
 export type Entry = {
@@ -27,6 +34,8 @@ export type Entry = {
 	jump: number?,
 	land_animation: string?,
 	dash: DashTuning?,
+	bite: BiteTuning?,
+	leap_distance: { [string]: number }?,
 	controls: { [string]: { Input } }?,
 	abilities: { string }?,
 	shots: { Shot }?,
@@ -40,7 +49,8 @@ export type Leap = {
 	airtime: number?,
 	max_speed: number?,
 	lead: number?,
-	homing: boolean?,
+	track: number?,
+	overrun: number?,
 }
 
 export type Ability = {
@@ -69,6 +79,12 @@ export type Bite = {
 	radius: number,
 	step_in: number?,
 	final: boolean?,
+	step_in_lead: number?,
+	step_in_ease: number?,
+	step_in_rise: number?,
+	range: number?,
+	miss_animation: string?,
+	leap: Leap?,
 }
 
 export type Dash = {
@@ -84,6 +100,7 @@ export type ClientProfile = {
 	walk_speed: number,
 	run_speed: number,
 	animations: { [string]: string },
+	animation_speeds: { [string]: number },
 	exclusive: { { string } },
 	hurt: { string },
 	visuals: string?,
