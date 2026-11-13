@@ -11,30 +11,29 @@ return {
 		reach = 14, --@ Studs ahead of its root the bite reaches
 		radius = 5, --@ Studs around that line that get hit
 		recovery = 0.12, --@ Short, so the late bite landings keep the rhythm
+		step_in = 24, --@ Studs/s its surge peaks at with each bite (~2 studs over the whole surge)
+		step_in_lead = 0.3, --@ Seconds before the bite lands it surges, as the bite is thrown
+		step_in_rise = 0.35, --@ Share of the surge it eases in over, so it doesn't snap forward
+		step_in_ease = 2, --@ Eases the surge out to a stop at the bite
 		animations = { "Bite1", "Bite2", "Bite3", "Bite4" }, --@ Played in order, one per bite
 
 		combo = { --@ Windups are each clip's visual frame / 60, so hits land with the visuals
 			[1] = { windup = 29 / 60 },
 			[2] = { windup = 28 / 60 },
 			[3] = { windup = 32 / 60 },
-			[4] = { --@ Final bite: backs off, then leaps in and launches
-				min_range = 18, --@ Studs root to root it backs off to
-				range = 28, --@ Studs root to root it leaps from
-				back_off = { speed = 42, animation = "DashBack", visual = "Dash" }, --@ Quick hop back before the leap
+			[4] = { --@ Final bite: a short lunge into the leap grab's grab and throw
 				windup = 24 / 60, --@ Seconds until the bite lands
 				recovery = 0.8,
-				damage = 16,
 				radius = 6,
 				leap = {
-					delay = 0.1, --@ Seconds into the attack it leaves the ground
-					speed = 69, --@ Covers the back-off gap within the windup
-					lead = 0.25, --@ Seconds of the target's movement it aims ahead
+					delay = 14 / 60, --@ Seconds into the bite it surges, just before the bite is thrown
+					speed = 30, --@ A short surge, far less than the leap ability's jump
+					overrun = 1.5, --@ Studs it eases on past where the surge lands, so it doesn't stop dead
+					lead = 0.2, --@ Seconds of the target's movement it aims ahead
+					track = 120, --@ Degrees/s it bends toward the target during the surge
 				},
-				launch = {
-					speed = 45,
-					lift = 26,
-					ragdoll = 1.3,
-				},
+				grab = "leap_grab", --@ A hit plays this ability's grab and throw instead of knocking back
+				unblockable = true, --@ Grabs through a block; by the fourth bite the player should be out of the way
 			},
 		},
 	},
@@ -60,8 +59,9 @@ return {
 				delay = 0.45, --@ Seconds into the leap clip it leaves the ground
 				airtime = 0.5, --@ Seconds it covers the gap in, whatever the distance
 				max_speed = 110,
+				overrun = 4, --@ Studs it eases on past the landing, so the leap doesn't stop dead
 				lead = 0.45, --@ Seconds of the target's movement it aims ahead
-				homing = true, --@ Keeps steering at the target while airborne
+				track = 120, --@ Degrees/s it bends its leap toward the target while airborne; 0 flies straight
 			},
 			cinematic = { --@ PairScene played on contact
 				Name = "WolfGrab",
@@ -106,7 +106,7 @@ return {
 				},
 			},
 		},
-		maul = { --@ Pounce that pins and claws; a ragdolled player is mauled where they lie
+		maul = { --@ Pounce that pins and claws while the victim struggles; it also goes for ragdolled players
 			range = 28, --@ Studs root to root it pounces from
 			targets_ragdolled = true,
 			chance = 0.2, --@ Chance per check on a standing target
@@ -123,29 +123,34 @@ return {
 			leap = {
 				delay = 0.45, --@ Seconds into the leap clip it leaves the ground
 				airtime = 0.5, --@ Seconds it covers the gap in, whatever the distance
-				max_speed = 80,
+				max_speed = 110, --@ Same reach as the leap grab
+				overrun = 4, --@ Studs it eases on past the landing, so the leap doesn't stop dead
 				lead = 0.3, --@ Seconds of the target's movement it aims ahead
-				homing = true, --@ Keeps steering at the target while airborne
+				track = 120, --@ Degrees/s it bends its leap toward the target while airborne; 0 flies straight
 			},
-			cinematic = { --@ PairScene played on contact
+			cinematic = { --@ PairScene played on contact; the combo loops while the victim struggles to escape
 				Name = "WolfMaul",
 				AttackerRig = "Any",
 				Facing = "Face",
-				Spacing = 15, --@ Studs from the victim to its root (~4 past its snout)
-				Duration = "Attacker", --@ Ends with ClawingBitingCombo
+				Spacing = 13, --@ Studs from the victim to its root: the victim's torso sits under its jaw (Bone18 averages 12.8 ahead through the combo)
+				Struggle = "Default", --@ StruggleLibrary profile both sides play; the scene lasts until it ends
+				SyncLoops = true, --@ The victim's loop starts where the combo is, so the two stay in step after its intro
 				IntroFade = 0.1,
 				LoopFade = 0.15,
 				ReleaseFade = 0.3,
 				BreakOn = {}, --@ Must not end on the victim's ragdoll
-				Attacker = { Intro = "ClawingBitingCombo" },
-				Hit = { Damage = 6 }, --@ Damage per hit time
-				HitTimes = { 12 / 60, 94 / 60, 137 / 60, 184 / 60 }, --@ Seconds into the combo each hit lands (the visual frames)
-				Victim = { --@ Placeholder until R6 victim clips exist: ragdolled where they fall
+				Hit = { Damage = 4 }, --@ Damage per Hit marker in ClawingBitingCombo, every loop
+				Attacker = { Loop = "ClawingBitingCombo" },
+				Victim = {
 					Status = "IsGrappled",
-					Anchor = false, --@ Not held in place
-					Ragdoll = 4.2, --@ Seconds ragdolled through the combo
+					Intro = "ClawingBitingVictimIntro",
+					Loop = "ClawingBitingVictimLoop",
 				},
-				ReleaseRagdoll = { Victim = 2 }, --@ Seconds ragdolled after, before getting up
+				Outcomes = {
+					AttackerWins = { Then = "leap_grab" }, --@ The victim lost: grabbed and thrown by this ability's cinematic
+					AttackerLoses = { Retreat = true }, --@ The victim escaped: they get up and the wolf dashes back (dash.retreat)
+					Draw = { Retreat = true },
+				},
 			},
 		},
 	},
@@ -197,6 +202,10 @@ return {
 	rig = {
 		root_scale = Vector3.new(0.7, 0.35, 0.5), --@ HumanoidRootPart size as a fraction of the scaled bounds
 		hip_ratio = 0.3, --@ HipHeight as a fraction of the scaled height
+	},
+
+	animation_speeds = { --@ Locomotion clip playback multipliers on top of the speed match
+		Run = 1.5,
 	},
 
 	animation_exclusive = { --@ Locomotion keys that never blend together

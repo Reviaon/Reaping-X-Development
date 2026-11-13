@@ -14,6 +14,18 @@ local entry: MorphTypes.Entry = {
 		cooldown = 0.5, --@ Seconds after landing before it may dash again
 	},
 
+	bite = { --@ Morph-only feel on top of the mob's bites 1-3 (the final bite surges as the mob's does)
+		lunge = 3, --@ Studs it surges forward as each bite is thrown (the mob's step_in_lead), eased in and out like the mob's (step_in_rise, step_in_ease), stopping short of a tracked target
+		track = 240, --@ Degrees/s it turns toward that target during the surge
+		cone = 60, --@ Degrees off its facing a bite looks for a target
+		range = 18, --@ Studs ahead a bite looks for a target
+	},
+
+	leap_distance = { --@ Most studs each leap ability covers, by name; the AI's own leaps are uncapped
+		leap_grab = 24,
+		maul = 24,
+	},
+
 	controls = { --@ Action -> inputs; each action is a MorphHandler/Actions module found by name
 		Bite = { Enum.UserInputType.MouseButton1 }, --@ The mob's bite combo, hits landing on its windups; hold to keep biting
 		Dash = { Enum.KeyCode.Q },

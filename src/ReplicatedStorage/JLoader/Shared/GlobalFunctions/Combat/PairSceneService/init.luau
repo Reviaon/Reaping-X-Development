@@ -17,6 +17,7 @@ local PairSceneService = {
 	Resolved = Signal.new(),
 	Launched = Signal.new(),
 	Struck = Signal.new(),
+	Looped = Signal.new(),
 
 	Align = Placement.Align,
 	Place = Placement.Place,
@@ -414,9 +415,19 @@ local function adopt(scene, character: Model, track: AnimationTrack)
 		freeMember(scene, character)
 	end))
 
+	if track.Looped then
+		table.insert(scene.Connections, track.DidLoop:Connect(function()
+			if active[scene] and not scene.Outcome then
+				PairSceneService.Looped:Fire(scene, character, track)
+			end
+		end))
+	end
+
 	if scene.Definition.HitTimes then return end
 
-	table.insert(scene.Connections, track:GetMarkerReachedSignal((scene.Definition.Hit or Config.Hit).Marker):Connect(function()
+	local marker = scene.Definition.Hit and scene.Definition.Hit.Marker or Config.Hit.Marker
+
+	table.insert(scene.Connections, track:GetMarkerReachedSignal(marker):Connect(function()
 		strike(scene, character, track)
 	end))
 end
@@ -575,7 +586,7 @@ function PairSceneService.Sequence(character: Model, side, definition, age: numb
 		sequence.Thread = nil
 		if sequence.Stopped then return end
 
-		play(side.Loop, true, definition.LoopFade)
+		play(side.Loop, true, definition.LoopFade, if definition.SyncLoops then os.clock() - began + skip else nil)
 
 		if intro then
 			intro:Stop(definition.LoopFade)

@@ -7,7 +7,7 @@ return {
 
 	Stick = {
 		Time = 10,
-		Depth = 0.4,
+		Depth = 0.8,
 	},
 
 	PoolSize = 12,

@@ -456,7 +456,11 @@ the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`Projec
 
 | Key | Shape |
 | --- | --- |
-| `attack.combo[i]` | Any `attack` key (`hitstun` and `back_off` included), plus `range`, `min_range`, `animation`, `hit_animation`, `miss_animation`, `marker`, `leap` and `launch`. |
+| `attack.combo[i]` | Any `attack` key (`hitstun` and `back_off` included), plus `range`, `min_range`, `animation`, `hit_animation`, `miss_animation`, `marker`, `leap` and `launch`. `grab = "<ability>"` makes a hit play that ability's `cinematic` instead of knocking back. `unblockable = true` lands through a guard and a counter (`CombatService:CanHit`'s `unblockable`). The wolf's 4th bite keeps its Bite4 clip, surges with a short `leap` (speed 30, from 14/60 s) and is `grab = "leap_grab"`, unblockable. |
+| `attack.step_in` / `step_in_lead` / `step_in_rise` / `step_in_ease` | The surge's peak speed, the seconds before the hit it starts (as the bite is thrown), the share of it spent easing in (smoothstep), and how it eases out to a stop at the hit. `Mob:Surge` stores it and `Body/Motion` follows `MathService.Surge` each frame. nil `step_in_lead` walks in from the start; 0 rise starts at full speed; 0 ease holds the speed. The wolf: 24, 0.3 s, rise 0.35, ease 2, about 1.3-1.9 studs per bite. The morph's `bite.lunge` uses the same window and curve, its peak set from the curve's average (`MathService.SurgeShare`) so `lunge` stays a distance. |
+| `abilities.<name>.cinematic` | A PairScene definition. On top of PairScene's own keys: `Struggle = "<StruggleLibrary profile>"` makes both sides play the minigame and the scene last until it resolves; `SyncLoops = true` starts each side's loop where the scene is, so a victim intro doesn't push the loops out of step; `Outcomes.<AttackerWins/AttackerLoses/Draw>` may carry `Then = "<ability>"` (chain straight into that ability's cinematic, unblockable) or `Retreat = true` (the mob hops back `dash.retreat` studs and waits `dash.retreat_pause` before attacking or pouncing). Hits come from the clip's `Hit` markers each loop (`Hit = { Damage }`; `Marker` defaults to "Hit"), and the ability's `visual` replays on every loop (`PairSceneService.Looped`). The wolf's maul (`Spacing = 13`, so the victim's torso sits under its jaw): ClawingBitingCombo loops over the victim's ClawingBitingVictimIntro/Loop; lose and the victim is grabbed and thrown (`Then = "leap_grab"`), win or draw and the wolf dashes back. |
+| `leap` | `{ delay, airtime or speed, max_speed, lead, track, overrun }`. `track` is degrees/s the leap bends toward the target while airborne (a turn-limited heading in `Brain/States/Attack`, so a strafing target pulls it into an arc rather than snapping it round); 0 or nil flies straight. `overrun` is studs it eases on past the landing instead of stopping dead: `Mob:Coast` arms it, and `Body/Motion` starts the slide on arrival or at the strike (`Mob:CoastOut`), decaying on `Motion.Settings.CoastEase`. The wolf: Leap Grab and Maul 4 (same `max_speed` 110, so they cover the same ground), final bite 1.5. The morph's `Lunge` coasts the same way (`Config.CoastEase`). |
+| `animation_speeds` | Locomotion key → playback multiplier applied after the speed match (`Body/Animation` and the morph's `Locomotion`). The wolf's `Run = 1.5`. |
 | `abilities.<name>` | An attack spec plus `range`/`min_range`, `users = { passive, fresh }`, `ability_cooldown`, `team_cooldown`, `chance`, `retry`, `cinematic`, `visual` (played when the cinematic starts), `targets_ragdolled` and `ragdolled_chance`. |
 | `rally` | `{ health, animation, at, radius, visual, shake = { visual, from, to }, flee = { duration, speed, distance } }`. It stands through the call, alerts nearby mobs of its kind, then flees. |
 | `feed` | `{ animation, range, distance, feeders, speed, swallow_chance, duration, visual, carry = { bone, offset } }`. |
@@ -521,7 +525,7 @@ timings from the player's side. `morph Wolf` in the Konsole turns you into the w
 | Entry | `Libraries/MorphLibrary/<Name>.luau` | Which mob it borrows from, its controls, test clips and morph-only tuning |
 | Types | `GlobalFunctions/Character/MorphTypes.luau` | `Entry`, `Shot`, `Hold`, `ClientProfile`, `Ability`, `AbilityResult` and the bite/dash specs, shared by server, client and every entry |
 | Server | `Services/MorphService/` | `init` (Morph/Unmorph, remotes), `Profile` (entry + resolved mob config, cached), `Swap` (body, possession, weapon stash and guard, placement), `Strike` (checks and lands reported bites; shared swing gate and victim sweep), `Abilities` (ability tools and their server-run use), `Types` |
-| Client | `Controllers/Character/MorphHandler/` | `Session` (one per morph), `Animator`, `Locomotion`, `Properties` (speed and jump under statuses), `Landing`, `Burst` (dash and leap mover), `Input`, `Abilities` (tool clicks, leap steering, miss follow-up, cooldown labels), `Hurt`, `Visuals`, `Targets`, `Types`, and `Actions/<Name>` found by name |
+| Client | `Controllers/Character/MorphHandler/` | `Session` (one per morph), `Animator`, `Locomotion`, `Properties` (speed and jump under statuses), `Landing`, `Burst` (dash and leap mover), `Lunge` (soft-tracked bite lunges and leaps), `Input`, `Abilities` (tool clicks, miss follow-up, cooldown labels), `Hurt`, `Visuals`, `Targets`, `Types`, and `Actions/<Name>` found by name |
 
 Morph modules are annotated (no `--!strict` header) and pass `luau-lsp analyze` with no errors (see "Type checking a morph").
 
@@ -577,15 +581,25 @@ How it works:
   ability starts the mob's real `PairScene` (WolfGrab with its throw, WolfMaul with its hits). The client
   roots the morph's own walking for the swing, plays the clip, and on a miss crossfades into `miss_animation`
   from the same point, as the AI does.
-- **A leap ability carries the mob's momentum.** At `leap.delay` the client looks for a living target in
-  `World.Live` within the ability's `range` and `Config.LeapCone` degrees of the morph's facing (so the camera
-  aims it). With one, it leaps as the AI's `Attack` state does: it aims `leap.lead` seconds ahead of the target,
-  lands `reach` short of it, picks the speed to arrive in `Config.LeapArrival` of `leap.airtime` (capped
-  at `max_speed`), keeps steering while `homing`, and stops on arrival. With none, it leaps straight ahead at
-  `max_speed` for the airtime (Leap Grab 55 studs, Maul 40). It faces its travel, then the target, under
-  a `NoRotate` status (source `Config.LeapFacing`) until the bite lands; a miss or hit ends the leap, and an
-  interrupt stops it dead. AI-only knobs stay skipped: `min_range`, `chance`/`retry`, `users` and the
-  pack's `team_cooldown`. The server answers each use with an
+- **Leaps carry the mob's momentum, capped for the morph** (`Lunge.Leap`, used by ability tools and the final
+  bite). At `leap.delay` the client looks for a living target in `World.Live` within the spec's `range` and
+  `Config.LeapCone` degrees of the morph's facing (so the camera aims it). With one, it aims `leap.lead`
+  seconds ahead, stops `reach` short, and picks the speed to arrive in `Config.LeapArrival` of the airtime.
+  With none it leaps straight ahead. Either way an ability covers at most the entry's
+  `leap_distance[<ability>]` (the wolf: Leap Grab and Maul both 24); the AI's leaps are uncapped. While
+  airborne it bends toward the target at `leap.track` degrees/s, the same soft track the AI uses. It faces
+  where it is going under a `NoRotate` status (source `Config.LungeFacing`) until the bite lands; a miss or
+  hit ends the leap, and an interrupt stops it dead. AI-only knobs stay skipped: `min_range`,
+  `chance`/`retry`, `users` and the pack's `team_cooldown`.
+- **Bites lunge and track** (`Lunge.Bite`, the entry's `bite` table). Each of bites 1-3 surges `lunge` studs
+  (the wolf: 3) forward in the mob's `step_in_lead` before the hit, as the bite is thrown, easing in and out
+  on the mob's `step_in_rise`/`step_in_ease` curve so it neither snaps forward nor carries past the bite. If a living target sits within
+  `range` studs and `cone` degrees ahead, it turns toward it at `track` degrees/s and stops
+  `Config.LungeDepth` of the reach short of it. In shift lock the camera turns it back once the bite lands.
+- **The final bite is Bite4 with a short surge into the grab** (the mob's `combo[4]`): it surges at the mob's
+  `leap` speed from `leap.delay`, stopping `reach` short of a target ahead, and a hit plays the WolfGrab and
+  throw (`grab = "leap_grab"`, through a guard). It is uncapped by `leap_distance`; the surge is short.
+- **Ability results.** The server answers each use with an
   `AbilityResult` (`Rejected`, `Interrupted`, `Missed`, `Landed`). An ability and a bite can't overlap,
   on the client (`Busy`) or the server (`Strike.Free`).
 - **A morph can't hold weapons.** A Tool given while morphed goes to the stash; on unmorph the stashed
@@ -596,7 +610,7 @@ How it works:
   one never tries to rig a weapon.
 
 Wolf controls: walk in any direction (it faces the camera in shift lock, and runs facing its travel),
-**LeftShift** run, **Space** jump, **M1** bite combo (hold to keep biting; the 4th launches),
+**LeftShift** run, **Space** jump, **M1** bite combo (hold to keep biting; bites 1-3 lunge and track, the 4th surges into the leap grab's grab),
 **Q** dash (left/right/back clip by direction, steered by the held keys; standing still hops back),
 ability tools **1** Leap Grab (15 s) and **2** Maul (14 s), each used by clicking while equipped, and clips **3-0** Growl, Howl, Screech (with its shake), Inspect, Eat,
 Maul combo, Grab n throw, Hurt. The tools take the first hotbar slots and the clip keys follow them
