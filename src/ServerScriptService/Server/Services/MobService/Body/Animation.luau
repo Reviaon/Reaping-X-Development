@@ -224,8 +224,9 @@ local function playbackSpeed(config, key: string, speed: number): number
 	if not reference or reference <= 0 then return 1 end
 
 	local range = Animation.Settings.PlaybackRange
+	local scale = config.animation_speeds and config.animation_speeds[key] or 1
 
-	return math.clamp(speed / reference, range[1], range[2])
+	return math.clamp(speed / reference, range[1], range[2]) * scale
 end
 
 function Animation:UpdateLocomotion()

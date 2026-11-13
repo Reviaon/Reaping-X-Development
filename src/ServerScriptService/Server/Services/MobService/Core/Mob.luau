@@ -209,6 +209,18 @@ function Mob:Burst(speed: number, unbraked: number?)
 	end
 end
 
+function Mob:Coast(distance: number?)
+	self.Overrun = if distance and distance > 0 then distance else nil
+end
+
+function Mob:CoastOut(): boolean
+	return Motion.Coast(self)
+end
+
+function Mob:Surge(peak: number, duration: number, ease: number?, rise: number?)
+	self.Surging = { Peak = peak, Duration = math.max(duration, 1e-3), Ease = ease or 0, Rise = rise or 0, At = os.clock() }
+end
+
 function Mob:DistanceTo(position: Vector3): number
 	return flat(position - self.Root.Position).Magnitude
 end
@@ -257,6 +269,9 @@ end
 
 function Mob:Halt()
 	self.Halted = true
+	self.Surging = nil
+	self.Overrun = nil
+	self.Coasting = nil
 	self.Moving = false
 	self.Stopping = false
 	self.DesiredSpeed = 0

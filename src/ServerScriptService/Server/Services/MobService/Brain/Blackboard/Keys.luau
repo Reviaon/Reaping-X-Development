@@ -6,12 +6,12 @@ return {
 
 	Combo = { Type = "number", Owner = "States/Attack" },
 	LastAttackAt = { Type = "number", Owner = "States/Attack, Team/Slots" },
-	NextAttackAt = { Type = "number", Owner = "States/Attack" },
+	NextAttackAt = { Type = "number", Owner = "States/Attack, States/Dash" },
 	PendingAbility = { Type = "string", Owner = "Conditions/AbilityReady" },
 	AbilityReadyAt = { Type = "table", Owner = "Conditions/AbilityReady, States/Attack" },
 
 	FlankReadyAt = { Type = "number", Owner = "Conditions/FlankReady, States/Dash" },
-	NextPounceAt = { Type = "number", Owner = "States/Pounce" },
+	NextPounceAt = { Type = "number", Owner = "States/Pounce, States/Dash" },
 	Staggered = { Type = "boolean", Owner = "States/Disabled, States/Dash" },
 	DodgeReadyAt = { Type = "number", Owner = "Combat/Dodge" },
 

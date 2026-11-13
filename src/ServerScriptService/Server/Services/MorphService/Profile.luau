@@ -9,7 +9,7 @@ type Spec = Types.Spec
 
 local Profile = {}
 
-local CLIENT_BITE = { "animation", "speed", "windup", "recovery", "cooldown", "reach", "reach_from", "radius", "step_in", "final" }
+local CLIENT_BITE = { "animation", "speed", "windup", "recovery", "cooldown", "reach", "reach_from", "radius", "step_in", "final", "step_in_lead", "step_in_ease", "step_in_rise", "range", "miss_animation", "leap" }
 local CLIENT_DASH = { "speed", "playback", "recovery", "visual", "animations" }
 local CLIENT_ABILITY = { "animation", "miss_animation", "speed", "windup", "recovery", "cooldown", "ability_cooldown", "reach", "range", "leap" }
 
@@ -120,6 +120,7 @@ function Profile.Get(library: Instance, MobService: any, name: string): Profile
 		walk_speed = config.walk_speed,
 		run_speed = config.run_speed,
 		animations = config.animations,
+		animation_speeds = config.animation_speeds or {},
 		exclusive = config.animation_exclusive or {},
 		hurt = config.hurt_animations or {},
 		visuals = config.visuals,

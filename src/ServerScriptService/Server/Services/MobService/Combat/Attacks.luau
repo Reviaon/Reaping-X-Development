@@ -49,6 +49,16 @@ local function specAt(mob, index: number)
 		end
 	end
 
+	if spec.grab then
+		local ability = config.abilities and config.abilities[spec.grab]
+
+		if not ability or not ability.cinematic then
+			error(`[MobService] combo {index} grabs with "{spec.grab}", which has no abilities entry with a cinematic`)
+		end
+
+		spec.cinematic = ability.cinematic
+	end
+
 	if spec.launch then
 		local launch = table.clone(config.launch)
 
@@ -67,6 +77,10 @@ local function specAt(mob, index: number)
 		spec.windup /= speed
 		spec.recovery /= speed
 		spec.cooldown /= speed
+
+		if spec.step_in_lead then
+			spec.step_in_lead /= speed
+		end
 
 		if spec.leap then
 			local leap = table.clone(spec.leap)
@@ -145,18 +159,55 @@ function Attacks.Grab(mob, target: Model, spec): boolean
 
 	if downed then
 		if not Jloader.GlobalFunctions.StatusService:IsAlive(target) then return false end
-	elseif not CombatService:CanHit(attacker, target) then
+	elseif not CombatService:CanHit(attacker, target, nil, spec.unblockable == true) then
 		return false
 	end
 
-	local scene = Jloader.GlobalFunctions.PairSceneService:Begin(spec.cinematic, attacker, target)
+	local PairSceneService = Jloader.GlobalFunctions.PairSceneService
+	local cinematic = spec.cinematic
+	local looped: RBXScriptConnection? = nil
+	local scene = nil
+
+	scene = PairSceneService:Begin(cinematic, attacker, target, {
+		OnRelease = function(_, outcome: string?)
+			if looped then
+				looped:Disconnect()
+			end
+
+			Attacks.Settle(mob, target, cinematic, outcome)
+		end,
+	})
 
 	if scene then
 		CombatService.Provoked:Fire(attacker, target)
 		Attacks.Shot(mob, spec.visual)
+
+		if spec.visual then
+			looped = PairSceneService.Looped:Connect(function(looping, character: Model)
+				if looping == scene and character == attacker then
+					Attacks.Shot(mob, spec.visual)
+				end
+			end)
+		end
 	end
 
 	return scene ~= nil
+end
+
+function Attacks.Settle(mob, target: Model, cinematic, outcome: string?)
+	local result = outcome and cinematic.Outcomes and cinematic.Outcomes[outcome]
+	if not result then return end
+
+	local follow = result.Then and mob.Config.abilities and mob.Config.abilities[result.Then]
+
+	if follow and follow.cinematic then
+		task.defer(Attacks.Grab, mob, target, { cinematic = follow.cinematic, visual = follow.visual, unblockable = true })
+	end
+
+	if result.Retreat and mob.Machine and not mob.Dead then
+		local root = target:FindFirstChild("HumanoidRootPart")
+		mob.Machine:Request("Dash", { kind = "retreat", from = if root and root:IsA("BasePart") then root.Position else nil }, true)
+	end
 end
 
 function Attacks.Hit(mob, target: Model, spec): boolean

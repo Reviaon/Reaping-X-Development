@@ -4,6 +4,8 @@ local ATTACKING = "IsAttacking"
 local MARKER_GRACE = 0.5
 local AIRTIME_EFFICIENCY = 0.75
 local STEP_IN_DEPTH = 0.7
+local LEAP_ARRIVE = 1.5
+local FLAT = Vector3.new(1, 0, 1)
 
 local function face(mob)
 	local root = mob:TargetRoot()
@@ -13,18 +15,31 @@ local function face(mob)
 	end
 end
 
+local function turn(from: Vector3, to: Vector3, limit: number): Vector3
+	local angle = math.acos(math.clamp(from:Dot(to), -1, 1))
+	if angle <= limit or angle < 1e-4 then return to end
+
+	local turned = CFrame.lookAt(Vector3.zero, from):Lerp(CFrame.lookAt(Vector3.zero, to), limit / angle).LookVector * FLAT
+
+	return if turned.Magnitude > 1e-3 then turned.Unit else to
+end
+
 local function leap(mob, spec, data)
 	local leapSpec = spec.leap
 	local aim = mob:LeadPoint(leapSpec.lead or 0)
 	local landing = mob:EngagePoint(aim, spec.reach)
+	local travel = (landing - mob.Root.Position) * FLAT
+	local look = mob.Root.CFrame.LookVector * FLAT
 	local speed = leapSpec.speed
 
 	if leapSpec.airtime then
-		local travel = (landing - mob.Root.Position) * Vector3.new(1, 0, 1)
 		speed = math.min(travel.Magnitude / (leapSpec.airtime * AIRTIME_EFFICIENCY), leapSpec.max_speed or math.huge)
 	end
 
 	data.LeapSpeed = speed
+	mob:Coast(leapSpec.overrun)
+	data.LeapHeading = if travel.Magnitude > 1e-3 then travel.Unit elseif look.Magnitude > 1e-3 then look.Unit else Vector3.zAxis
+	data.SteeredAt = os.clock()
 
 	mob:Face(aim)
 	mob:MoveTo(landing, speed)
@@ -33,15 +48,32 @@ end
 
 local function steer(mob, spec, data)
 	local root = mob:TargetRoot()
-	if not root then return end
+	if not root or mob.Coasting then return end
 
-	mob:Face(root.Position)
-	mob:MoveTo(mob:EngagePoint(root.Position, spec.reach), data.LeapSpeed)
+	local now = os.clock()
+	local dt = now - data.SteeredAt
+	local landing = mob:EngagePoint(mob:LeadPoint(spec.leap.lead or 0), spec.reach)
+	local offset = (landing - mob.Root.Position) * FLAT
+
+	data.SteeredAt = now
+
+	if offset.Magnitude <= LEAP_ARRIVE then return end
+
+	data.LeapHeading = turn(data.LeapHeading, offset.Unit, math.rad(spec.leap.track) * dt)
+
+	local point = mob.Root.Position + data.LeapHeading * offset.Magnitude
+
+	mob:Face(point)
+	mob:MoveTo(point, data.LeapSpeed)
 end
 
-local function stepIn(mob, spec, data)
+local function stepIn(mob, spec, data, elapsed: number)
 	local root = mob:TargetRoot()
 	if not root then return end
+
+	if not data.Stepping then
+		mob:Surge(spec.step_in, spec.windup - elapsed, spec.step_in_ease, spec.step_in_rise)
+	end
 
 	data.Stepping = true
 	mob:MoveTo(mob:EngagePoint(root.Position, spec.reach * STEP_IN_DEPTH), spec.step_in)
@@ -137,7 +169,7 @@ return {
 		if spec.leap and not data.Leapt and elapsed >= (spec.leap.delay or 0) then
 			data.Leapt = true
 			leap(mob, spec, data)
-		elseif spec.leap and spec.leap.homing and data.Leapt and not data.Hit then
+		elseif spec.leap and (spec.leap.track or 0) > 0 and data.Leapt and not data.Hit then
 			steer(mob, spec, data)
 		end
 
@@ -146,16 +178,19 @@ return {
 				face(mob)
 			end
 
-			if not spec.leap and (spec.step_in or 0) > 0 then
-				stepIn(mob, spec, data)
+			if not spec.leap and (spec.step_in or 0) > 0 and elapsed >= spec.windup - (spec.step_in_lead or spec.windup) then
+				stepIn(mob, spec, data, elapsed)
 			end
 
 			if strikeDue(spec, data, elapsed) then
 				data.Hit = true
 
 				local hits = mob:Strike(spec)
+				local coasting = data.Leapt and mob:CoastOut()
 
-				if data.Leapt or data.Stepping then
+				mob:Coast(nil)
+
+				if (data.Leapt or data.Stepping) and not coasting then
 					mob:Stop()
 				end
 
@@ -178,6 +213,7 @@ return {
 
 	Exit = function(mob, data)
 		mob:Unface()
+		mob:Coast(nil)
 
 		if data.Marker then
 			data.Marker:Disconnect()

@@ -208,6 +208,15 @@ return {
 			point = root and regroupPoint(mob, root)
 		elseif kind == "sidestep" then
 			point = Awareness.Sidestep.Point(mob)
+		elseif kind == "retreat" then
+			local away = if args.from then planar(mob.Root.Position - args.from) else Vector3.zero
+			local back = if away.Magnitude > 1e-3 then away.Unit else -(lookOf(mob.Root) or Vector3.zAxis)
+
+			local pause = os.clock() + (dash.retreat_pause or 0)
+
+			point = mob.Root.Position + back * (dash.retreat or 0)
+			blackboard.NextAttackAt = math.max(blackboard.NextAttackAt or 0, pause)
+			blackboard.NextPounceAt = math.max(blackboard.NextPounceAt or 0, pause)
 		elseif args and args.from and dash.dodge then
 			blackboard.Staggered = nil
 			point = dodgePoint(mob, dash.dodge, args.from)

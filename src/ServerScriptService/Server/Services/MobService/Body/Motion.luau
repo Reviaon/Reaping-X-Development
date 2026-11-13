@@ -1,3 +1,5 @@
+local MathService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Utility/MathService")
+
 local Motion = {}
 
 Motion.Settings = {
@@ -8,6 +10,7 @@ Motion.Settings = {
 	HeadingEpsilon = 0.01,
 	ArriveDistance = 1.5,
 	HeadingTolerance = 0.99995,
+	CoastEase = 2,
 }
 
 local function flat(vector: Vector3): Vector3
@@ -42,10 +45,37 @@ local function arrivalCap(mob): number
 	return math.sqrt(2 * deceleration * math.max(remaining, 0))
 end
 
+local function surge(mob): number?
+	local surging = mob.Surging
+	if not surging then return nil end
+
+	local progress = (os.clock() - surging.At) / surging.Duration
+
+	if progress >= 1 then
+		mob.Surging = nil
+		mob.Coasting = nil
+		return nil
+	end
+
+	return surging.Peak * MathService.Surge(progress, surging.Rise, surging.Ease)
+end
+
 local function updateSpeed(mob, heading: Vector3?, dt: number)
 	local settings = Motion.Settings
 	local config = mob.Config
 	local humanoid = mob.Humanoid
+	local surging = surge(mob)
+
+	if surging then
+		mob.Speed = surging
+
+		if math.abs(humanoid.WalkSpeed - surging) > settings.SpeedEpsilon then
+			humanoid.WalkSpeed = surging
+		end
+
+		return
+	end
+
 	local desired = math.min(mob.DesiredSpeed, arrivalCap(mob))
 
 	if desired > 0 and heading then
@@ -97,8 +127,45 @@ local function updateHeading(mob, heading: Vector3?)
 	end
 end
 
+function Motion.Coast(mob): boolean
+	local distance = mob.Overrun
+	if not distance or not mob.Moving or not mob.Destination or mob.Speed <= Motion.Settings.StopSpeed then return false end
+
+	local root = mob.Root
+	local offset = flat(mob.Destination - root.Position)
+	local look = flat(root.CFrame.LookVector)
+	local heading = if offset.Magnitude > 1e-3 then offset.Unit elseif look.Magnitude > 1e-3 then look.Unit else nil
+
+	mob.Overrun = nil
+	if not heading then return false end
+
+	local ease = Motion.Settings.CoastEase
+	local point = root.Position + heading * (distance + Motion.Settings.ArriveDistance)
+
+	mob.Destination = point
+	mob.DesiredSpeed = 0
+	mob.Stopping = true
+	mob.Coasting = true
+	mob.Humanoid:MoveTo(point)
+	mob:Surge(mob.Speed, distance * (ease + 1) / mob.Speed, ease)
+
+	return true
+end
+
+local function coast(mob, dt: number)
+	if not mob.Overrun or mob.Stopping or not mob.Destination then return end
+
+	local offset = flat(mob.Destination - mob.Root.Position)
+
+	if offset.Magnitude <= math.max(mob.Speed * dt * 2, Motion.Settings.ArriveDistance) then
+		Motion.Coast(mob)
+	end
+end
+
 function Motion.Step(mob, dt: number)
 	if mob.Halted then return end
+
+	coast(mob, dt)
 
 	local heading = headingOf(mob)
 
