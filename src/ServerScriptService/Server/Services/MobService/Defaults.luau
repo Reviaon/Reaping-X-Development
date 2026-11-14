@@ -3,6 +3,7 @@ return {
 	scale = 1, --@ Model:ScaleTo factor
 	health = 100,
 	corpse_time = 3, --@ Seconds the body stays
+	ragdoll = nil, --@ Bone ragdoll built when it dies (BoneRagdollService): { segments ={ { name, from, to, parent, across, padding, round, drives, cone, twist, friction } } }; nil dies without one
 
 	walk_speed = 9, --@ Wander, return and circle speed
 	run_speed = 26, --@ Chase speed
@@ -79,6 +80,9 @@ return {
 		reach_from = 0, --@ Studs ahead of the root the hit starts
 		radius = 4, --@ Studs around the reach line
 		step_in = 12, --@ Windup walk-in speed; 0 holds still
+		step_in_lead = nil, --@ Seconds before the hit the step-in surges; nil walks in from the start
+		step_in_ease = 0, --@ How the surge eases out to a stop at the hit: 0 holds step_in to the hit, 2 slows like (1 - t)^2
+		step_in_rise = 0, --@ Share of the surge it spends easing up to step_in (smoothstep); 0 starts at full speed
 		hitstun = nil, --@ Seconds; nil lasts until its next windup ends
 		hitstun_slack = 0.2, --@ Seconds added to derived stuns
 		back_off = nil, --@ { speed, animation, visual } for min_range hits
@@ -86,6 +90,8 @@ return {
 		reaction_combo = 1,
 		combo_reset = 2.5, --@ Seconds idle before the combo restarts
 		combo = {}, --@ Per-hit overrides by combo index
+		grab = nil, --@ Set per combo index: an `abilities` name whose cinematic a hit plays instead of knocking back
+		unblockable = false, --@ Lands through a block and a counter
 	},
 
 	launch_stun = 0.45, --@ Seconds a launch stuns it when it can't ragdoll
@@ -96,8 +102,6 @@ return {
 		speed = 40,
 		lift = 22,
 		spin = 360,
-		twist = 0.5,
-		flail = 12,
 	},
 
 	pounce = { --@ Mid-range gap closer; false turns it off
@@ -116,6 +120,8 @@ return {
 		playback = 1.6,
 		visual = nil, --@ Timeline played with every dash
 		animations = { Left = "DashLeft", Right = "DashRight", Back = "DashBack" },
+		retreat = 14, --@ Studs it hops back when a held victim escapes (a cinematic outcome with Retreat)
+		retreat_pause = 1.5, --@ Seconds after that hop before it attacks or pounces again
 		dodge = { --@ Hopping out of a swing
 			chance = 0.3,
 			retry = 0.8, --@ Seconds it ignores swings after passing
@@ -184,4 +190,5 @@ return {
 	visuals = nil, --@ Effects module path for combo visuals
 
 	animations = {}, --@ Key -> Animation name
+	animation_speeds = {}, --@ Locomotion key -> playback multiplier on top of the speed match (Run = 1.5 plays the run clip 1.5x faster)
 }
