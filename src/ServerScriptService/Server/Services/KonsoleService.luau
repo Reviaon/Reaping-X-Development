@@ -627,6 +627,28 @@ function Implementations.unmorphServer(context)
 	return unmorph(context, target)
 end
 
+function Implementations.outfitServer(context)
+	local target, rest = targetOf(context, argumentsOf(context))
+
+	if not target then
+		return context.err("no-target", "nobody to dress")
+	end
+
+	local worn, problem = Jloader.GetService("ClothingService"):Dress(target, table.concat(rest, " "))
+
+	if not worn then
+		return context.err("unknown-set", problem)
+	end
+
+	local who = target == context.entity and "you are" or ("%s is"):format(target.Name)
+
+	if worn == "none" then
+		return context.reply(("%s wearing no set"):format(who))
+	end
+
+	return context.reply(("%s wearing %s"):format(who, worn))
+end
+
 function Implementations.armServer(context)
 	local living = livingFolder()
 	if not living then
@@ -930,6 +952,30 @@ function KonsoleService:Init()
 		description = "Turns a morphed player back, where the morph stood, with their weapons.",
 		server = "unmorphServer",
 		args = {
+			{
+				name = "target",
+				type = "string",
+				required = false,
+			},
+		},
+	})
+
+	local outfits = Jloader.GetService("ClothingService"):GetNames()
+	table.insert(outfits, "off")
+
+	Konsole.define({
+		name = "outfit",
+		rank = settings.CommandRank,
+		aliases = { "clothing", "wear", "dress" },
+		description = "Dresses you in a clothing set from ServerStorage.Clothing, by number or name; 'outfit off' takes it off.",
+		server = "outfitServer",
+		args = {
+			{
+				name = "set",
+				type = "string",
+				required = true,
+				suggestions = outfits,
+			},
 			{
 				name = "target",
 				type = "string",
