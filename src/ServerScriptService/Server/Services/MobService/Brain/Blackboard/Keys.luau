@@ -22,6 +22,13 @@ return {
 	Chewing = { Type = "Instance", Owner = "States/Feed" },
 	Finished = { Type = "table", Owner = "States/Feed" },
 
+	Predators = { Type = "table", Owner = "Conditions/PredatorNear, Conditions/Disturbed" },
+	EvadedAt = { Type = "number", Owner = "States/Evade, States/Watch" },
+	WatchUntil = { Type = "number", Owner = "Conditions/Wary, States/Evade" },
+	StartledUntil = { Type = "number", Owner = "States/Wake" },
+	Asleep = { Type = "boolean", Owner = "Conditions/Asleep, States/Sleep, States/Wake" },
+	Sleeper = { Type = "boolean", Owner = "Conditions/Asleep" },
+
 	AimWindow = { Type = "table", Owner = "Senses/Awareness/Draw" },
 	Sidestep = { Type = "table", Owner = "Senses/Awareness/Sidestep" },
 	SidestepReadyAt = { Type = "number", Owner = "Senses/Awareness/Sidestep" },
