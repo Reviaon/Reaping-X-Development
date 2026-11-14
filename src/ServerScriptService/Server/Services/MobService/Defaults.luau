@@ -187,6 +187,9 @@ return {
 	rally = false, --@ Calling for help when badly hurt
 	feed = false, --@ Eating corpses when idle
 
+	evade = false, --@ Prey running from predators (Prey tree): { range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }; runs inside range until all are past safe, then watches one inside watch for watch_time; players and whoever hurt it always count
+	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, animations = { lie, loop, wake } }
+
 	visuals = nil, --@ Effects module path for combo visuals
 
 	animations = {}, --@ Key -> Animation name

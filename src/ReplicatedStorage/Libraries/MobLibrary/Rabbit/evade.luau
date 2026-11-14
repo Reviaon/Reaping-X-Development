@@ -2,7 +2,7 @@
 	**Evade**: running from predators and keeping away from them
 	- **Predators:** any player it notices (sight or hearing), whoever hurt it, and the mobs named in `predators`
 	- **Escape line:** straight away from them all, swung through `fan` until a line is clear of walls
-	- **Keeping away:** inside `range` it runs until all are past `safe`; inside `watch` it then stops and watches the nearest instead of heading home
+	- **Keeping away:** inside `range` it runs until all are past `safe`; inside `watch` it then stops and watches the nearest for `watch_time`, then wanders again (a predator inside `range` still sends it running)
 ]]
 local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
 
@@ -10,6 +10,7 @@ local evade: MobTypes.Evade = {
 	range = 30, --@ Studs a noticed predator sets it running from
 	safe = 50, --@ Studs every predator must be past before it stops
 	watch = 65, --@ Studs inside which it stays put watching the nearest instead of heading home
+	watch_time = { 3, 6 }, --@ Seconds it watches before it goes back to its day; rolled again after its next run
 	distance = 22, --@ Studs ahead it aims each refresh
 	speed = "run_speed",
 	refresh = 0.3, --@ Seconds between re-aims

@@ -2,7 +2,7 @@ return {
 	MaxAirtime = 5,
 
 	HeavyAirtime = 3,
-	MinJumpShare = 0.5,
+	MinJumpShare = 0.25, --@ Share of a full jump's airtime a fall needs before it counts as a landing
 
 	FadeTime = 0.1,
 

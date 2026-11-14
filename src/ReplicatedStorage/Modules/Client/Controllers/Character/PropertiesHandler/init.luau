@@ -8,27 +8,26 @@ local PropertyHandler = Jloader.CreateHandler({ Name = script.Name })
 local function stateOf(controller)
 	local state = controller:Scope(Config.Scope)
 
-	if state.decayedJumpPower == nil then
-		state.decayedJumpPower = Config.BaseJumpPower
+	if state.jumpLimit == nil then
 		state.jumpLimit = Config.BaseJumpPower
-		state.jumpResetPending = false
+		state.jumpCooling = false
 	end
 
 	return state
 end
 
-local function resolveJumpPower(controller)
+local function resolveJumpPower(controller): number
 	local state = stateOf(controller)
 
 	if state.launchPower then
 		return state.launchPower
 	end
 
-	if state.decayedJumpPower < Config.Jump.MinPower then
+	if state.jumpCooling then
 		return 0
 	end
 
-	return math.min(state.decayedJumpPower, state.jumpLimit)
+	return state.jumpLimit
 end
 
 local function applyHumanoidProperties(controller)
@@ -52,29 +51,11 @@ local function applyHumanoidProperties(controller)
 	end
 end
 
-local function cancelIdleReset(state)
-
-	if state.idleThread then
-		task.cancel(state.idleThread)
-		state.idleThread = nil
+local function cancelCooldown(state)
+	if state.cooldownThread then
+		task.cancel(state.cooldownThread)
+		state.cooldownThread = nil
 	end
-end
-
-local function scheduleIdleReset(controller)
-	cancelIdleReset(stateOf(controller))
-
-	local state = stateOf(controller)
-	local Character = controller.Character
-
-	state.idleThread = task.delay(Config.Jump.IdleReset, function()
-		if controller.Character ~= Character then return end
-		state.idleThread = nil
-
-		if state.decayedJumpPower >= Config.BaseJumpPower then return end
-
-		state.decayedJumpPower = Config.BaseJumpPower
-		applyHumanoidProperties(controller)
-	end)
 end
 
 function PropertyHandler:InitCharacter(controller)
@@ -86,14 +67,9 @@ function PropertyHandler:InitCharacter(controller)
 
 	local state = stateOf(controller)
 
-	if state.resetThread then
-		task.cancel(state.resetThread)
-		state.resetThread = nil
-	end
-	cancelIdleReset(stateOf(controller))
-	state.decayedJumpPower = Config.BaseJumpPower
+	cancelCooldown(state)
 	state.jumpLimit = Config.BaseJumpPower
-	state.jumpResetPending = false
+	state.jumpCooling = false
 	state.launchPower = nil
 
 	local trove = controller.Trove.new()
@@ -107,8 +83,8 @@ function PropertyHandler:InitCharacter(controller)
 		end
 	end)
 
-	trove:Connect(controller.Humanoid.Jumping, function(active)
-		if controller.Character ~= Character or not active or state.jumpResetPending then return end
+	trove:Connect(controller.Humanoid.Jumping, function(active: boolean)
+		if controller.Character ~= Character or not active or state.jumpCooling then return end
 
 		state.launchPower = controller.Humanoid.JumpPower
 		RunService.Heartbeat:Once(function()
@@ -119,39 +95,21 @@ function PropertyHandler:InitCharacter(controller)
 			end
 		end)
 
-		state.decayedJumpPower = math.max(0, state.decayedJumpPower - Config.Jump.DecayStep)
-
-		if state.decayedJumpPower < Config.Jump.MinPower then
-			state.decayedJumpPower = 0
-		end
-
-		if state.decayedJumpPower <= 0 then
-			--@ Fully decayed: the zeroed-out cooldown owns the reset from here.
-			cancelIdleReset(stateOf(controller))
-
-			state.jumpResetPending = true
-			state.resetThread = task.delay(Config.Jump.ResetCooldown, function()
-				if controller.Character ~= Character then return end
-				state.resetThread = nil
-				state.jumpResetPending = false
-				state.decayedJumpPower = Config.BaseJumpPower
-				applyHumanoidProperties(controller)
-			end)
-		else
-			scheduleIdleReset(controller)
-		end
+		state.jumpCooling = true
+		cancelCooldown(state)
+		state.cooldownThread = task.delay(Config.Jump.Cooldown, function()
+			if controller.Character ~= Character then return end
+			state.cooldownThread = nil
+			state.jumpCooling = false
+			applyHumanoidProperties(controller)
+		end)
 
 		applyHumanoidProperties(controller)
 	end)
 
 	trove:Add(function()
-		if state.resetThread then
-			task.cancel(state.resetThread)
-			state.resetThread = nil
-		end
-		cancelIdleReset(state)
+		cancelCooldown(state)
 	end)
-
 
 	trove:Connect(controller.Humanoid.Died, function()
 		trove:Clean()

@@ -117,6 +117,19 @@ function Animation:PlayAction(key: string, speed: number?, position: number?): A
 	return track
 end
 
+function Animation:PlayLoop(key: string, speed: number?): AnimationTrack?
+	local track = self.Tracks[key]
+	if track and track.IsPlaying then return track end
+
+	track = self:PlayAction(key, speed)
+
+	if track then
+		track.Looped = true
+	end
+
+	return track
+end
+
 function Animation:Position(key: string): number?
 	local track = self.Tracks[key]
 	return if track and track.IsPlaying then track.TimePosition else nil

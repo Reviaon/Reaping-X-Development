@@ -19,7 +19,7 @@ local GROUNDED = {
 }
 
 local function minAirtime(): number
-	return 2 * PropertiesConfig.Jump.MinPower / workspace.Gravity * Config.MinJumpShare
+	return 2 * PropertiesConfig.BaseJumpPower / workspace.Gravity * Config.MinJumpShare
 end
 
 local function release(state)
