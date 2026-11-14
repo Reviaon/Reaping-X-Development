@@ -209,8 +209,9 @@ function Mob:Burst(speed: number, unbraked: number?)
 	end
 end
 
-function Mob:Coast(distance: number?)
+function Mob:Coast(distance: number?, settle: number?)
 	self.Overrun = if distance and distance > 0 then distance else nil
+	self.Settle = if self.Overrun then settle else nil
 end
 
 function Mob:CoastOut(): boolean
@@ -271,6 +272,7 @@ function Mob:Halt()
 	self.Halted = true
 	self.Surging = nil
 	self.Overrun = nil
+	self.Settle = nil
 	self.Coasting = nil
 	self.Moving = false
 	self.Stopping = false

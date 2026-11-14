@@ -79,7 +79,9 @@ local function playback(session: Session, key: string, speed: number): number
 	local reference = if field == "walk_speed" then session.Profile.walk_speed elseif field == "run_speed" then session.Profile.run_speed else nil
 	if not reference or reference <= 0 then return 1 end
 
-	return math.clamp(speed / reference, Config.PlaybackRange[1], Config.PlaybackRange[2])
+	local scale = session.Profile.animation_speeds[key] or 1
+
+	return math.clamp(speed / reference, Config.PlaybackRange[1], Config.PlaybackRange[2]) * scale
 end
 
 function Locomotion.Step(session: Session)

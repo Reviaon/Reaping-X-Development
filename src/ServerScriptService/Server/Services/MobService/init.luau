@@ -57,7 +57,7 @@ function MobService:GetKind(name: string)
 		error(`[MobService] "{tostring(name)}" has no entry under Libraries.MobLibrary.`, 2)
 	end
 
-	local config = Config.Resolve(require(entry))
+	local config = Config.Resolve(Config.Gather(entry))
 	local templates = ServerStorage:FindFirstChild(self.Settings.TemplateFolder)
 	local templateName = config.template or name
 	local template = templates and templates:FindFirstChild(templateName)

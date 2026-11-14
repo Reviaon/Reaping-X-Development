@@ -34,6 +34,37 @@ local function merge(base, override)
 	return result
 end
 
+local function gather(container: Instance, into, path: string)
+	for _, child in container:GetChildren() do
+		local key = child.Name
+		local value
+
+		if child:IsA("ModuleScript") then
+			value = require(child)
+
+			if typeof(value) == "table" and #child:GetChildren() > 0 then
+				value = gather(child, table.clone(value), `{path}.{key}`)
+			end
+		elseif child:IsA("Folder") then
+			value = gather(child, {}, `{path}.{key}`)
+		else
+			continue
+		end
+
+		if into[key] ~= nil then
+			error(`[MobService] {path}.{key} is set twice: in {path} and as its own module.`, 0)
+		end
+
+		into[key] = value
+	end
+
+	return into
+end
+
+function Config.Gather(entry: ModuleScript)
+	return gather(entry, table.clone(require(entry)), entry.Name)
+end
+
 function Config.Resolve(entry)
 	return merge(Defaults, entry)
 end

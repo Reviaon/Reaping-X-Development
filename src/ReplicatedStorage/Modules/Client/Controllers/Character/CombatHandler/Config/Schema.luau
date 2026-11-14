@@ -83,8 +83,6 @@ Schema.Finisher = {
 	speed = "number",
 	lift = "number",
 	spin = "number",
-	twist = "number",
-	flail = "number",
 }
 
 Schema.ImpulseEntry = {

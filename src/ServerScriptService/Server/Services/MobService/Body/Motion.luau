@@ -136,18 +136,22 @@ function Motion.Coast(mob): boolean
 	local look = flat(root.CFrame.LookVector)
 	local heading = if offset.Magnitude > 1e-3 then offset.Unit elseif look.Magnitude > 1e-3 then look.Unit else nil
 
+	local settle = mob.Settle or 0
+
 	mob.Overrun = nil
+	mob.Settle = nil
 	if not heading then return false end
 
 	local ease = Motion.Settings.CoastEase
-	local point = root.Position + heading * (distance + Motion.Settings.ArriveDistance)
+	local duration = math.max(distance * (ease + 1) / mob.Speed, settle)
+	local point = root.Position + heading * (mob.Speed * duration / (ease + 1) + Motion.Settings.ArriveDistance)
 
 	mob.Destination = point
 	mob.DesiredSpeed = 0
 	mob.Stopping = true
 	mob.Coasting = true
 	mob.Humanoid:MoveTo(point)
-	mob:Surge(mob.Speed, distance * (ease + 1) / mob.Speed, ease)
+	mob:Surge(mob.Speed, duration, ease)
 
 	return true
 end

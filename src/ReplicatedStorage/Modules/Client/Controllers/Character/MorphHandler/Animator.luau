@@ -79,6 +79,21 @@ function Animator.Play(self: Self, key: string, speed: number?): AnimationTrack?
 	return track
 end
 
+function Animator.Crossfade(self: Self, from: string, to: string, speed: number?, fade: number?): AnimationTrack?
+	local playing = Animator.Playing(self, from)
+	local position = if playing then playing.TimePosition else 0
+
+	Animator.Stop(self, from, fade)
+
+	local track = Animator.Play(self, to, speed)
+
+	if track then
+		track.TimePosition = position
+	end
+
+	return track
+end
+
 function Animator.Loop(self: Self, key: string, priority: Enum.AnimationPriority): AnimationTrack?
 	local track = Animator.Track(self, key)
 	if not track then return nil end

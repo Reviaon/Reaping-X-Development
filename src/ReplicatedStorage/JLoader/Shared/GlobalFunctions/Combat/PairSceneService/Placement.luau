@@ -211,6 +211,39 @@ function Placement.Settled(character: Model, from: CFrame?): CFrame?
 	return rotation + Vector3.new(target.X, base.Y + floor - baseFloor, target.Z)
 end
 
+function Placement.Embedded(character: Model): number
+	local torso = torsoOf(character)
+	if not torso then return 0 end
+
+	local parts = { torso }
+
+	for _, name in Config.LooseJoints do
+		local motor = torso:FindFirstChild(name)
+
+		if motor and motor:IsA("Motor6D") and motor.Part1 then
+			table.insert(parts, motor.Part1)
+		end
+	end
+
+	local ignore = ignoreList()
+	local probeY = torso.Position.Y
+	local depth = 0
+
+	for _, part in parts do
+		if not part:IsA("BasePart") or part.Parent ~= character then continue end
+
+		local frame, size = part.CFrame, part.Size
+		local half = (math.abs(frame.XVector.Y) * size.X + math.abs(frame.YVector.Y) * size.Y + math.abs(frame.ZVector.Y) * size.Z) / 2
+		local floor = floorUnder(Vector3.new(frame.X, math.max(frame.Y, probeY), frame.Z), ignore)
+
+		if floor then
+			depth = math.max(depth, floor - (frame.Y - half))
+		end
+	end
+
+	return depth
+end
+
 function Placement.MeasureBounds(definition, rig: Model): ({ Min: Vector3, Max: Vector3 }, string)
 	local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
 	local library = game:GetService("ReplicatedStorage").Storage.Animations

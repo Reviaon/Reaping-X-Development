@@ -189,17 +189,43 @@ local function loosen(character: Model)
 	seatLimbs(character, true)
 end
 
-local function loosenLocally(character: Model)
+local function isLoose(root: BasePart, limb: BasePart): boolean
+	return limb.Anchored or limb.AssemblyRootPart ~= root.AssemblyRootPart
+end
+
+local function loosenLocally(character: Model, root: BasePart)
 	local torsoFrame = torsoFrameOf(character)
 	if not torsoFrame then return end
 
 	for motor, limb in limbsOf(character) do
 		if limb.Anchored then
 			seat(limb, motor, torsoFrame, false)
-		else
+		elseif isLoose(root, limb) then
 			limb.CFrame += torsoFrame * motor.C0.Position - limb.CFrame * motor.C1.Position
 		end
 	end
+end
+
+local function surface(character: Model, root: BasePart): Vector3
+	local depth = Placement.Embedded(character)
+	if depth <= 0 then return Vector3.zero end
+
+	local up = Vector3.new(0, depth, 0)
+	local loose = {}
+
+	for _, limb in limbsOf(character) do
+		if isLoose(root, limb) then
+			table.insert(loose, limb)
+		end
+	end
+
+	root.CFrame += up
+
+	for _, limb in loose do
+		limb.CFrame += up
+	end
+
+	return up
 end
 
 local function place(character: Model, partner: Model)
@@ -215,8 +241,15 @@ local function unanchor(character: Model)
 	local root = rootOf(character)
 	if not root or not root.Parent then return end
 
+	local player = Players:GetPlayerFromCharacter(character)
+
 	if character:GetAttribute(Config.LooseAttribute) then
 		character:SetAttribute(Config.LooseAttribute, nil)
+
+		if not player then
+			seatLimbs(character, true)
+			surface(character, root)
+		end
 
 		for _, limb in limbsOf(character) do
 			limb.Anchored = false
@@ -225,7 +258,6 @@ local function unanchor(character: Model)
 
 	root.Anchored = false
 
-	local player = Players:GetPlayerFromCharacter(character)
 	if not player then return end
 
 	local parts = { root }
@@ -245,15 +277,7 @@ local function isCarried(character: Instance?): boolean
 	return character ~= nil and character:GetAttribute(Config.CarryAttribute) ~= nil
 end
 
-local function carryFrame(character: Model, elapsed: number, origin: CFrame?, duration: number?): CFrame?
-	local velocity = character:GetAttribute(Config.CarryAttribute)
-	local from = origin or character:GetAttribute(Config.CarryFromAttribute)
-	local spin = character:GetAttribute(Config.CarrySpinAttribute)
-	local flight = duration or character:GetAttribute(Config.CarryTimeAttribute)
-
-	if typeof(velocity) ~= "Vector3" or typeof(from) ~= "CFrame" or typeof(flight) ~= "number" then return nil end
-
-	local t = math.clamp(elapsed, 0, flight)
+local function arcFrame(from: CFrame, velocity: Vector3, spin: unknown, t: number): CFrame
 	local position = from.Position + velocity * t + Vector3.new(0, -0.5 * workspace.Gravity * t * t, 0)
 	local rotation = from.Rotation
 
@@ -262,6 +286,35 @@ local function carryFrame(character: Model, elapsed: number, origin: CFrame?, du
 	end
 
 	return rotation + position
+end
+
+local function carryFrame(character: Model, elapsed: number, origin: CFrame?, duration: number?): CFrame?
+	local velocity = character:GetAttribute(Config.CarryAttribute)
+	local from = origin or character:GetAttribute(Config.CarryFromAttribute)
+	local spin = character:GetAttribute(Config.CarrySpinAttribute)
+	local flight = duration or character:GetAttribute(Config.CarryTimeAttribute)
+
+	if typeof(velocity) ~= "Vector3" or typeof(from) ~= "CFrame" or typeof(flight) ~= "number" then return nil end
+
+	return arcFrame(from, velocity, spin, math.clamp(elapsed, 0, flight))
+end
+
+local function entryFrame(entry, elapsed: number): CFrame
+	return arcFrame(entry.Origin, entry.Velocity, entry.Spin, math.clamp(elapsed, 0, entry.Duration))
+end
+
+local function simulatesHere(character: Model?): boolean
+	if not character then return false end
+	if IS_SERVER then return Players:GetPlayerFromCharacter(character) == nil end
+
+	return character == (Players.LocalPlayer and Players.LocalPlayer.Character)
+end
+
+local function streamed(character: Model): boolean
+	local RagdollService = require("./RagdollService")
+	local settings = RagdollService.Settings
+
+	return not simulatesHere(character) and settings.Replication == "Stream" and character:GetAttribute(settings.EnabledAttribute) == true
 end
 
 local function carryEntry(character: Model, root: BasePart)
@@ -278,12 +331,64 @@ local function carryEntry(character: Model, root: BasePart)
 		From = from,
 		Origin = origin,
 		Velocity = velocity,
+		Spin = character:GetAttribute(Config.CarrySpinAttribute),
 		Duration = if landing then landing.Time else character:GetAttribute(Config.CarryTimeAttribute),
 		SeenAt = os.clock(),
 	}
 	carried[character] = entry
 
 	return entry
+end
+
+local function touchedDown(character: Model?): boolean
+	local entry = character and carried[character]
+
+	return entry ~= nil and simulatesHere(character) and os.clock() - entry.SeenAt >= entry.Duration - Config.TouchdownLead
+end
+
+local function landingVelocity(entry, elapsed: number): Vector3
+	if elapsed < entry.Duration then
+		return entry.Velocity - Vector3.yAxis * workspace.Gravity * elapsed
+	end
+
+	local braked = math.clamp((elapsed - entry.Duration) / Config.LandingBrake, 0, 1)
+
+	return Vector3.new(entry.Velocity.X, 0, entry.Velocity.Z) * Config.LandingCarry ^ braked
+end
+
+local function steer(character: Model, root: BasePart, entry, elapsed: number)
+	root.CFrame = entryFrame(entry, elapsed)
+	root.AssemblyLinearVelocity = landingVelocity(entry, elapsed)
+	loosenLocally(character, root)
+	surface(character, root)
+end
+
+local function brake(character: Model)
+	local entry = carried[character]
+	if not entry or not entry.Released or not entry.BrakedTo then return end
+
+	local stop = entry.Duration + Config.LandingBrake
+	local elapsed = math.min(os.clock() - entry.SeenAt, stop)
+	if elapsed <= entry.BrakedTo then return end
+
+	local factor = Config.LandingCarry ^ ((elapsed - entry.BrakedTo) / Config.LandingBrake)
+	entry.BrakedTo = elapsed
+
+	local root = rootOf(character)
+	if not root or root.Anchored then return end
+
+	local parts = { root }
+
+	for _, limb in limbsOf(character) do
+		if isLoose(root, limb) then
+			table.insert(parts, limb)
+		end
+	end
+
+	for _, part in parts do
+		local velocity = part.AssemblyLinearVelocity
+		part.AssemblyLinearVelocity = Vector3.new(velocity.X * factor, velocity.Y, velocity.Z * factor)
+	end
 end
 
 local function clearCarry(character: Model)
@@ -293,11 +398,23 @@ local function clearCarry(character: Model)
 	character:SetAttribute(Config.CarryTimeAttribute, nil)
 end
 
+local function launchBody(character: Model, root: BasePart, velocity: Vector3)
+	root.AssemblyLinearVelocity = velocity
+	root.AssemblyAngularVelocity = Vector3.zero
+
+	for _, limb in limbsOf(character) do
+		limb.AssemblyLinearVelocity = velocity
+		limb.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
 local function land(character: Model)
 	carries[character] = nil
 
 	local root = rootOf(character)
-	local frame = carryFrame(character, math.huge)
+	local entry = IS_SERVER and carried[character]
+	local elapsed = entry and os.clock() - entry.SeenAt
+	local frame = if entry then entryFrame(entry, elapsed) else carryFrame(character, math.huge)
 
 	clearCarry(character)
 
@@ -306,6 +423,49 @@ local function land(character: Model)
 	end
 
 	unanchor(character)
+
+	if root and entry and not entry.Released then
+		entry.Released = true
+		entry.BrakedTo = math.max(elapsed, entry.Duration)
+		launchBody(character, root, landingVelocity(entry, elapsed))
+	end
+end
+
+local function stepCarries()
+	for character, entry in carried do
+		local root = rootOf(character)
+
+		if not root or not character.Parent or not simulatesHere(character) then
+			carried[character] = nil
+			continue
+		end
+
+		local elapsed = os.clock() - entry.SeenAt
+
+		if entry.Released then
+			if elapsed < entry.Duration then
+				steer(character, root, entry, elapsed)
+			end
+
+			brake(character)
+
+			if elapsed > entry.Duration + Config.LandingBrake then
+				carried[character] = nil
+			end
+		elseif not isCarried(character) then
+			carried[character] = nil
+		elseif elapsed < entry.Duration - Config.TouchdownLead then
+			root.CFrame = entryFrame(entry, elapsed)
+			seatLimbs(character, true)
+			surface(character, root)
+		else
+			if carries[character] then
+				task.cancel(carries[character])
+			end
+
+			land(character)
+		end
+	end
 end
 
 function PairSceneService.Carry(character: Model, velocity: Vector3, landing, motion): boolean
@@ -331,6 +491,10 @@ function PairSceneService.Carry(character: Model, velocity: Vector3, landing, mo
 	if carries[character] then
 		task.cancel(carries[character])
 	end
+
+	carried[character] = if simulatesHere(character)
+		then { From = root.CFrame, Origin = root.CFrame, Velocity = velocity, Spin = spin, Duration = duration, SeenAt = os.clock() }
+		else nil
 
 	carries[character] = task.delay(duration + Config.CarryGrace, land, character)
 
@@ -684,10 +848,18 @@ local function step()
 			local root, anchor = rootOf(character), anchorOf(character)
 
 			if root and anchor and not scene.Freed[character] then
-				hold(root, anchor)
+				local followed = simulatesHere(character) and followFrame(character, partnerIn(scene, character))
+
+				hold(root, followed or anchor)
+
+				if followed and character:GetAttribute(Config.LooseAttribute) then
+					seatLimbs(character, true)
+				end
 			end
 		end
 	end
+
+	stepCarries()
 
 	for character in members do
 		guard(character)
@@ -1045,28 +1217,56 @@ function PairSceneService.HoldAnchors()
 		for _, character in live:GetChildren() do
 			local anchor = anchorOf(character)
 			local root = (anchor or isCarried(character)) and rootOf(character)
-			local entry = root and not anchor and carryEntry(character, root)
-			local flight = entry and carryFrame(character, os.clock() - entry.SeenAt, entry.Origin, entry.Duration)
+			local entry = root and not anchor and not streamed(character) and carryEntry(character, root)
+			local elapsed = entry and os.clock() - entry.SeenAt
+			local flight = entry and carryFrame(character, elapsed, entry.Origin, entry.Duration)
+
+			if entry and entry.Released then
+				if flight and elapsed < entry.Duration and not root.Anchored then
+					steer(character, root, entry, elapsed)
+				end
+
+				flight = nil
+			end
 
 			if root and (anchor or flight) then
 				local frame = flight or followFrame(character, (PairSceneService.PartnerOf(character))) or anchor
 
+				local loose = character:GetAttribute(Config.LooseAttribute)
+
 				heldRoots[root] = true
-				heldFrames[character] = frame
 				hold(root, frame)
 
-				if character:GetAttribute(Config.LooseAttribute) then
-					loosenLocally(character)
+				if loose then
+					loosenLocally(character, root)
 				end
+
+				if flight then
+					frame += surface(character, root)
+				end
+
+				heldFrames[character] = frame
 			end
 		end
 	end
 
+	PairSceneService.FreeHeld()
+
+	local own = Players.LocalPlayer and Players.LocalPlayer.Character
+
+	if own then
+		guard(own)
+	end
+
+	releaseGuards()
+end
+
+function PairSceneService.FreeHeld()
 	local own = Players.LocalPlayer and Players.LocalPlayer.Character
 
 	for root in heldRoots do
 		local character = root.Parent
-		if anchorOf(character) or isCarried(character) or (character and predictions[character]) then continue end
+		if anchorOf(character) or (isCarried(character) and not touchedDown(character)) or (character and predictions[character]) then continue end
 
 		heldRoots[root] = nil
 
@@ -1075,22 +1275,30 @@ function PairSceneService.HoldAnchors()
 		root.Anchored = false
 
 		local thrown = carried[character]
-		carried[character] = nil
 
-		if thrown and character == own then
-			local t = os.clock() - thrown.SeenAt
-
-			root.AssemblyLinearVelocity = if t < thrown.Duration
-				then thrown.Velocity + Vector3.new(0, -workspace.Gravity * t, 0)
-				else Vector3.new(thrown.Velocity.X, 0, thrown.Velocity.Z) * Config.LandingCarry
+		if thrown then
+			thrown.Released = true
 		end
+
+		if character ~= own then continue end
+
+		local velocity = Vector3.zero
+
+		if thrown then
+			local elapsed = os.clock() - thrown.SeenAt
+
+			velocity = landingVelocity(thrown, elapsed)
+			thrown.BrakedTo = math.max(elapsed, thrown.Duration)
+		end
+
+		loosenLocally(character, root)
+		surface(character, root)
+		launchBody(character, root, velocity)
 	end
 
 	if own then
-		guard(own)
+		brake(own)
 	end
-
-	releaseGuards()
 end
 
 function PairSceneService.Predict(character: Model, definition, partner: Model)

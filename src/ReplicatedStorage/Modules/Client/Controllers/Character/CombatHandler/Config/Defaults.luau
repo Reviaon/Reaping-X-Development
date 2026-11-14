@@ -30,9 +30,7 @@ return {
 		recovery = 0.5, --@ Seconds of hit immunity once the ragdoll ends, so the victim acts first
 		speed = 40, --@ Studs per second the victim is thrown away from the attacker
 		lift = 32, --@ Studs per second of upward launch; 32 peaks about 2.6 studs up
-		spin = 540, --@ Degrees per second the victim tumbles backward in the air; 0 flies rigid
-		twist = 0.6, --@ Share of spin added again as random angular velocity, so the tumble yaws and rolls
-		flail = 16, --@ Studs per second of random velocity given to each loose limb at launch
+		spin = 540, --@ Degrees per second the victim tumbles backward in the air; 0 leaves the tumble to the hit
 	},
 
 	Visuals = {

@@ -150,19 +150,19 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 		end)
 	end
 
-	local motion = { spin = finisher.spin, twist = finisher.twist, flail = finisher.flail }
+	local motion = { spin = finisher.spin }
 	local carried = GlobalFunctions.PairSceneService.Carry(victim, velocity, landing, motion)
 
 	self.Launch:FireAll(victim, velocity, landing, motion)
 
 	if not carried and not Players:GetPlayerFromCharacter(victim) then
-		RagdollService.Launch(victim, velocity, motion)
+		RagdollService.Launch(victim, velocity, finisher.spin)
 	end
 
 	return true
 end
 
-function CombatService:CanHit(attacker: Model, victim: Model, profile): boolean
+function CombatService:CanHit(attacker: Model, victim: Model, profile, unblockable: boolean?): boolean
 	profile = profile or GlobalFunctions.ServerController:GetProfile(victim)
 	if not profile then return false end
 
@@ -170,6 +170,7 @@ function CombatService:CanHit(attacker: Model, victim: Model, profile): boolean
 	if not GlobalFunctions.StatusService:IsAlive(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
 	if GlobalFunctions.StatusService:IsHitYielded(attacker) then return false end
+	if unblockable then return true end
 	if getBlockService():HasPriority(victim, attacker) then
 		if GlobalFunctions.DebugService.IsEnabled() then
 			warn(`[Block] {victim.Name}'s counter outranks {attacker.Name}: hit refused`)

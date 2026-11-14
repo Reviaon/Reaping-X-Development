@@ -12,6 +12,7 @@ local Hurt = require("./Hurt")
 local Input = require("./Input")
 local Landing = require("./Landing")
 local Locomotion = require("./Locomotion")
+local Lunge = require("./Lunge")
 local Properties = require("./Properties")
 local Types = require("./Types")
 
@@ -102,6 +103,7 @@ function Session.Start(self: Session)
 		if humanoid.Health <= 0 then return end
 
 		Locomotion.Step(self)
+		Lunge.Step(self)
 		Input.Step(self)
 		Abilities.Step(self)
 	end)
@@ -171,8 +173,8 @@ function Session.Interrupt(self: Session)
 
 	self:Cancel("Bite")
 	self:Cancel("Ability")
+	Lunge.Stop(self)
 	self.Burst:Stop()
-	Abilities.Release(self)
 
 	for _, key in { state.BiteAnimation, state.DashAnimation, state.AbilityAnimation } do
 		self.Animator:Stop(key)

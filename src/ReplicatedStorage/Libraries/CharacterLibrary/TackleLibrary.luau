@@ -118,8 +118,6 @@ local TackleLibrary = {
 			speed = 34,
 			lift = 0,
 			spin = 0,
-			twist = 0,
-			flail = 0,
 		},
 	},
 

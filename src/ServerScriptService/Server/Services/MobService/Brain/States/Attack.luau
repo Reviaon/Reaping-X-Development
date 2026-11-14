@@ -37,7 +37,7 @@ local function leap(mob, spec, data)
 	end
 
 	data.LeapSpeed = speed
-	mob:Coast(leapSpec.overrun)
+	mob:Coast(leapSpec.overrun, leapSpec.settle)
 	data.LeapHeading = if travel.Magnitude > 1e-3 then travel.Unit elseif look.Magnitude > 1e-3 then look.Unit else Vector3.zAxis
 	data.SteeredAt = os.clock()
 

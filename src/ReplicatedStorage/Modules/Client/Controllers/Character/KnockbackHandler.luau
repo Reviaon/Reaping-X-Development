@@ -33,13 +33,7 @@ function KnockbackHandler:Launch(victim, velocity, landing, motion)
 	if victim ~= Players.LocalPlayer.Character then return true end
 	if PairSceneService.IsCarried(victim) then return true end
 
-	return RagdollService.Launch(victim, velocity, motion)
-end
-
-function KnockbackHandler:InitCharacter(controller, isLocal)
-	if not isLocal or not controller.Character then return end
-
-	RagdollService.Watch(controller.Character)
+	return RagdollService.Launch(victim, velocity, if typeof(motion) == "table" then motion.spin else nil)
 end
 
 function KnockbackHandler:Init()

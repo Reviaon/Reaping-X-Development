@@ -44,9 +44,11 @@ return {
 	BurstName = "MorphBurst", --@ Name of the LinearVelocity that drives dashes
 	BurstForcePerMass = 2000, --@ Planar force per unit of assembly mass behind a burst
 
-	LeapCone = 40, --@ Degrees off the morph's facing a leap ability looks for a target within the ability's range; with none it leaps straight ahead at the leap's top speed
+	LeapCone = 40, --@ Degrees off the morph's facing a leap looks for a target within its range; with none it leaps straight ahead at the leap's top speed, both capped by the entry's leap_distance
 	LeapArrival = 0.8, --@ Share of the airtime a locked-on leap reaches its landing in, so the server sees it arrive before the bite lands
-	LeapFacing = "MorphLeap", --@ NoRotate source held while a leap turns the morph to face where it is going
+	LungeFacing = "MorphLunge", --@ NoRotate source held while a bite lunge or leap turns the morph to face where it is going
+	LungeDepth = 0.7, --@ Share of a bite's reach it stops short of a tracked target, as the mob's step-in does
+	CoastEase = 2, --@ How a leap's overrun (the mob's leap.overrun) eases to a stop past the landing
 
 	DashDistance = 14, --@ Used when a morph's dash leaves distance out
 	DashCooldown = 0.5, --@ Used when a morph's dash leaves cooldown out

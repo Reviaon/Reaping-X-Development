@@ -19,8 +19,6 @@ return {
 		speed = 30,
 		lift = 22,
 		spin = 360,
-		twist = 0.5,
-		flail = 12,
 	},
 
 	HitStop = {
