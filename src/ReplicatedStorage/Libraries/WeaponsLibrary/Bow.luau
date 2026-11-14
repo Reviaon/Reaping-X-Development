@@ -1,5 +1,5 @@
 return {
-	Rig = "IronBowRig",
+	Rig = "DrawstringBowRig",
 	RigAttachments = { "ArrowReload" },
 	idle_while_moving = true,
 	idle_priority = "Action2",
