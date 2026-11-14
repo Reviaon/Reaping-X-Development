@@ -422,7 +422,8 @@ function TackleComponent:Activate(controller, combatState)
 		faceAlong(root, heading)
 
 		if now >= getUpAt then
-			finish(miss.GetUpFade)
+			local recovery = controller.RecoveryService.Play(character, TackleLibrary.Recovery)
+			finish(if recovery then controller.RecoveryService.Settings.Sources[TackleLibrary.Recovery].FadeIn else miss.GetUpFade)
 		end
 	end))
 
