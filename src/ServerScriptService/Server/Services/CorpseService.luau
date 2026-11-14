@@ -70,6 +70,7 @@ local function keep(character: Model)
 	if not corpse then return end
 
 	strip(corpse)
+	GlobalFunctions.RagdollService.Adopt(corpse)
 	CollectionService:AddTag(corpse, CorpseLibrary.Tag)
 	corpse.Parent = folder()
 
