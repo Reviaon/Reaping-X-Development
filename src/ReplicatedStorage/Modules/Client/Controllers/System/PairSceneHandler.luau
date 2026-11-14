@@ -8,6 +8,7 @@ function PairSceneHandler:Load()
 	local PairSceneService = Jloader.GlobalFunctions.PairSceneService
 
 	RunService.PreRender:Connect(PairSceneService.HoldAnchors)
+	RunService.PreSimulation:Connect(PairSceneService.FreeHeld)
 end
 
 return PairSceneHandler
