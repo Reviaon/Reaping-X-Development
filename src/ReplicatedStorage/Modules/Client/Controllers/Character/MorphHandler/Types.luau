@@ -29,8 +29,7 @@ export type Burst = {
 }
 
 export type Jump = {
-	Decayed: number,
-	Pending: boolean,
+	Cooling: boolean,
 	Launching: boolean,
 }
 
