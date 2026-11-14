@@ -15,6 +15,8 @@ local TackleLibrary = {
 		Miss = "TackleMiss",
 	},
 
+	Recovery = "TackleMiss", --@ RecoveryService source a missed tackle gets up through
+
 	TrackPriority = Enum.AnimationPriority.Action4,
 	TrackFade = 0.08,
 	StopFade = 0.15,
