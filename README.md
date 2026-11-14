@@ -388,6 +388,37 @@ Notes that are not obvious:
   value, so `attack_duraton` produces default timing and no warning. Check spelling against this list
   before assuming a weapon is misbehaving.
 
+### Bow drawstring
+
+- **Every bow tier shares one boned rig.**
+  - `Bow.luau` names `Storage.Rigs.DrawstringBowRig`, built from the Iron authoring rig.
+  - Tier models live at `Storage.Models.Weapons.Bow.<Tier>` (`Wooden`, `Stone`, `Diamond`).
+  - Each one is a skinned `Bow` mesh with bones `HANDLE` › `TOPSTRING` / `MIDDLESTRING` / `BOTTOMSTRING`.
+  - Each one also carries a nested `Arrow` on `ArrowMotor`, plus `ArrowIdle` and `ArrowAim` attachments.
+- **A tier's `RigOffset` is `IronC1 * TierC1:Inverse()`.**
+  - These are the `Left Arm.Bow` joint C1s from the authoring rigs.
+  - The rig's joint then holds each tier exactly where its own authoring rig did (checked at 0 error per tier).
+- **One aim set plays on every tier.**
+  - It was uploaded once from the Iron rig to the owning group:
+
+    | Animation | Clip | Asset id |
+    |---|---|---|
+    | `BowAim` | `ArrowStringAim` | 97598041602039 |
+    | `BowAimIdle` | `ArrowStringAimIdle` | 89639294898084 |
+    | `BowFire` | `ArrowStringFire` | 114872029209642 |
+
+  - The IDs sit on the `Animation` instances under `Storage.Animations.Player.Combat.Bow`, which `projectile.animations` names.
+  - The clips pose the bow, the arrow and the string bones; `MIDDLESTRING` pulls back about 2 studs at full draw.
+  - `BowIdle` and `BowArrowEquip` are unchanged. The arrow's rest pose relative to `Left Arm` matches the old rig, so they still line up.
+- **Names are load-bearing.**
+  - Poses bind by part and bone name (`Bow`, `Arrow`, `HANDLE`, `MIDDLESTRING`), so a renamed one silently stops animating.
+  - The arrow's motor must not be called `Arrow`. `Nock` looks the arrow up with `FindFirstChild("Arrow")`, and a Motor6D with that name would shadow it.
+- **Authoring rigs and archives.**
+  - The authoring rigs are `Workspace.UpdatedBows.Fixed<Wooden|Iron|Diamond>BowDrawstring`.
+  - The Iron rig's AnimSaves carry the `AssetId`/`AnimKey` stamps.
+  - The old rig and tier meshes are in `ServerStorage.Archive` (`IronBowRig_2026-11-14`, `BowTiers_2026-11-14`).
+  - The replaced IDs were `BowAim` 72786093703458, `BowAimIdle` 95380297507336 and `BowFire` 125503774287908.
+
 ---
 
 ## Mobs
@@ -480,7 +511,19 @@ status overhead adds two lines: state and target (with threat), then slot and pa
 2. **Animations.** Publish them to the **group that owns the game** (otherwise they will not play live) and put the
    `Animation` instances in `ReplicatedStorage.Storage.Animations.Mobs.<Name>`. Until then, Studio plays them from
    the template's `AnimSaves`. Keep big AnimSaves models out of the Workspace: they hang play-test teardown.
-3. **Entry.** Copy `Libraries/MobLibrary/Wolf.luau` to `<Name>.luau` and change only what differs:
+3. **Entry.** Make a folder module `Libraries/MobLibrary/<Name>/`, using `Wolf/` as the reference.
+
+   - **Each child fills the key named after it.**
+     - `MobService/Config.Gather` assembles the entry before it is resolved over `Defaults`, so consumers still see one table.
+     - A child ModuleScript becomes that key's value; `attack.luau` is the entry's `attack`.
+     - A child Folder becomes a table of its children; `abilities/maul.luau` is `abilities.maul`.
+     - A module with children of its own is assembled the same way, so a large ability can split its `cinematic` out too.
+   - **One concern per module.**
+     - `init.luau` holds identity and the small settings: `template`, `scale`, `health`, speeds, `spawn`, `visuals`, `rig`.
+     - `attack`, `rally`, `feed`, `ragdoll` and `animations` each get their own module.
+     - Every ability is its own module under `abilities/`. The module name is the ability key the rest of the config refers to (`grab = "leap_grab"`, `Then = "leap_grab"`, a morph's `leap_distance`).
+   - **A key set twice is an error.** Defining `attack` in `init.luau` and also as `attack.luau` fails the spawn, naming both places.
+   - **Override only what differs from `Defaults`.** Folded together, a small mob looks like:
 
    ```lua
    return {
@@ -509,6 +552,34 @@ status overhead adds two lines: state and target (with threat), then slot and pa
 5. **Check it.** Reach and spacing come from the body size; set `attack.reach` if the head sits far ahead
    of the body's middle. If two directional clips swing the body around when they cross-fade, list them in
    `animation_exclusive`.
+6. **Death ragdoll (optional).** Add a `ragdoll.luau` module returning `{ segments = { … } }`. With none, the
+   mob just stops where it died. `GlobalFunctions/Combat/BoneRagdollService` builds the body when the mob
+   dies, so a new mob needs only the table.
+
+   - **How it works:** the server builds an invisible part (segment) for each part of the body, from the
+     bone positions at the moment of death, and joins them with limited ball sockets. It welds the mesh
+     root (the part the bones live under) and the `HumanoidRootPart` to the first segment, then simulates
+     the body. Each client sets every listed bone to follow its segment once per frame (`Pose`).
+   - **Segment keys:**
+     - `from` and `to` are the bones the segment spans.
+     - `parent` is the segment it hangs off, jointed at `from`.
+     - `drives` lists the bones it places; it defaults to `{ from }`.
+     - `across` is the thickness in template studs (a number or a `Vector2`); the model's scale is applied
+       on top.
+     - `padding` adds to the length.
+     - `round = true` makes the segment a cylinder along its length, for torsos.
+     - `cone` and `twist` are the joint limits, in degrees from the pose at death.
+     - `friction` is the joint damping, per unit of mass.
+   - **Choosing segments:**
+     - Make the first segment the hips; everything else hangs off it.
+     - Each bone a segment drives takes its children along rigidly. So list only the bones where the body
+       should bend, and every root-level bone that isn't under the spine. The wolf's hind legs are IK roots
+       straight under `RootPart`, so `Thigh`, `Shin` and `Toe` are each driven.
+     - To list the bones with their positions, run a bone dump over `ServerStorage.Mobs.<Name>`.
+   - **Collisions and replication:** segments go in the `Mobs` collision group, so they hit the world but
+     not players or other mobs. The model gets a `BoneRagdolled` attribute, which `ChronoConfig` pauses
+     Chrono on; otherwise clients would keep moving the root.
+   - **Lifetime:** the body stays for `corpse_time` (3 s by default).
 
 A new *behaviour* (not a new mob) is a new state/condition/action module under `Brain/`, used from a tree.
 
@@ -971,25 +1042,11 @@ the step and the shove cover the same studs and the target stays in reach throug
 
 The final hit of every combo (`timing.is_final`) is a finisher: instead of a knockback recipe it
 **launches and ragdolls** the victim, player or NPC. `CombatConfig` gives every weapon
-`DEFAULT_FINISHER` — `ragdoll` 1.5s, `speed` 40, `lift` 32, `spin` 540, `twist` 0.6,
-`flail` 16 — and a weapon's `finisher = { ... }` overrides any key, while `finisher = false` turns
-it off. `spin` is degrees per second of backward tumble on the torso assembly; `twist` adds that
-share of it again as a random angular velocity so no two launches turn the same way; `flail` is
-studs per second of random velocity (and a random spin) given to each loose limb, so arms and legs
-leave the torso moving instead of hanging along it. The whole body still shares the launch velocity.
-
-**Limbs must not collide while ragdolled.** The Humanoid forces limb parts non-colliding every
-frame in its normal states and re-enables them on the way into `Physics` — after which an arm
-hanging flush against the torso locks on contact friction and a 40 studs/s kick moves it 5°. Both
-`RagdollService.enable` (server) and `RagdollService.Watch` (owner client) hold the four limbs'
-`CanCollide` off every Heartbeat for as long as the ragdoll lasts; the massless colliders do the
-colliding. With that, the same kick reaches the 110° cone limit.
-
-**The colliders do collide with the body.** Each is `ColliderScale` (0.85) of its limb, so at rest
-it sits clear of the torso and never starts in contact, and it carries `ColliderProperties` (low
-friction) so a limb lying against the body slides rather than sticks. That is what keeps arms and
-legs from sinking through the torso and head mid-tumble; there are no `NoCollisionConstraint`s
-between them any more.
+`DEFAULT_FINISHER` — `ragdoll` 1.5s, `speed` 40, `lift` 32, `spin` 540 — and a weapon's
+`finisher = { ... }` overrides any key, while `finisher = false` turns it off. The launch is a
+RagdollR6 fling: one impulse on the upper torso brings the body to the launch velocity, the limbs
+trail on their own (relaxed muscles, limb drag), and `spin` then sets the torso tumbling backward at
+that many degrees per second. `spin = 0` leaves the tumble to the off-centre hit.
 
 `CombatService:ApplyFinisher` cancels any push still running on the victim, applies `IsRagdolled`
 for `ragdoll` seconds and `IsStunned` for the same `ragdoll` seconds (so every existing stun gate holds
@@ -1025,14 +1082,56 @@ EffectService objects on the `HitYield` list (`CancelOn` in a visual's settings 
 `false` opts out), and `VisualsCore.WatchInterrupt` stops the rest of that swing's timeline and clears
 its afterimages.
 
-`RagdollService` (GlobalFunctions) builds the rig once per R6 character from its own joints — no
-template instances — when `ServerController` loads it: a ball socket at each shoulder and hip,
-positioned from the `Motor6D` C0/C1 with limits in `Settings`, a massless collider per limb,
-no-collision pairs between them, and a disabled weld from root to torso. Enabling it (the server,
-reacting to the `IsRagdolled` attribute) swaps the limb motors and `RootJoint` for those and claims
-the loose limbs for the character's owner, so they are simulated where the rest of the body is. The
-Humanoid goes to `Physics` and back through `GettingUp` — on the server for an NPC, through
-`RagdollService.Watch` on the player's own client. Shift-lock's per-frame root rotation stands down
+**The ragdoll is RagdollR6** (`Libraries/RagdollR6`): ball sockets with soft limits, plus
+`AnimationConstraint` muscles that pull each joint toward a relaxed pose, so a body lands and settles
+like a body. `RagdollService` (GlobalFunctions) is the game's adapter onto it:
+
+- `Setup` builds the rig once per R6 character when `ServerController` loads it (`RagdollR6.Setup`,
+  profile `Settings.Profile`). Mobs and morphs that aren't R6 are skipped.
+- `IsRagdolled` stays the one switch every system reads. The adapter mirrors it onto RagdollR6's
+  `RagdollEnabled` attribute, except that a dead body never stands back up.
+- The simulating machine runs the ragdoll: the server for an NPC, the player's own client for a
+  player (`System/RagdollHandler` starts RagdollR6 on every client). The server splits its copy of a
+  player's rig too and pins the parts to that player.
+- Observers don't simulate a ragdoll. They play back the simulator's pose stream (root plus one
+  rotation per joint, 20 Hz, jitter-buffered) with the joints rigid, so a body never tears at the
+  hips. `Settings.Replication = "Native"` swaps that for plain physics replication, for A/B tests.
+- `Launch` flings on the simulating machine (`spin` in degrees per second); `Sever` removes a limb's
+  sockets, muscles and motor; `Adopt` gives a copied body (a corpse) its own stream id.
+- A pair scene that holds a ragdolled body (the wolf grab, its throw) pins it to an anchored root.
+  The server holds its loose joints (`PairSceneService` `Config.LooseJoints`, the neck included)
+  anchored at rest; the owner client unanchors them locally, lets them hang on their muscles, and
+  pulls each one back onto its socket every frame by position only. On release it does that pull
+  once more, lifts the body until no part sits below the floor (`Placement.Embedded`), and only then
+  hands it to physics. It never snaps the limbs back to their rest pose there: they hang 120-170°
+  away from it, and that one-frame snap read as a mid-air jitter. A thrown body is also kept above
+  the floor for its whole flight. The owner client does this in `PreSimulation` (`FreeHeld`),
+  because the server's unanchor can arrive before the next render step. An NPC is reseated at rest
+  by the server, where its limbs were anchored at rest all along.
+- A thrown player does not wait for the server to land them. The server's `land` comes
+  `CarryGrace` plus a round trip after the client's own arc touches down, and waiting for it froze
+  the body at the touchdown point for 0.2-0.4 s. The owner client lets go `TouchdownLead` before its
+  own touchdown at the arc's velocity, keeps steering the unanchored body along the arc until
+  touchdown (the first physics step after an unanchor barely moves it, which showed as a one-frame
+  stall), then brakes the horizontal speed to `LandingCarry` over `LandingBrake` instead of in one
+  frame.
+- Whoever simulates a held or thrown body moves it; everyone else watches its ragdoll stream. That
+  is the owner client for a player and the server for an NPC (`simulatesHere`). The server holds an
+  NPC victim on the attacker's follow bone (the server does animate a morphed player's bones), flies
+  it along the arc, and lets go at its own touchdown with the same steer and brake (`stepCarries`).
+  A client never draws the arc for a streamed body it does not simulate (`streamed`). Before this,
+  the server kept an NPC victim at the scene anchor through the throw. The stream showed that spot,
+  and it beat the client's arc in `PreRender`, so a thrown Dummy snapped back to where it had been
+  held, sat there for the flight, then zipped 20 studs to where the server landed it.
+
+Three changes from the library as dropped into the place: only the six skeleton joints (`RootJoint`,
+`Neck`, shoulders, hips) become ragdoll joints, so weapon pieces stay welded to their limb; only
+skeleton parts get collision and mass while ragdolled; and the air model (lift and drag impulses)
+stands down while the torso is pinned to an anchored root. Limbs hanging off an anchored body don't
+simulate, and Roblox banks every `ApplyImpulse` on them until they do, so a three-second pair-scene
+hold used to release with about 250 studs/s of stored lift and launch the body. Limbs collide (no-collision pairs keep them
+off the torso and each other where they touch at rest). The Humanoid's limb-collision flip no longer
+matters, because the limbs are meant to collide. Shift lock's per-frame root rotation stands down
 while ragdolled.
 
 ### Blocking
