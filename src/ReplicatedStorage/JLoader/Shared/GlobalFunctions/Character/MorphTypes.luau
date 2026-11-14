@@ -51,6 +51,7 @@ export type Leap = {
 	lead: number?,
 	track: number?,
 	overrun: number?,
+	settle: number?,
 }
 
 export type Ability = {
