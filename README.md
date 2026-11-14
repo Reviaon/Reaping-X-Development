@@ -60,6 +60,7 @@ place file and are invisible to git. Know this before you go looking for somethi
 | `ReplicatedStorage.Storage` | Mapped `$className`-only. Rigs, weapon models, `Models.RigParts.Handle`, particles, animations and `UIFolder` all live here. |
 | `Workspace` | Not mapped at all. The map, `World.Live` (where characters are parented) and the NPC placements are place-only. |
 | `ServerStorage.Mobs` | Mob template models (e.g. `Wolf`). Mob spawn zones are Parts tagged `MobZone` in the Workspace. |
+| `ServerStorage.Clothing` | Clothing set models (`Set1`…`Set4`) that `ClothingService` dresses players in. |
 
 Practical consequence: inspect the live place through Studio rather than reasoning from `src/`, and
 do not assume something is absent just because grep found nothing.
@@ -434,7 +435,7 @@ MobService/
   Core/            Mob, Registry, Scheduler, Telemetry
   Body/            Rig, Animation, Motion, Spacing, Healing
   Brain/           Tree, StateMachine, Status, Blackboard/, Nodes/, Conditions/, Actions/, States/, Trees/
-  Senses/          Perception, Sight/, Awareness/
+  Senses/          Perception, Predators, Sight/, Awareness/
   Combat/          Attacks, Dodge, Threat/
   World/           Obstacles, Feeding
   Path/            pathfinding steering
@@ -451,6 +452,8 @@ A new module goes in the folder for what it is *about*. A system with several fi
 | `Libraries/MobLibrary/<Name>.luau` | One mob's differences from `Defaults`. Merged over them (nested tables merge, lists replace, `false` disables). |
 | `Config.luau` | Does the merge, then derives size-based values (`attack.reach`, `attack_range`, `pounce.range`, `pack.clearance`, `pack.orbit_radius`) from the measured body when an entry leaves them out. |
 | `Brain/Trees/Hunter.luau` | The shared brain: disabled → returning (unless prey is noticed on the way) → acquire target → leash / rally / sidestep / stalk an unreachable target / ability / attack / pounce / chase / circle → search for lost prey → head home if away → wander. Abilities and pounce also need `LaneClear`, so nothing leaps through a wall. |
+| `Brain/Trees/Prey.luau` | The passive brain (the Rabbit): disabled → asleep (wake if `Disturbed`, else keep sleeping) → evade a predator inside `evade.range` → watch one inside `evade.watch` for `evade.watch_time` (`Wary`) → nap again when `Drowsy` → head home if past `wander_radius` → wander. None of the hunter kit runs, so a prey entry switches `pounce`, `dash`, `pack` and `search` off. |
+| `Senses/Predators.luau` | What prey runs from: players it notices (`Sight`), whoever hurt it (any distance for `evade.startle` seconds after the hit, else only in range), and mobs whose name is in `evade.predators`, found through the spacing grid. `Away` sums the directions away from them, nearer ones weighted more. |
 | `Senses/Awareness/` | What a mob reads off its target, never the arrow itself. `Draw` watches the target's bow state (`ProjectileState`) and facing and decides when to sidestep a drawn aim (`ProjectileIncoming` → `Dash` kind `sidestep`). `Release` reacts to `RangedService.Fired` along the shot's line. `Sidestep` holds the shared cooldown, lock rules, hop point and `[Awareness]` debug lines. Tuned by `dash.sidestep`. |
 | `Brain/` | Behaviour-tree nodes, conditions, actions and states, each its own module found by name. A tree leaf asks the state machine for a state; the state runs enter/update/exit. |
 | `Body/Rig.luau` | Turns a template into a mob once per type: strips AnimSaves, scales, adds a collider `HumanoidRootPart` + R15 Humanoid, disables unused Humanoid states. Spawns clone that prototype. |
@@ -490,12 +493,14 @@ the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`Projec
 | `attack.combo[i]` | Any `attack` key (`hitstun` and `back_off` included), plus `range`, `min_range`, `animation`, `hit_animation`, `miss_animation`, `marker`, `leap` and `launch`. `grab = "<ability>"` makes a hit play that ability's `cinematic` instead of knocking back. `unblockable = true` lands through a guard and a counter (`CombatService:CanHit`'s `unblockable`). The wolf's 4th bite keeps its Bite4 clip, surges with a short `leap` (speed 30, from 14/60 s) and is `grab = "leap_grab"`, unblockable. |
 | `attack.step_in` / `step_in_lead` / `step_in_rise` / `step_in_ease` | The surge's peak speed, the seconds before the hit it starts (as the bite is thrown), the share of it spent easing in (smoothstep), and how it eases out to a stop at the hit. `Mob:Surge` stores it and `Body/Motion` follows `MathService.Surge` each frame. nil `step_in_lead` walks in from the start; 0 rise starts at full speed; 0 ease holds the speed. The wolf: 24, 0.3 s, rise 0.35, ease 2, about 1.3-1.9 studs per bite. The morph's `bite.lunge` uses the same window and curve, its peak set from the curve's average (`MathService.SurgeShare`) so `lunge` stays a distance. |
 | `abilities.<name>.cinematic` | A PairScene definition. On top of PairScene's own keys: `Struggle = "<StruggleLibrary profile>"` makes both sides play the minigame and the scene last until it resolves; `SyncLoops = true` starts each side's loop where the scene is, so a victim intro doesn't push the loops out of step; `Outcomes.<AttackerWins/AttackerLoses/Draw>` may carry `Then = "<ability>"` (chain straight into that ability's cinematic, unblockable) or `Retreat = true` (the mob hops back `dash.retreat` studs and waits `dash.retreat_pause` before attacking or pouncing). Hits come from the clip's `Hit` markers each loop (`Hit = { Damage }`; `Marker` defaults to "Hit"), and the ability's `visual` replays on every loop (`PairSceneService.Looped`). The wolf's maul (`Spacing = 13`, so the victim's torso sits under its jaw): ClawingBitingCombo loops over the victim's ClawingBitingVictimIntro/Loop; lose and the victim is grabbed and thrown (`Then = "leap_grab"`), win or draw and the wolf dashes back. |
-| `leap` | `{ delay, airtime or speed, max_speed, lead, track, overrun }`. `track` is degrees/s the leap bends toward the target while airborne (a turn-limited heading in `Brain/States/Attack`, so a strafing target pulls it into an arc rather than snapping it round); 0 or nil flies straight. `overrun` is studs it eases on past the landing instead of stopping dead: `Mob:Coast` arms it, and `Body/Motion` starts the slide on arrival or at the strike (`Mob:CoastOut`), decaying on `Motion.Settings.CoastEase`. The wolf: Leap Grab and Maul 4 (same `max_speed` 110, so they cover the same ground), final bite 1.5. The morph's `Lunge` coasts the same way (`Config.CoastEase`). |
+| `leap` | `{ delay, airtime or speed, max_speed, lead, track, overrun, settle }`. `settle` is the least seconds the overrun lasts; a faster leap carries further past the landing to fill it, so it eases out instead of braking (the wolf's Leap Grab and Maul: `overrun` 10, `settle` 0.3, `max_speed` 80). `track` is degrees/s the leap bends toward the target while airborne (a turn-limited heading in `Brain/States/Attack`, so a strafing target pulls it into an arc rather than snapping it round); 0 or nil flies straight. `overrun` is studs it eases on past the landing instead of stopping dead: `Mob:Coast` arms it, and `Body/Motion` starts the slide on arrival or at the strike (`Mob:CoastOut`), decaying on `Motion.Settings.CoastEase`. The wolf's final bite: 1.5, no `settle`. The morph's `Lunge` coasts the same way (`Config.CoastEase`). |
 | `animation_speeds` | Locomotion key → playback multiplier applied after the speed match (`Body/Animation` and the morph's `Locomotion`). The wolf's `Run = 1.5`. |
 | `abilities.<name>` | An attack spec plus `range`/`min_range`, `users = { passive, fresh }`, `ability_cooldown`, `team_cooldown`, `chance`, `retry`, `cinematic`, `visual` (played when the cinematic starts), `targets_ragdolled` and `ragdolled_chance`. |
 | `rally` | `{ health, animation, at, radius, visual, shake = { visual, from, to }, flee = { duration, speed, distance } }`. It stands through the call, alerts nearby mobs of its kind, then flees. |
 | `feed` | `{ animation, range, distance, feeders, speed, swallow_chance, duration, visual, carry = { bone, offset } }`. |
 | `animations` | Key → Animation name in `Storage.Animations.Mobs.<Mob>` (the template's AnimSaves in Studio). |
+| `evade` | `{ range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }` (Prey tree). It runs once a predator is inside `range`, until all are past `safe`, aiming `distance` ahead every `refresh` seconds along the first `fan` angle clear of walls. While any is inside `watch` it stands and faces the nearest for a rolled `watch_time`, then goes back to wandering; it watches again only after its next run, and never naps while one is still that close. `startle` keeps it running that long after waking or a hit. Types: `MobTypes.Evade`. |
+| `sleep` | `{ chance, wake_range, wake_speed, resettle, blend, animations = { lie, loop, wake } }` (Prey tree). `chance` of spawns start asleep (`Asleep` rolls once, on the first think). A noticed predator inside `wake_range` plays `wake`, then it evades; a hit skips the wake-up. After `resettle` calm seconds a sleeper walks home and lies down again (`false` stays awake). Types: `MobTypes.Sleep`. |
 
 Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
 removes them. `ai [state|threat|sight|path|team|reselect|calm|stats|zones] [all]` inspects the nearest mob within
@@ -581,6 +586,16 @@ status overhead adds two lines: state and target (with threat), then slot and pa
      Chrono on; otherwise clients would keep moving the root.
    - **Lifetime:** the body stays for `corpse_time` (3 s by default).
 
+7. **A passive mob (prey).** Use `Rabbit/` as the reference.
+
+   - **Brain:** `tree = "Prey"` in `init.luau`, with `pounce`, `dash`, `pack` and `search` set to `false`.
+   - **Behaviour modules:** `evade.luau` (who it runs from, how far, which mobs count as predators) and,
+     if it sleeps, `sleep.luau` with its lie/loop/wake clip keys. Both are typed against
+     `GlobalFunctions/Character/MobTypes`.
+   - **Scale is absolute** (`Model:ScaleTo`): a template authored at another scale (the rabbit's is 0.6)
+     keeps its size with `scale` left out; setting it rescales from 1, not from the template.
+   - **Konsole:** `mob Rabbit` spawns one group in front of you, so most bolt at once and some wake.
+
 A new *behaviour* (not a new mob) is a new state/condition/action module under `Brain/`, used from a tree.
 
 ---
@@ -633,8 +648,9 @@ How it works:
   own movement statuses (`Config.OwnStatuses`: ShiftLock, IsSprinting, IsAttacking). The ratio scales its
   own walk, run or step-in. A stun stops it, a guard break slows a walking wolf to 4/10, sprinting still
   outranks the guard break, and no jump while biting (IsAttacking's JumpPower 0).
-- **Jumps decay like a player's**, using `PropertiesHandler/Config.Jump`: each jump drops 10 of 50, below
-  25 jumping stops for `ResetCooldown`, and 2 s on the ground restores it (the wolf: 45 → 36 → 27 → 0).
+- **Jumps share the player's cooldown** (`PropertiesHandler/Config.Jump.Cooldown`, 1.5 s).
+  - Every jump is full power; then jumping is off until the cooldown ends.
+  - It replaced the per-jump decay, which made spammed sprint jumps too weak to trigger the sprint-jump VFX (`FullJump.MinRise`), so the animation played without its effects.
 - **Heavy landings root it like a player** (`Landing`, using `LandComponent/Config`): 3 s or more in the air
   sets `IsLanding`, shakes the camera (`HeavyLand`) and plays the entry's `land_animation`.
 - **Actions stop like a player's attacks:** hit-yields, action locks and ragdoll cancel a bite or dash and
@@ -687,6 +703,9 @@ ability tools **1** Leap Grab (15 s) and **2** Maul (14 s), each used by clickin
 Maul combo, Grab n throw, Hurt. The tools take the first hotbar slots and the clip keys follow them
 (`Config.ShotKeys`, up to 0).
 
+Rabbit controls (`morph Rabbit`): walk (the hop), **LeftShift** run, **Space** jump; no bite, dash or
+ability tools. Clips **1-4**: lie down, sleep loop, wake-up, flinch.
+
 ## Adding a morph
 
 A morph needs a working mob first (see "Adding a mob"): it borrows the rig, clips, bites and visuals.
@@ -725,6 +744,8 @@ A morph needs a working mob first (see "Adding a mob"): it borrows the rig, clip
    - A shot's `animation` is an `animations` key or a raw clip name in `Storage.Animations.Mobs.<mob>`;
      `visual` is a method on the mob's `visuals` module; `hold = { attribute, from, to, visual }` sets an
      attribute between two markers (or for the whole clip) for attribute-gated visuals.
+   - **A mob with no attack or dash** (the Rabbit): leave `Bite` and `Dash` out of `controls`, and leave out
+     `bite`, `dash`, `leap_distance` and `land_animation`. `MorphLibrary/Rabbit.luau` is the small reference.
    - Abilities need nothing in the entry: each key under the mob's `abilities` becomes a Tool running
      that ability on its own spec, `leap` and cooldown. List names in `abilities` only to reorder them or leave
      some out; a name the mob lacks fails the morph with a message.
@@ -754,6 +775,77 @@ copy with it renamed to `$ignoreUnknownInstances`. It also reports errors in `Mo
 `Senses/Perception`; those are older and not the morph's. Two old-solver habits keep morph code clean: give a local its type
 before iterating `x or {}` (`local shots: { Shot } = entry.shots or {}`), and cast arrays of differently
 shaped tables.
+
+---
+
+## Player data
+
+`Server/Services/DataService` loads each player's save with ProfileService and replicates it to their client.
+
+- **Lifecycle:** `GameService` drives it.
+  - `DataService:Open(player, "Player")` runs on join and yields, so the character is built once data is in.
+  - `DataService:Close(player, "Player")` runs on leave and at shutdown.
+  - `DataService:Get(player, scope)` returns the live data table.
+- **Stores live in `DataService/Config.Stores`**, keyed by scope.
+  - Each store names its DataStore and its template (`DataLibrary/TempData`). Every profile is reconciled against the template on load, so new template keys reach old saves.
+  - The key is `Config.Prefix .. UserId` (`Reaping0.0.1_<UserId>`). Changing the prefix starts everyone on fresh data.
+  - A new scope is a new entry. An optional `DataService/Handlers/<Scope>` module, `(player, profile) -> ()`, runs once after that scope loads.
+- **Replication** (`Mirror`): a store with `Replicate = "Data"` mirrors its data under `Player.Data` as Folders and Number/String/BoolValues.
+  - The tree is built whole before it's parented, so clients never see it half-built.
+  - **Server writes go through the Values.** Setting `.Value`, parenting a new Value or Folder, or removing one updates the profile.
+  - Writing the table from `Get` directly saves but doesn't replicate.
+  - Array entries are named by index and read back as number keys.
+- **Session safety:**
+  - The player is kicked with a message if their profile can't load, or if another server takes its lock.
+  - Closing it yourself never kicks.
+  - `Config.MockInStudio` points Studio at a throwaway mock store. It's off, so playtests read and write the real save.
+- **JLoader name trap:** a service method named `Load`, `InitPlayer` or `InitCharacter` is called by JLoader on every service at boot. That's why these methods are `Open`/`Close`.
+
+---
+
+## Clothing
+
+`Server/Services/ClothingService` dresses players in 3D layered clothing: meshes welded over each R6 limb.
+
+- **A set is a Model in `ServerStorage.Clothing`.**
+  - It's worn by its name (`Set1`…`Set4`), or by its number in natural order.
+  - Each MeshPart is named after the limb slot it covers: `Torso`, `Head`, `LeftArm`, `RightArm`, `LeftLeg` or `RightLeg`, or the limb itself (`Left Arm`).
+  - Several pieces may share a slot. `Set1` wears a coat and a belt, both on `Torso`.
+- **Adding a set is adding a model.**
+  - Lay its pieces out around an R6 body in Studio, the way they should sit, and drop the model in the folder. No code changes.
+  - Then bake its fit from the Studio command bar and save the place:
+    `print(require(game.ServerScriptService.Server.Services.ClothingService.Measure).Bake())`
+  - `Config.Slots` holds the slot names, each limb's R6 size and the R6 layout. A new slot (a hat on `Head`) is one line there.
+- **Where a piece sits** (`Layout`):
+  - The body is placed where the set's limb pieces say it stands, oriented like its largest `Torso` piece.
+  - Each piece keeps its authored offset from its limb. That's checked within 0.07 studs for all four sets.
+  - If a set sits wrong, set a `BodyOffset` CFrame attribute on its Model. It's the body's place relative to that largest `Torso` piece, and it replaces the guess.
+- **How a piece is fitted so no limb clips through** (`Measure`, `Fit`):
+  - `Measure` reads the piece's real triangles (`EditableMesh`) and tests a grid of points on the limb's four side faces.
+    - A point clips when a ray out of the face misses the piece, but a ray inward hits an outward-facing wall within the outer 40% of the limb.
+    - The deepest such wall sets how much wider (X) and deeper (Z) the piece must be to sit `Fit.Margin` (0.04 studs) outside the limb. The piece keeps its length.
+  - Rounded sleeves can't cover a box-shaped R6 limb's corners at their authored size, so pieces widen ×1.0–1.31. Legs land around ×1.2.
+  - The test skips what widening can't fix:
+    - Hems, shoulder seams and folds that turn inward (`Fit.Rim`, `Fit.Facing`).
+    - Deep openings like a coat's front (`Fit.Wall`).
+  - **Bake** stores the result on each piece as a `FitScale` attribute, so live servers never read meshes. An unbaked piece is measured on first wear, and worn unfitted with a warning if its mesh can't be read.
+  - A denser 21×13 grid per face found no clipping left on any piece of the four sets.
+- **How it's worn** (`Dress`):
+  - Each piece is sized to the wearer's real limb: its `FitScale`, times the limb's `Size` over the slot's R6 size, scaled around the limb's center.
+    - A bigger or smaller limb gets a matching piece. A 1.3×2.4×1.3 arm was checked exactly.
+  - The pieces sit in a `Clothing` Model inside the character, named `Clothing<Piece>` so none shadows a limb.
+  - Each is welded to its limb, so it follows animations and ragdolls.
+  - Pieces never collide, aren't hit by queries or arrows, and add no mass.
+- **Limbs stay visible** (`Config.HideLimbs = false`). Turn it on to hide covered limbs instead.
+  - A hidden limb goes fully transparent, including its decals and textures.
+  - The original value is kept in a `ClothingTransparency` attribute on that limb and restored when the set comes off or changes.
+  - Set a `ShowLimb = true` attribute on a piece (say, a belt over a bare torso) to leave its limb visible.
+  - Only the limb's transparency changes, so hitboxes and arrows still hit the body.
+- **The choice persists for the session.**
+  - The player's `ClothingSet` attribute is re-applied on every respawn and after a morph turns back. Morph bodies are never dressed.
+  - `Config.Default` dresses new players (nil = none). The choice isn't saved to player data.
+- **Console:** `outfit <number|name|off> [player]` (aliases `clothing`, `wear`, `dress`).
+  - Examples: `outfit 3`, `outfit set2 Sizzorsx`, `outfit off`.
 
 ---
 
@@ -1236,6 +1328,18 @@ friction: setting the limb colliders to 0.2, plastic or 1.0 friction changed the
 variation between runs. To stop a body near the marker, bleed its horizontal velocity on touchdown
 from the owner's `Landed` hook.
 
+### Getting up
+
+- **One clip for every get-up.** `GlobalFunctions/Character/RecoveryService` plays `Storage.Animations.Universal.UniversalRecoveryAnimation` on the local character.
+  - The owner plays it and the Animator replicates it, so everyone sees it.
+  - It holds `IsGettingUp` (WalkSpeed 0, JumpPower 0, no auto-rotate, and listed in `StatusLibrary.ActionLock`) until `Release` seconds before the clip ends.
+  - A new ragdoll while it plays stops it, and the next ragdoll end plays it again.
+- **Triggers are sources, found by name** in `RecoveryService/Config.Sources`. Each source sets its own fade-in (and optionally its speed).
+  - `Ragdoll`: `RecoveryService.Start` (from `RagdollHandler`) watches the local character's `IsRagdolled` status. When it ends (alive, not a morph), the clip plays. Pair-scene releases that ragdoll the victim get up this way too.
+  - `TackleMiss`: a missed tackle skids, holds the `TackleMiss` pose for `Miss.ProneHold`, then cross-fades into the clip (`TackleLibrary.Recovery` names the source). Without the clip it falls back to the old `Miss.GetUpFade`.
+- **Adding a trigger:** add a source entry and call `RecoveryService.Play(character, "<Source>")` where the fall ends.
+- **The clip is IsGettingUp, not IsRecovering.** `IsRecovering` is the attack recovery `CombatService` uses (it's in `HitImmune`). A player getting up can still be hit.
+
 ---
 
 ## Effects
@@ -1282,7 +1386,7 @@ clearweapons [target]      clearnpcs
 debug [on|off|toggle]      aggro [on|off|toggle]
 arm <weapon>               mob [name] [count]
 ai [section|verb] [all]    morph <mob|off> [target]
-unmorph [target]
+unmorph [target]           outfit <set|off> [target]
 ```
 
 `spawn Dummy Sword 2` drops two sword dummies; `arm` re-equips every NPC in `World.Live` (Melee
