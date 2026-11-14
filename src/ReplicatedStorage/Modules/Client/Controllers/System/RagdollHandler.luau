@@ -4,6 +4,7 @@ local RagdollHandler = Jloader.CreateHandler({ Name = script.Name })
 function RagdollHandler:Load()
 	Jloader.GlobalFunctions.RagdollService.Start()
 	Jloader.GlobalFunctions.BoneRagdollService.Start()
+	Jloader.GlobalFunctions.RecoveryService.Start()
 end
 
 return RagdollHandler
