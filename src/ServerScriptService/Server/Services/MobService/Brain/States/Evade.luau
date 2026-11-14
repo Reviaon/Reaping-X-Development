@@ -32,6 +32,7 @@ end
 return {
 	Enter = function(mob, data)
 		data.MovedAt = nil
+		mob.Blackboard.WatchUntil = nil
 		mob:SetTarget(nil)
 		mob:Unface()
 	end,
