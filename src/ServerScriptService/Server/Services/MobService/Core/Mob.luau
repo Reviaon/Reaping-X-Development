@@ -358,6 +358,11 @@ function Mob:Die()
 	self.Machine:Exit()
 	self:Halt()
 	self:LeaveTeam()
+
+	if self.Config.ragdoll then
+		GlobalFunctions.BoneRagdollService.Build(self.Model, self.Config.ragdoll)
+	end
+
 	self.Animation:StopAll()
 	Inspect.Publish(self)
 	self.Died:Fire(self)
