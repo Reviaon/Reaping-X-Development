@@ -5,6 +5,7 @@ return {
 	idle_priority = "Action2",
 	finisher = false,
 	base_damage = 10,
+	hit_stop = 0,
 	hitbox = { effect = "ProjectileHitLimb" },
 
 	projectile = {

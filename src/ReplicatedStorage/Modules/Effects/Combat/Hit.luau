@@ -10,6 +10,7 @@ local NPCLibrary = Libraries:WaitForChild("NPCLibrary")
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local AnimatorService = Jloader.GlobalFunctions.AnimatorService
 local EffectService = Jloader.GlobalFunctions.EffectService
+local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
 
 local Settings = {
 	DefaultEffect = "BluntHit", --@ Used when the swing names no effect
@@ -220,6 +221,20 @@ function Hit.Highlight(victim)
 	return highlight
 end
 
+--@ The reaction holds its first frames for the weapon's hit_stop, matching the attacker's frozen swing.
+function Hit.Freeze(track: AnimationTrack?, duration: number)
+	if not track or duration <= 0 then return end
+
+	local speed = track.Speed
+	track:AdjustSpeed(0)
+
+	task.delay(duration, function()
+		if track.IsPlaying and track.Speed == 0 then
+			track:AdjustSpeed(speed)
+		end
+	end)
+end
+
 function Hit.Emit(Info)
 	local victim = Info.Target
 	if typeof(victim) ~= "Instance" or not victim:IsA("Model") then return end
@@ -230,6 +245,8 @@ function Hit.Emit(Info)
 	local highlight = Hit.Highlight(victim)
 	local effect = Hit.SpawnParticles(victim, Info.Effect, rawget(Info, "Point"), rawget(Info, "Normal"))
 	local track = Hit.PlayReaction(Info, victim)
+
+	Hit.Freeze(track, CombatConfig:ResolveHitStop(rawget(Info, "WeaponId"), rawget(Info, "ComboIndex")))
 
 	if rawget(Info, "Predicted") then
 		predictions[victim] = { Highlight = highlight, Effect = effect, Track = track }

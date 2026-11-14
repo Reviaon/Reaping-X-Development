@@ -130,7 +130,7 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 
 	local landing = TrajectoryService.PredictLanding(root.Position, velocity, root.Size)
 
-	if not RagdollService.Ragdoll(victim, finisher.ragdoll) then return false end
+	if not RagdollService.Ragdoll(victim, finisher.ragdoll, finisher.gravity) then return false end
 
 	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
 

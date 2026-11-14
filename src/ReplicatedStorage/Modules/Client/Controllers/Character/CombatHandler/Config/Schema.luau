@@ -13,6 +13,7 @@ Schema.Weapon = {
 	ease_out = "number|table",
 	ease_pause = "number|table",
 	ease_fade = "number|table",
+	hit_stop = "number|table",
 	light_impulse = "table",
 	hitbox = "table",
 	knockback = "table",
@@ -91,6 +92,7 @@ Schema.Finisher = {
 	speed = "number",
 	lift = "number",
 	spin = "number",
+	gravity = "number",
 }
 
 Schema.ImpulseEntry = {

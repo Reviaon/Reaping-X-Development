@@ -13,6 +13,7 @@ return{
 
 	ease_out = 0.25, --@ How long to ease out the animation speed to 0 at the end of the attack
 	ease_fade = 0.35, --@ How long to fade out the animation after the ease out has completed
+	hit_stop = 0, --@ Fists land without a freeze frame (CombatHandler Config Defaults.HitStop for the rest)
 	
 	attack_duration = {
 		0.63,

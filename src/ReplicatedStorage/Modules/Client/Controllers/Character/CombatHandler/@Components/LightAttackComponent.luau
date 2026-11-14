@@ -75,7 +75,16 @@ function LightAttackComponent:Activate(controller, combatState)
 	AttackService:ScheduleEaseOut(controller, SWING, track, timing)
 	AttackService:ReportSwing(controller, weaponId, comboIndex)
 	broadcastVisual(controller, weaponId, comboIndex, timing.speed)
-	AttackService:ScheduleHitbox(controller, SWING, Character, timing, { weaponId = weaponId })
+	local frozen = false
+
+	AttackService:ScheduleHitbox(controller, SWING, Character, timing, {
+		weaponId = weaponId,
+		onHit = function(_, clean: boolean)
+			if frozen or not clean then return end
+
+			frozen = AttackService:Freeze(controller, SWING, timing.hit_stop)
+		end,
+	})
 
 	if not is_diving then
 		AttackService:ScheduleImpulse(controller, SWING, Character, timing, {

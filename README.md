@@ -342,6 +342,8 @@ return {
     ease_pause = 0.05,
     ease_fade = 0.25,
 
+    hit_stop = 0.06,               --@ Freeze frame on a clean hit; 0 turns it off
+
     light_impulse = {
         speed = 8, duration = 0.8, falloff = 0.5,
         priority = 1,              --@ A live higher-priority impulse cannot be stomped
@@ -385,6 +387,13 @@ Notes that are not obvious:
 - **Timings are authored at 1x.** `attack_speed` divides `attack_duration`, the cooldowns, the
   `ease_*` values, `impulse_delay`, the impulse `duration`/`falloff` and the hitbox `duration`; it
   multiplies impulse `speed`; it does not touch `influence` or `priority`.
+- **A clean hit freezes the swing for `hit_stop` seconds.**
+  - The default is `Defaults.HitStop` (0.06) in the CombatHandler `Config`. Fists (`Melee`) and the `Bow` set 0.
+  - It's a number or a table keyed by combo index, and `attack_speed` doesn't scale it.
+  - Only the first clean hit of a swing freezes it. A guarded or immune target doesn't.
+  - The victim's hit reaction holds for the same time: `Effects/Combat/Hit` resolves it from the hit's weapon and combo (`CombatConfig:ResolveHitStop`). Hits without a weapon config, like the push, don't freeze.
+  - `AttackService:Freeze` pauses the attacker's track, which replicates to everyone, and holds the swing's ease-out back by the same time, so the frozen frames are added to the swing, not cut from its end.
+  - It plays alongside the attacker's `HitDealt` shake (`ShakeLibrary`), which `Effects/Combat/Hit` already plays on every hit.
 - **A typo'd key is silent.** `ResolveNumber` falls back to a default on an unknown or wrongly-typed
   value, so `attack_duraton` produces default timing and no warning. Check spelling against this list
   before assuming a weapon is misbehaving.
@@ -1146,6 +1155,12 @@ The final hit of every combo (`timing.is_final`) is a finisher: instead of a kno
 RagdollR6 fling: one impulse on the upper torso brings the body to the launch velocity, the limbs
 trail on their own (relaxed muscles, limb drag), and `spin` then sets the torso tumbling backward at
 that many degrees per second. `spin = 0` leaves the tumble to the off-centre hit.
+
+- **A finisher falls at full gravity.**
+  - RagdollR6's air profile (`Profiles.luau`, `AIR.gravity` 0.55) lifts every airborne ragdoll against gravity, which made finishers hang in the air.
+  - `finisher.gravity` (default 1) is handed to `RagdollService.Ragdoll`. It stamps it on the rig as `RagdollGravityScale`, which RagdollR6 reloads live, and clears it when `IsRagdolled` ends.
+  - At 1 the body also lands where the server's `TrajectoryService.PredictLanding` (full gravity) says it will.
+  - Other ragdolls (push launches, mob throws, deaths) pass no gravity and keep the profile's 0.55.
 
 `CombatService:ApplyFinisher` cancels any push still running on the victim, applies `IsRagdolled`
 for `ragdoll` seconds and `IsStunned` for the same `ragdoll` seconds (so every existing stun gate holds

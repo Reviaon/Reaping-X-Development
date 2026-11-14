@@ -41,7 +41,7 @@ function AttackService:Scope(controller)
 	local scope = _scopes[controller]
 
 	if not scope then
-		scope = { threads = {}, tracks = {}, hitboxes = {} }
+		scope = { threads = {}, tracks = {}, hitboxes = {}, holds = {}, easing = {} }
 		_scopes[controller] = scope
 	end
 
@@ -176,7 +176,36 @@ function AttackService:LivingFolder()
 	return found
 end
 
+--@ Freezes a swing's track for duration seconds, then resumes it at its speed. The swing's ease-out
+--@ waits the same time, so the frozen frames are added to the swing rather than cut from its end.
+function AttackService:Freeze(controller, key, duration: number): boolean
+	local scope = self:Scope(controller)
+	local track = scope.tracks[key]
+
+	if duration <= 0 or not track or not track.IsPlaying or track.Speed == 0 then return false end
+	if scope.easing[key] == track then return false end
+
+	local speed = track.Speed
+
+	scope.holds[key] = (scope.holds[key] or 0) + duration
+	track:AdjustSpeed(0)
+
+	task.delay(duration, function()
+		if scope.tracks[key] == track and scope.easing[key] ~= track and track.IsPlaying and track.Speed == 0 then
+			track:AdjustSpeed(speed)
+		end
+	end)
+
+	return true
+end
+
 function AttackService:ScheduleEaseOut(controller, key, track, timing)
+	local scope = self:Scope(controller)
+	local swing = key
+
+	scope.holds[swing] = 0
+	scope.easing[swing] = nil
+
 	key = part(key, "ease")
 	self:Cancel(controller, key)
 
@@ -190,7 +219,17 @@ function AttackService:ScheduleEaseOut(controller, key, track, timing)
 	local start_at = math.max(timing.duration - ease_out, 0)
 
 	self:Schedule(controller, key, start_at, function()
+		local held = 0
+
+		while (scope.holds[swing] or 0) > held do
+			local owed = scope.holds[swing] - held
+			held += owed
+			task.wait(owed)
+		end
+
 		if not (track and track.IsPlaying) then return end
+
+		scope.easing[swing] = track
 
 		local began = os.clock()
 
@@ -342,7 +381,7 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 			end
 
 			if options.onHit then
-				options.onHit(target)
+				options.onHit(target, not guarded and predicted)
 			end
 		end)
 

@@ -22,6 +22,8 @@ return {
 	EasePause = 0.05,
 	EaseFade = 0.15,
 
+	HitStop = 0.06, --@ Seconds a light attack's swing freezes on its first clean hit; not scaled by attack_speed
+
 	MinAttackSpeed = 0.1,
 	MaxAttackSpeed = 10,
 
@@ -31,6 +33,7 @@ return {
 		speed = 40, --@ Studs per second the victim is thrown away from the attacker
 		lift = 32, --@ Studs per second of upward launch; 32 peaks about 2.6 studs up
 		spin = 540, --@ Degrees per second the victim tumbles backward in the air; 0 leaves the tumble to the hit
+		gravity = 1, --@ Share of gravity the ragdoll falls with while airborne; RagdollR6's own default is 0.55
 	},
 
 	Visuals = {

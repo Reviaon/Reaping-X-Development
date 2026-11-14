@@ -13,6 +13,7 @@ RagdollService.Settings = {
 	Profile = "Soft", --@ RagdollR6 profile a rig starts on: Soft (muscles) or Hard (limits only)
 	Replication = "Stream", --@ How observers see a ragdoll: Stream (the simulator's pose, buffered) or Native (physics replication)
 	EnabledAttribute = "RagdollEnabled", --@ RagdollR6's switch, driven from Status
+	GravityAttribute = "RagdollGravityScale", --@ RagdollR6's airborne gravity share; set per ragdoll, cleared when it ends
 	IdentityAttributes = { "RagdollId", "RagdollReady" }, --@ Cleared on a copied rig so it gets its own stream id
 }
 
@@ -28,6 +29,10 @@ local function follow(character: Model)
 
 	character:GetAttributeChangedSignal(settings.Status):Connect(function()
 		local ragdolled = character:GetAttribute(settings.Status) == true
+
+		if not ragdolled then
+			character:SetAttribute(settings.GravityAttribute, nil)
+		end
 
 		if not ragdolled and not isAlive(character) then return end
 
@@ -68,9 +73,12 @@ function RagdollService.Adopt(copy: Model): boolean
 	return RagdollService.Setup(copy)
 end
 
-function RagdollService.Ragdoll(character: Model, duration: number)
+--@ gravity is the share of gravity the body falls with while airborne; nil keeps the profile's own.
+function RagdollService.Ragdoll(character: Model, duration: number, gravity: number?)
 	if not RunService:IsServer() then return nil end
 	if not RagdollService.Setup(character) then return nil end
+
+	character:SetAttribute(RagdollService.Settings.GravityAttribute, gravity)
 
 	local handle = StatusService:ApplyStatus(character, RagdollService.Settings.Status, true, duration)
 	character:SetAttribute(RagdollService.Settings.EnabledAttribute, true)

@@ -197,6 +197,13 @@ function CombatConfig:ResolveAttackSpeed(weaponConfig, comboIndex: number?): num
 	return math.clamp(speed, Defaults.MinAttackSpeed, Defaults.MaxAttackSpeed)
 end
 
+function CombatConfig:ResolveHitStop(weaponId: string?, comboIndex: number?): number
+	local weaponConfig = weaponId and self.WeaponConfig[weaponId]
+	if not weaponConfig then return 0 end
+
+	return ResolveNumber(weaponConfig.hit_stop, comboIndex or 1, Defaults.HitStop)
+end
+
 function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weaponConfig)
 	weaponConfig = weaponConfig or self:ResolveWeaponConfig(controller)
 	comboIndex = comboIndex or 1
@@ -244,6 +251,8 @@ function CombatConfig:ResolveAttackTiming(controller, comboIndex: number?, weapo
 		ease_out = ResolveNumber(weaponConfig.ease_out, comboIndex, Defaults.EaseOut) / speed,
 		ease_pause = ResolveNumber(weaponConfig.ease_pause, comboIndex, Defaults.EasePause) / speed,
 		ease_fade = ResolveNumber(weaponConfig.ease_fade, comboIndex, Defaults.EaseFade) / speed,
+
+		hit_stop = ResolveNumber(weaponConfig.hit_stop, comboIndex, Defaults.HitStop),
 
 		impulse = Scaling.Impulse(impulseData, impulse, speed),
 		impulse_delay = impulseDelay,
