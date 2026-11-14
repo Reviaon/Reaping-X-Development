@@ -4,12 +4,9 @@ TempData.plrData = {
 
 	CharacterData = { 
 		Gender = "Male";
-		Inventory = {};
 		
+		Inventory = {};
 		Outfit = {};
-		Appearance = {};
-		Body = {};
-		Access = {};
 		Settings = {};
 	};
 
