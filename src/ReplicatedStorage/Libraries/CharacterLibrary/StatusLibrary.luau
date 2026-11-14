@@ -3,7 +3,7 @@ return{
 	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames", "InPairScene" },
 	HitYield = { "IsStunned", "GuardBroken", "IsGrappled" },
 	HitGuard = { "IsGuarding" },
-	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene" },
+	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene", "IsGettingUp" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -97,6 +97,13 @@ return{
 			JumpPower = 0,
 			AutoRotate = false,
 			Priority = 7;
+		};
+
+		IsGettingUp = {
+			WalkSpeed = 0,
+			JumpPower = 0,
+			AutoRotate = false,
+			Priority = 8;
 		};
 
 		IsRunJumping = {
