@@ -91,7 +91,7 @@ end
 
 function GameService:Initialize()
 	Players.PlayerAdded:Connect(function(player)
-		DataService.InitPlr(player, "Player")
+		DataService:Open(player, "Player")
 		self.CharacterHandlers[player] = CharacterHandler.new(player)
 
 		player.CharacterAdded:Connect(function()
@@ -103,7 +103,7 @@ function GameService:Initialize()
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
-		DataService.RemovePlr(player, "Player")
+		DataService:Close(player, "Player")
 		if self.CharacterHandlers[player] then
 			self.CharacterHandlers[player].Trove:Destroy()
 			self.CharacterHandlers[player] = nil
@@ -143,7 +143,7 @@ function GameService:Initialize()
 
 	game:BindToClose(function()
 		for _, player in Players:GetPlayers() do
-			DataService.RemovePlr(player, "Player")
+			DataService:Close(player, "Player")
 		end
 	end)
 end
