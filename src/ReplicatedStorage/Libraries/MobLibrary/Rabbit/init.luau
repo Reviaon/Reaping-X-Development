@@ -3,6 +3,7 @@
 	- **Assembled by name:** each child module fills the key it is named after (`MobService/Config.Gather`)
 	  - `evade`: who it runs from and how
 	  - `sleep`: spawning asleep, the wake-up, napping again
+	  - `ragdoll`: the death ragdoll
 	  - `animations`: clip names
 	- **Brain:** the `Prey` tree, so none of the hunter kit (attack, pounce, dash, pack) is used and it is all switched off
 	- **This module:** identity, body and small settings; anything left out comes from `MobService/Defaults`

@@ -115,6 +115,28 @@ local inputActions = {
 	},
 }
 
+local function routeGrabCommands()
+	local push = CombatHandler.components["PushAttackComponent"]
+	if not push then return end
+
+	for _, input in push:CommandInputs() do
+		local fallback = inputActions.Began[input]
+
+		inputActions.Began[input] = {
+			canHold = if fallback then fallback.canHold else false,
+			action = function(controller)
+				if push:Command(controller, input) then return end
+
+				if fallback then
+					fallback.action(controller)
+				end
+			end,
+		}
+	end
+end
+
+routeGrabCommands()
+
 function CombatHandler:Init()
 	InputHandler.Init()
 	InputHandler.BindInput(inputActions, inputConnections, ClientController)

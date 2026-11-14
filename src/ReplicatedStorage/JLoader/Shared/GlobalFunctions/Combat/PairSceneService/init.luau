@@ -10,6 +10,7 @@ local Signal = require("../Utility/Signal")
 local Config = require("@self/Config")
 local Placement = require("@self/Placement")
 local Timeline = require("@self/Timeline")
+local Walk = require("@self/Walk")
 
 local PairSceneService = {
 	Settings = Config,
@@ -56,9 +57,13 @@ local function liveFolder(): Instance?
 	return found
 end
 
-local function boneOf(model: Model, name: string): Bone?
+local function followTarget(model: Model, name: string): Instance?
 	local found = model:FindFirstChild(name, true)
-	return if found and found:IsA("Bone") then found else nil
+	return if found and (found:IsA("Bone") or found:IsA("BasePart")) then found else nil
+end
+
+local function targetFrame(target: Instance): CFrame
+	return if target:IsA("Bone") then target.TransformedWorldCFrame else (target :: BasePart).CFrame
 end
 
 local function shaken(character: Model, frame: CFrame, across: Vector3): CFrame
@@ -73,34 +78,34 @@ local function shaken(character: Model, frame: CFrame, across: Vector3): CFrame
 	return CFrame.new(position) * CFrame.Angles(0, math.rad(shake.X) * twist, 0) * frame.Rotation
 end
 
-local function followFrame(character: Model, partner: Model?): CFrame?
-	local boneName = character:GetAttribute(Config.FollowAttribute)
+local function followFrame(character: Model, partner: Model?, partsOnly: boolean?): CFrame?
+	local targetName = character:GetAttribute(Config.FollowAttribute)
 	local offset = character:GetAttribute(Config.FollowOffsetAttribute)
 
-	if typeof(boneName) ~= "string" or typeof(offset) ~= "CFrame" or not partner then return nil end
+	if typeof(targetName) ~= "string" or typeof(offset) ~= "CFrame" or not partner then return nil end
 
 	local partnerRoot = partner:FindFirstChild("HumanoidRootPart")
 	if not partnerRoot then return nil end
 
-	local bone = followBones[character]
+	local target = followBones[character]
 
-	if not bone or bone.Name ~= boneName or not bone:IsDescendantOf(partner) then
-		bone = boneOf(partner, boneName)
-		followBones[character] = bone
+	if not target or target.Name ~= targetName or not target:IsDescendantOf(partner) then
+		target = followTarget(partner, targetName)
+		followBones[character] = target
 	end
 
-	if not bone then return nil end
+	if not target or (partsOnly and target:IsA("Bone")) then return nil end
 
-	return shaken(character, bone.TransformedWorldCFrame * offset, partnerRoot.CFrame.RightVector)
+	return shaken(character, targetFrame(target) * offset, partnerRoot.CFrame.RightVector)
 end
 
 local function startFollow(character: Model, partner: Model, follow): boolean
 	local partnerRoot = partner:FindFirstChild("HumanoidRootPart")
-	local bone = boneOf(partner, follow.Bone)
+	local bone = followTarget(partner, follow.Bone)
 
 	if not partnerRoot or not bone then return false end
 
-	local boneFrame = bone.TransformedWorldCFrame
+	local boneFrame = targetFrame(bone)
 	local held = (partnerRoot.CFrame.Rotation + boneFrame.Position) * (follow.Offset or CFrame.identity)
 	local shake = follow.Shake
 
@@ -601,7 +606,8 @@ local function settleMember(scene, character: Model): boolean
 	if not anchor then return false end
 
 	local root = rootOf(character)
-	local settled = root and Placement.Settled(character, anchor)
+	local base = followFrame(character, partnerIn(scene, character)) or anchor
+	local settled = root and Placement.Settled(character, base)
 
 	if not settled then return false end
 
@@ -610,9 +616,26 @@ local function settleMember(scene, character: Model): boolean
 	end
 
 	character:SetAttribute(Config.AnchorAttribute, settled)
+	clearFollow(character)
 	root.CFrame = settled
 
 	return true
+end
+
+local function startWalk(scene, walker: Model)
+	local side = scene.Definition[roleOf(scene, walker)]
+	local held = partnerIn(scene, walker)
+
+	if not side.Walk or not active[scene] or scene.Outcome or scene.Walker then return end
+	if scene.Freed[walker] or scene.Freed[held] then return end
+
+	local walkerAnchor, heldAnchor = anchorOf(walker), anchorOf(held)
+	if not walkerAnchor or not heldAnchor then return end
+
+	if not Walk.Begin(walker, held, side.Walk, walkerAnchor, heldAnchor) then return end
+
+	scene.Walker = walker
+	unanchor(walker)
 end
 
 local function animationId(animation: Animation?): string?
@@ -848,7 +871,7 @@ local function step()
 			local root, anchor = rootOf(character), anchorOf(character)
 
 			if root and anchor and not scene.Freed[character] then
-				local followed = simulatesHere(character) and followFrame(character, partnerIn(scene, character))
+				local followed = followFrame(character, partnerIn(scene, character), not simulatesHere(character))
 
 				hold(root, followed or anchor)
 
@@ -957,10 +980,18 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 
 	table.insert(scene.Sequences, PairSceneService.Sequence(victim, definition.Victim, definition, age, function(track)
 		adopt(scene, victim, track)
+
+		if track.Looped then
+			startWalk(scene, victim)
+		end
 	end))
 
 	local attackerSequence = PairSceneService.Sequence(attacker, definition.Attacker, definition, age, function(track)
 		adopt(scene, attacker, track)
+
+		if track.Looped then
+			startWalk(scene, attacker)
+		end
 	end, scene.Predicted)
 
 	table.insert(scene.Sequences, attackerSequence)
@@ -1076,6 +1107,8 @@ function PairSceneService:Release(scene, reason: string?)
 				StatusService:RemoveStatus(character, side.Status)
 			end
 
+			Walk.End(character, side.Walk)
+
 			local fallback = configuredRagdoll(scene, character)
 
 			if launching then
@@ -1128,6 +1161,8 @@ function PairSceneService:Free(scene, character: Model, held: boolean?): boolean
 		if side.Status then
 			StatusService:RemoveStatus(character, side.Status)
 		end
+
+		Walk.End(character, side.Walk)
 	end
 
 	return true

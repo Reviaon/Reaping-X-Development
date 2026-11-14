@@ -20,6 +20,13 @@ function Weapon.Of(controller)
 	return id, data and data.projectile
 end
 
+function Weapon.Start(projectile, key: string): number
+	local starts = projectile.starts
+	local start = typeof(starts) == "table" and starts[key]
+
+	return if typeof(start) == "number" and start > 0 then start else 0
+end
+
 function Weapon.AnimationName(id: string, projectile, key: string): string
 	local named = typeof(projectile.animations) == "table" and projectile.animations[key]
 	return if typeof(named) == "string" then named else id .. Config.DefaultAnimations[key]

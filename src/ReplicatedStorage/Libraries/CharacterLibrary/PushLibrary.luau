@@ -76,6 +76,10 @@ return {
 			Status = "IsGrappling",
 			Intro = "GrabStartAttacker",
 			Loop = "GrabStruggleAttackerLoop",
+
+			--@ From the loop on, the attacker walks free and the victim is carried at the same offset.
+			--@ Status sets the walk speed (StatusLibrary.Types)
+			Walk = { Status = "IsCarrying" },
 		},
 
 		Victim = {
@@ -92,6 +96,24 @@ return {
 			Draw = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
 			AttackerWins = { Attacker = "GrabSuccessAttacker", Victim = "GrabFailVictim", Launch = { Victim = true } },
 			AttackerLoses = { Attacker = "GrabFailAttacker", Victim = "GrabEscapeVictim", Launch = { Attacker = true } },
+			Release = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
+			Shove = { Attacker = "Push", ReleaseAt = { Victim = 0.25 }, Launch = { Victim = true } },
+		},
+
+		--@ What the attacker can do while holding, by name. Input is the key or button, Outcome the
+		--@ outcome above it resolves (ending the minigame), Nudge an optional knockback the victim
+		--@ takes once let go, sent the way the attacker faces
+		Commands = {
+			Release = {
+				Input = Enum.KeyCode.G,
+				Outcome = "Release",
+				Nudge = { speed = 8, duration = 0.25, falloff = 0.2, rampIn = 0.05, distance = 1.5 },
+			},
+
+			Shove = {
+				Input = Enum.UserInputType.MouseButton2,
+				Outcome = "Shove",
+			},
 		},
 	},
 

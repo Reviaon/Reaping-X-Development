@@ -11,6 +11,7 @@ return{
 		Enum.KeyCode.R,
 		Enum.KeyCode.E,
 		Enum.KeyCode.F,
+		Enum.KeyCode.G,
 		Enum.KeyCode.C,
 		Enum.KeyCode.LeftShift,
 		Enum.KeyCode.LeftControl

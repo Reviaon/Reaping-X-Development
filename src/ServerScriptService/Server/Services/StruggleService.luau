@@ -236,6 +236,14 @@ function StruggleService:Abort(struggle)
 	end
 end
 
+function StruggleService:AbortScene(scene)
+	for _, struggle in struggles do
+		if struggle.Scene == scene then
+			self:Abort(struggle)
+		end
+	end
+end
+
 function StruggleService:HandleClick(player: Player, id, dotId, at)
 	if typeof(id) ~= "number" or typeof(dotId) ~= "number" or typeof(at) ~= "number" or at ~= at then return end
 
@@ -289,6 +297,10 @@ end
 function StruggleService:Init()
 	GlobalFunctions.PairSceneService.Started:Connect(function(scene)
 		self:Start(scene)
+	end)
+
+	GlobalFunctions.PairSceneService.Resolved:Connect(function(scene)
+		self:AbortScene(scene)
 	end)
 
 	self.Click:Connect(function(player, id, dotId, at)

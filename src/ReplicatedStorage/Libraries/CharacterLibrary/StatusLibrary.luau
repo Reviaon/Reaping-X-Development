@@ -1,9 +1,9 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
-	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames", "InPairScene" },
+	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames", "InPairScene", "IsCarrying" },
 	HitYield = { "IsStunned", "GuardBroken", "IsGrappled" },
 	HitGuard = { "IsGuarding" },
-	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene", "IsGettingUp" },
+	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene", "IsCarrying", "IsGettingUp" },
 	PropertyModes = { JumpPower = "Min" },
 	
 	Types = {
@@ -122,6 +122,12 @@ return{
 		};
 
 		IsGrappled = {
+			Priority = 9;
+		};
+
+		IsCarrying = { --@ Walking with a held victim; a little under BaseWalkSpeed
+			WalkSpeed = 8,
+			JumpPower = 0,
 			Priority = 9;
 		};
 

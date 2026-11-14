@@ -57,6 +57,46 @@ local function hitStop(controller, track: AnimationTrack, variant)
 	end)
 end
 
+local function isHolding(controller): boolean
+	local character = controller.Character
+	if not character then return false end
+
+	local _, sceneName = controller.PairSceneService.PartnerOf(character)
+
+	return sceneName == PushLibrary.Grab.Name
+		and controller.StatusService:CheckStatuses(character, { [PushLibrary.Grab.Attacker.Status] = true })
+end
+
+function PushComponent:CommandInputs(): { Enum.KeyCode | Enum.UserInputType }
+	local inputs = {}
+
+	for _, command in PushLibrary.Grab.Commands do
+		if not table.find(inputs, command.Input) then
+			table.insert(inputs, command.Input)
+		end
+	end
+
+	return inputs
+end
+
+function PushComponent:Command(controller, input: Enum.KeyCode | Enum.UserInputType): boolean
+	if not isHolding(controller) then return false end
+
+	local relay = getPushRelay()
+
+	for name, command in PushLibrary.Grab.Commands do
+		if command.Input == input then
+			if relay then
+				relay.ReportGrab:Fire(name)
+			end
+
+			return true
+		end
+	end
+
+	return false
+end
+
 function PushComponent:CanActivate(controller, _combatState): boolean
 	local Character = controller.Character
 	if not Character then return false end

@@ -7,7 +7,7 @@ local PushLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/
 
 local PushService = Jloader.CreateService({
 	Name = script.Name,
-	Signals = { Remote = { "ReportPush", "ReportHit", "ReportLunge" } },
+	Signals = { Remote = { "ReportPush", "ReportHit", "ReportLunge", "ReportGrab" } },
 })
 
 PushService.Settings = {
@@ -210,13 +210,57 @@ function PushService:StartGrab(attacker: Model, victim: Model): boolean
 	if not isBehind(attacker, victim) then return false end
 	if GlobalFunctions.StatusService:IsHitImmune(victim) then return false end
 
-	local scene, problem = GlobalFunctions.PairSceneService:Begin(PushLibrary.Grab, attacker, victim)
+	local scene, problem = GlobalFunctions.PairSceneService:Begin(PushLibrary.Grab, attacker, victim, {
+		OnRelease = function(_, outcome: string?)
+			self:LetGo(attacker, victim, outcome)
+		end,
+	})
 
 	if not scene and GlobalFunctions.DebugService.IsEnabled() then
 		warn(`[Push] {attacker.Name}'s grab on {victim.Name} fell back to a push: {problem}`)
 	end
 
 	return scene ~= nil
+end
+
+function PushService:HandleGrab(player: Player, name)
+	if typeof(name) ~= "string" then return end
+
+	local command = PushLibrary.Grab.Commands[name]
+	local attacker = player and player.Character
+	if not command or not attacker then return end
+
+	local PairSceneService = GlobalFunctions.PairSceneService
+	local scene = PairSceneService.SceneOf(attacker)
+
+	if not scene or scene.Attacker ~= attacker or scene.Definition.Name ~= PushLibrary.Grab.Name then return end
+
+	PairSceneService:Resolve(scene, command.Outcome)
+end
+
+function PushService:LetGo(attacker: Model, victim: Model, outcome: string?)
+	for _, command in PushLibrary.Grab.Commands do
+		if command.Outcome == outcome and command.Nudge then
+			self:Nudge(attacker, victim, command.Nudge)
+		end
+	end
+end
+
+function PushService:Nudge(attacker: Model, victim: Model, nudge): boolean
+	if not rootOf(attacker) or not rootOf(victim) then return false end
+	if not GlobalFunctions.StatusService:IsAlive(victim) then return false end
+
+	local KnockbackService = GlobalFunctions.KnockbackService
+	local direction = GlobalFunctions.PositionService.Aim(attacker, victim)
+	if direction.Magnitude <= 0 then return false end
+
+	local recipe = KnockbackService.Build(victim, direction, nudge, nil)
+	if not recipe then return false end
+
+	getCombatService().Knockback:FireAll(victim, recipe)
+	KnockbackService.Apply(victim, recipe)
+
+	return true
 end
 
 function PushService:HandleHit(player: Player, victim)
@@ -297,6 +341,10 @@ function PushService:Init()
 
 	self.ReportHit:Connect(function(player, victim)
 		self:HandleHit(player, victim)
+	end)
+
+	self.ReportGrab:Connect(function(player, name)
+		self:HandleGrab(player, name)
 	end)
 
 	GlobalFunctions.PairSceneService.Resolved:Connect(function(scene, outcome)

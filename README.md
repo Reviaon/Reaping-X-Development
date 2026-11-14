@@ -411,6 +411,9 @@ Notes that are not obvious:
   - The IDs sit on the `Animation` instances under `Storage.Animations.Player.Combat.Bow`, which `projectile.animations` names.
   - The clips pose the bow, the arrow and the string bones; `MIDDLESTRING` pulls back about 2 studs at full draw.
   - `BowIdle` and `BowArrowEquip` are unchanged. The arrow's rest pose relative to `Left Arm` matches the old rig, so they still line up.
+- **The release starts at the string's snap.**
+  - `projectile.starts.fire = 5 / 60` skips the clip's opening over-pull. The arrow leaves at `release_at` 0, so the string now reaches rest 0.08 s after the shot instead of 0.17 s.
+  - `starts` takes any clip key (`draw`, `hold`, `fire`, `reload`). `Cycle` and the observers' nock timing both subtract it from the clip length.
 - **Names are load-bearing.**
   - Poses bind by part and bone name (`Bow`, `Arrow`, `HANDLE`, `MIDDLESTRING`), so a renamed one silently stops animating.
   - The arrow's motor must not be called `Arrow`. `Nock` looks the arrow up with `FindFirstChild("Arrow")`, and a Motor6D with that name would shadow it.
@@ -580,6 +583,9 @@ status overhead adds two lines: state and target (with threat), then slot and pa
      - Each bone a segment drives takes its children along rigidly. So list only the bones where the body
        should bend, and every root-level bone that isn't under the spine. The wolf's hind legs are IK roots
        straight under `RootPart`, so `Thigh`, `Shin` and `Toe` are each driven.
+     - A limb whose last bone has no child can end on its IK control bone instead. The rabbit's legs run
+       from `Thigh`/`Bicep` to the root-level `Toe`/`Hand` and drive both limb bones, one segment per leg,
+       which keeps a small body stable.
      - To list the bones with their positions, run a bone dump over `ServerStorage.Mobs.<Name>`.
    - **Collisions and replication:** segments go in the `Mobs` collision group, so they hit the world but
      not players or other mobs. The model gets a `BoneRagdolled` attribute, which `ChronoConfig` pauses
@@ -592,6 +598,7 @@ status overhead adds two lines: state and target (with threat), then slot and pa
    - **Behaviour modules:** `evade.luau` (who it runs from, how far, which mobs count as predators) and,
      if it sleeps, `sleep.luau` with its lie/loop/wake clip keys. Both are typed against
      `GlobalFunctions/Character/MobTypes`.
+   - **Death:** `ragdoll.luau` as in step 6; the rabbit's is seven segments sized for its 0.6 scale.
    - **Scale is absolute** (`Model:ScaleTo`): a template authored at another scale (the rabbit's is 0.6)
      keeps its size with `scale` left out; setting it rescales from 1, not from the template.
    - **Konsole:** `mob Rabbit` spawns one group in front of you, so most bolt at once and some wake.
@@ -1225,6 +1232,28 @@ hold used to release with about 250 studs/s of stored lift and launch the body. 
 off the torso and each other where they touch at rest). The Humanoid's limb-collision flip no longer
 matters, because the limbs are meant to collide. Shift lock's per-frame root rotation stands down
 while ragdolled.
+
+### Push and the chokehold
+
+Right-click with shift lock pushes. The numbers live in `Libraries/CharacterLibrary/PushLibrary`, and `PushService` judges each push.
+
+- **A push from behind becomes a chokehold.** A push that lands inside `GrabArc` behind the victim starts the `PushGrab` pair scene (`PushLibrary.Grab`) instead of launching them. Both sides play the `Default` struggle minigame from `StruggleLibrary`.
+- **The attacker walks while holding.**
+  - Both bodies are locked for the grab intro. When the attacker's loop starts, `Grab.Attacker.Walk` unanchors the attacker and swaps their `InPairScene` for `IsCarrying`.
+  - `IsCarrying` in `StatusLibrary.Types` is the carry speed knob: `WalkSpeed` 8 against the base 10, and no jumping. It sits in `ActionLock` and `HitImmune`, as `InPairScene` did.
+  - The victim stays anchored, tethered to the attacker's `HumanoidRootPart` at the offset the intro placed them. The server and every client re-hold it each frame, so it tracks the attacker's root as each of them sees it.
+  - Chrono keeps replicating the walking attacker, because `IsCarrying` isn't one of `ChronoConfig.PauseStatuses`.
+  - The minigame keeps running while they walk. Its keys (Q E R F Z X) don't overlap WASD.
+- **Commands while holding** live in `Grab.Commands`, one entry per command: `Input`, the `Outcome` it resolves, and an optional `Nudge`.
+  - **G lets go.** It resolves `Release`, which plays the Draw release clips. Once the scene ends, the victim takes `Nudge`, a 1.5-stud knockback the way the attacker faces, so another push can retake them.
+  - **Right-click shoves.** It resolves `Shove`: the attacker plays `Push`, and `ReleaseAt.Victim` (0.25 s) frees the victim and launches them with `PushLibrary.Launch`, ragdolled, like a push.
+  - **Either one ends the minigame at once.** `StruggleService` aborts any struggle whose scene resolves from outside the minigame.
+  - **Routing:** `CombatHandler` hands each command's input to `PushAttackComponent:Command` first. If the player isn't holding anyone, the key does what it normally does.
+  - **To add a command,** add an entry and its outcome. A new key also goes in `KeybindsLibrary.WhiteList`.
+- **Walking is a PairScene feature.**
+  - Any side with `Walk = { Status, Part? }` walks free once its loop starts, carrying its partner on `Part` (the root by default).
+  - A `Follow` target can be a BasePart as well as a Bone.
+  - When the scene ends, a followed member settles from where it was carried, not from where the scene began.
 
 ### Blocking
 

@@ -15,6 +15,7 @@ return {
 	TouchdownLead = 0.08,
 	LandingBrake = 0.15,
 	FollowOffsetAttribute = "PairSceneFollowOffset",
+	WalkPart = "HumanoidRootPart",
 	OutcomeAttribute = "PairSceneOutcome",
 	Status = "InPairScene",
 	TrackPriority = Enum.AnimationPriority.Action4,

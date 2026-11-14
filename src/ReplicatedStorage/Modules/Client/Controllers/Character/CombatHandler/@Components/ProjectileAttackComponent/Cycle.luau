@@ -25,9 +25,19 @@ local function play(controller, state, id: string, projectile, key: string, loop
 		Speed = speed,
 	})
 
+	local start = Weapon.Start(projectile, key)
+	local length = if track.Length > 0 then track.Length else Config.FallbackLength
+
+	if start > 0 and track.Length > 0 then
+		start = math.min(start, track.Length)
+		track.TimePosition = start
+	else
+		start = 0
+	end
+
 	state.tracks[key] = track
 
-	return (if track.Length > 0 then track.Length else Config.FallbackLength) / speed
+	return (length - start) / speed
 end
 
 local function broadcast(controller, state)

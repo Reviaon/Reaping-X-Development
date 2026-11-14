@@ -25,6 +25,7 @@ Schema.Weapon = {
 
 Schema.Projectile = {
 	animations = "table",
+	starts = "table",
 	nock = "table",
 	release_at = "number",
 	model = "string",
@@ -66,6 +67,13 @@ Schema.ProjectileAnimations = {
 	hold = "string",
 	fire = "string",
 	reload = "string",
+}
+
+Schema.ProjectileStarts = {
+	draw = "number",
+	hold = "number",
+	fire = "number",
+	reload = "number",
 }
 
 Schema.ProjectileNock = {
@@ -263,6 +271,10 @@ function Schema.Validate(weapon: string, data)
 
 		if typeof(projectile.animations) == "table" then
 			validateShape(weapon, "projectile.animations.", projectile.animations, Schema.ProjectileAnimations)
+		end
+
+		if typeof(projectile.starts) == "table" then
+			validateShape(weapon, "projectile.starts.", projectile.starts, Schema.ProjectileStarts)
 		end
 
 		if typeof(projectile.nock) == "table" then

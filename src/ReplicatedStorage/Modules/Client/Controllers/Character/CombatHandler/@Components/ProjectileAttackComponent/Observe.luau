@@ -24,7 +24,7 @@ local function clipLength(controller, character: Model, id: string, projectile, 
 		clipLengths[name] = length
 	end
 
-	return clipLengths[name] / speed
+	return math.max(clipLengths[name] - Weapon.Start(projectile, key), 0) / speed
 end
 
 function Observe.Step(controller, dt: number)

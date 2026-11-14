@@ -14,6 +14,9 @@ return {
 			fire = "BowFire",
 			reload = "BowArrowEquip",
 		},
+		starts = { --@ Seconds into a clip it starts from
+			fire = 5 / 60, --@ The string's snap; earlier frames only pull further after the arrow has already left
+		},
 		nock = {
 			part = "Arrow",
 			idle = "ArrowIdle",
