@@ -25,39 +25,24 @@ local function share(full: number, neutral: number): number
 end
 
 local function jumpShare(jump: Types.Jump, limit: number): number
-	if jump.Decayed < PlayerConfig.Jump.MinPower then return 0 end
+	if jump.Cooling then return 0 end
 
-	return math.min(jump.Decayed, limit) / PlayerConfig.BaseJumpPower
+	return math.min(PlayerConfig.BaseJumpPower, limit) / PlayerConfig.BaseJumpPower
 end
 
-local function decay(session: Session)
+local function cool(session: Session)
 	local jump = session.State.Jump
 
-	jump.Decayed = math.max(0, jump.Decayed - PlayerConfig.Jump.DecayStep)
-
-	if jump.Decayed < PlayerConfig.Jump.MinPower then
-		jump.Decayed = 0
-	end
-
+	jump.Cooling = true
 	session:Cancel("JumpReset")
-
-	if jump.Decayed <= 0 then
-		jump.Pending = true
-		session:Delay("JumpReset", PlayerConfig.Jump.ResetCooldown, function()
-			jump.Pending = false
-			jump.Decayed = PlayerConfig.BaseJumpPower
-			session:Speed()
-		end)
-	else
-		session:Delay("JumpReset", PlayerConfig.Jump.IdleReset, function()
-			jump.Decayed = PlayerConfig.BaseJumpPower
-			session:Speed()
-		end)
-	end
+	session:Delay("JumpReset", PlayerConfig.Jump.Cooldown, function()
+		jump.Cooling = false
+		session:Speed()
+	end)
 end
 
 function Properties.Fresh(): Types.Jump
-	return { Decayed = PlayerConfig.BaseJumpPower, Pending = false, Launching = false }
+	return { Cooling = false, Launching = false }
 end
 
 function Properties.Apply(session: Session)
@@ -93,7 +78,7 @@ function Properties.Start(session: Session)
 	local jump = session.State.Jump
 
 	session.Trove:Connect(session.Humanoid.Jumping, function(active: boolean)
-		if not active or jump.Pending then return end
+		if not active or jump.Cooling then return end
 
 		jump.Launching = true
 
@@ -102,7 +87,7 @@ function Properties.Start(session: Session)
 			session:Speed()
 		end)
 
-		decay(session)
+		cool(session)
 		session:Speed()
 	end)
 end
