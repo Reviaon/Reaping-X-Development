@@ -8,10 +8,12 @@ export type Hold = MorphTypes.Hold
 export type BiteSpec = MorphTypes.Bite
 export type DashTuning = MorphTypes.DashTuning
 export type Ability = MorphTypes.Ability
+export type Leap = MorphTypes.Leap
 
 export type ClipPlayer = {
 	Track: (self: ClipPlayer, key: string) -> AnimationTrack?,
 	Play: (self: ClipPlayer, key: string, speed: number?) -> AnimationTrack?,
+	Crossfade: (self: ClipPlayer, from: string, to: string, speed: number?, fade: number?) -> AnimationTrack?,
 	Loop: (self: ClipPlayer, key: string, priority: Enum.AnimationPriority) -> AnimationTrack?,
 	Playing: (self: ClipPlayer, key: string) -> AnimationTrack?,
 	Stop: (self: ClipPlayer, key: string?, fade: number?) -> (),
@@ -41,17 +43,43 @@ export type DashMotion = {
 	Until: number,
 }
 
-export type LeapMotion = {
+export type BiteTuning = MorphTypes.BiteTuning
+
+export type LungeMotion = {
 	Target: BasePart?,
-	Landing: Vector3?,
 	Direction: Vector3,
 	Speed: number,
+	Distance: number,
+	Track: number,
 	Lead: number,
-	Reach: number,
-	Homing: boolean,
+	Stop: number,
+	Origin: Vector3,
 	Arrived: boolean,
+	Ease: number,
+	Rise: number,
+	Overrun: number,
+	Settle: number,
+	Coast: { At: number, Speed: number, Duration: number }?,
+	Started: number,
+	Duration: number,
 	At: number,
 	Until: number,
+}
+
+export type Lunge = {
+	Target: BasePart?,
+	Direction: Vector3,
+	Speed: number,
+	Distance: number,
+	Track: number,
+	Lead: number,
+	Stop: number,
+	Ease: number,
+	Rise: number,
+	Overrun: number,
+	Settle: number,
+	Duration: number,
+	Hold: number,
 }
 
 export type State = {
@@ -66,7 +94,7 @@ export type State = {
 	DashAnimation: string?,
 	DashReadyAt: number?,
 	Dash: DashMotion?,
-	Leap: LeapMotion?,
+	Lunge: LungeMotion?,
 	BusyUntil: number?,
 	Attacking: boolean?,
 	StepIn: number?,
