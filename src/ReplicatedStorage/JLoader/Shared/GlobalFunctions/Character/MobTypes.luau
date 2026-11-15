@@ -26,4 +26,23 @@ export type Sleep = {
 	animations: SleepAnimations,
 }
 
+export type Gait = {
+	at: { number },
+	shake: string,
+}
+
+export type Footsteps = {
+	gaits: { [string]: Gait },
+	range: number,
+	min_weight: number,
+}
+
+export type Notice = {
+	visual: string,
+	head: string,
+	offset: Vector3,
+	cooldown: number,
+	lifetime: number,
+}
+
 return {}
