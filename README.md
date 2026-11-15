@@ -512,6 +512,8 @@ the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`Projec
 | `feed` | `{ animation, range, distance, feeders, speed, swallow_chance, duration, visual, carry = { bone, offset } }`. |
 | `animations` | Key → Animation name in `Storage.Animations.Mobs.<Mob>` (the template's AnimSaves in Studio). |
 | `evade` | `{ range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }` (Prey tree). It runs once a predator is inside `range`, until all are past `safe`, aiming `distance` ahead every `refresh` seconds along the first `fan` angle clear of walls. While any is inside `watch` it stands and faces the nearest for a rolled `watch_time`, then goes back to wandering; it watches again only after its next run, and never naps while one is still that close. `startle` keeps it running that long after waking or a hit. Types: `MobTypes.Evade`. |
+| `notice` | `{ visual, head, offset, cooldown, lifetime }` (default on for every mob). The moment it notices a player (a hunter going from no target to one, or prey startled into `Evade` with a player among the threats), `Senses/Notice` relays `Combat.Notice` to every client. That client effect clones `visual` from `Storage.Particles.UniversalVFX` (`NoticeVfx`), hides its holder part, emits it, and keeps it `offset` studs (scaled with the mob) above the `head` bone or part for `lifetime` seconds. `cooldown` keeps one mob from repeating it; `false` turns it off. Types: `MobTypes.Notice`. |
+| `footsteps` | `{ gaits, range, min_weight }` (default off). Players near the mob feel its steps.<br>• **Gaits:** keyed like `animations` (`Run`, `Walk`, ...), each `{ at, shake }`; the client `Camera/StepShakeHandler` finds each playing gait clip and shakes its `shake` shape (ShakeLibrary) when the clip passes a share in `at`, so steps follow the playback speed. Two gaits striking together: the heavier blend weight wins.<br>• **Strength:** full at the mob, nothing at `range`; a track below `min_weight` stays quiet. Several mobs on one frame give one shake, the strongest. Nothing goes over the network.<br>• **Wolf** (`footsteps.luau`): `Run` at 0.06/0.31 with `WolfStep` (Amplifier 0.025); `Walk` at 0.44/0.94 (its diagonal pairs) with `WolfWalkStep` (0.008); timings measured from the clips' paw heights; `range` 60. Types: `MobTypes.Footsteps`, `MobTypes.Gait`. |
 | `sleep` | `{ chance, wake_range, wake_speed, resettle, blend, animations = { lie, loop, wake } }` (Prey tree). `chance` of spawns start asleep (`Asleep` rolls once, on the first think). A noticed predator inside `wake_range` plays `wake`, then it evades; a hit skips the wake-up. After `resettle` calm seconds a sleeper walks home and lies down again (`false` stays awake). Types: `MobTypes.Sleep`. |
 
 Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
@@ -600,6 +602,10 @@ status overhead adds two lines: state and target (with threat), then slot and pa
      not players or other mobs. The model gets a `BoneRagdolled` attribute, which `ChronoConfig` pauses
      Chrono on; otherwise clients would keep moving the root.
    - **Lifetime:** the body stays for `corpse_time` (3 s by default).
+   - **Knockdowns (optional):** `knockdown = true` in the same table makes finishers, pushes and tackles
+     ragdoll the living mob too, then stand it back up (see Finishers). While it is down,
+     `Animation:SetLimp` stops every clip, so the Animator doesn't fight the posed bones; with no get-up
+     clip it snaps upright.
 
 7. **A passive mob (prey).** Use `Rabbit/` as the reference.
 
@@ -607,7 +613,8 @@ status overhead adds two lines: state and target (with threat), then slot and pa
    - **Behaviour modules:** `evade.luau` (who it runs from, how far, which mobs count as predators) and,
      if it sleeps, `sleep.luau` with its lie/loop/wake clip keys. Both are typed against
      `GlobalFunctions/Character/MobTypes`.
-   - **Death:** `ragdoll.luau` as in step 6; the rabbit's is seven segments sized for its 0.6 scale.
+   - **Death and knockdowns:** `ragdoll.luau` as in step 6; the rabbit's is seven segments sized for its
+     0.6 scale, with `knockdown = true` so hits and pushes ragdoll it.
    - **Scale is absolute** (`Model:ScaleTo`): a template authored at another scale (the rabbit's is 0.6)
      keeps its size with `scale` left out; setting it rescales from 1, not from the template.
    - **Konsole:** `mob Rabbit` spawns one group in front of you, so most bolt at once and some wake.
@@ -1175,6 +1182,14 @@ be chained straight into another combo. The immunity ends early the moment one o
 accepted (`CombatService:LandHit` removes `Settings.RecoveryStatus`), so it can't cover a whole
 counter-combo, or the moment they dive.
 
+- **Mobs (skinned rigs) can't use RagdollR6**, so a finisher, push or tackle takes one of two paths:
+  - **Bone knockdown:** if the mob's `ragdoll` table has `knockdown = true` (the Rabbit's does),
+    `CombatService:ApplyBoneLaunch` calls `BoneRagdollService.Knockdown`. It builds the death ragdoll's
+    segments, throws them at the launch velocity and spin, and holds `IsRagdolled` and `IsStunned` for
+    `ragdoll` seconds. `Recover` then stands the mob up where its hips landed, facing the way its body
+    lay, and re-enables the joints and constraints the build turned off.
+  - **Ground slide:** any other mob slides along the ground, stunned for at most its `launch_stun`.
+
 **`IFrames` is the universal i-frame status.** It is in `HitImmune`, carries no movement overrides,
 and anything that needs brief hit immunity applies it on the server with
 `StatusService:ApplyStatus(character, "IFrames", true, seconds)` (`CombatService.Settings.IFrameStatus`)
@@ -1265,8 +1280,10 @@ Right-click with shift lock pushes. The numbers live in `Libraries/CharacterLibr
   - **Either one ends the minigame at once.** `StruggleService` aborts any struggle whose scene resolves from outside the minigame.
   - **Routing:** `CombatHandler` hands each command's input to `PushAttackComponent:Command` first. If the player isn't holding anyone, the key does what it normally does.
   - **To add a command,** add an entry and its outcome. A new key also goes in `KeybindsLibrary.WhiteList`.
+- **A victim escape locks both in place.** `AttackerLoses` carries `Lock = true`. On resolving it, the walk stops where the attacker stands: the attacker is anchored there with `InPairScene` back (no moving, turning or attacking), and the victim is pinned at the carried spot. The escape then plays out like any other pair scene.
 - **Walking is a PairScene feature.**
   - Any side with `Walk = { Status, Part? }` walks free once its loop starts, carrying its partner on `Part` (the root by default).
+  - An outcome with `Lock = true` ends the walk the moment it resolves, so its clips play from a fixed spot.
   - A `Follow` target can be a BasePart as well as a Bone.
   - When the scene ends, a followed member settles from where it was carried, not from where the scene began.
 
@@ -1382,6 +1399,10 @@ from the owner's `Landed` hook.
   - `Ragdoll`: `RecoveryService.Start` (from `RagdollHandler`) watches the local character's `IsRagdolled` status. When it ends (alive, not a morph), the clip plays. Pair-scene releases that ragdoll the victim get up this way too.
   - `TackleMiss`: a missed tackle skids, holds the `TackleMiss` pose for `Miss.ProneHold`, then cross-fades into the clip (`TackleLibrary.Recovery` names the source). Without the clip it falls back to the old `Miss.GetUpFade`.
 - **Adding a trigger:** add a source entry and call `RecoveryService.Play(character, "<Source>")` where the fall ends.
+- **Observers see it on the ground because the ragdoll tail is cut.**
+  - RagdollR6's pose stream carries joint rotations only. Its after-exit tail (0.8 s by default) would hold the clip's torso drop at standing height on other screens.
+  - `RecoveryService.Start` sets `RagdollTail = 0` on the local character, so the stream ends at exit and observers play their own copy of the clip.
+  - NPCs keep the default tail.
 - **The clip is IsGettingUp, not IsRecovering.** `IsRecovering` is the attack recovery `CombatService` uses (it's in `HitImmune`). A player getting up can still be hit.
 
 ---
