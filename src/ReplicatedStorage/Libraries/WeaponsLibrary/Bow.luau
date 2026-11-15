@@ -46,6 +46,7 @@ return {
 		aim_line = "Subtle",
 		release_shake = "BowRelease",
 		sever_carry = 0.35,
+		unblockable = true, --@ Arrows land through a block and a counter
 		
 		arm_pitch = {
 			joints = { "Right Shoulder", "Left Shoulder" },

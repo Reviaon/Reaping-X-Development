@@ -347,15 +347,17 @@ function RangedService:HandleHit(player: Player, localId, victim, hitPosition, f
 	local alive = humanoid.Health > 0
 	local limb = limbOf(victim, limbName, hitPosition)
 
+	local data = CombatConfig.WeaponConfig[shot.Weapon]
+	local projectile = data and data.projectile
+
 	local accepted = getCombatService():LandHit(character, victim, profile, shot.Weapon, 1, nil, {
 		Point = hitPosition,
 		Normal = if velocity.Magnitude > 0 then -velocity.Unit else Vector3.yAxis,
-	})
+	}, projectile and projectile.unblockable == true)
 
 	if not accepted then return refuse(`CombatService refused the hit on {victim.Name} (immune, guarding or dodging)`) end
 
-	local data = CombatConfig.WeaponConfig[shot.Weapon]
-	local carry = data and data.projectile and data.projectile.sever_carry
+	local carry = projectile and projectile.sever_carry
 
 	if limb and alive and humanoid.Health <= 0 and typeof(carry) == "number" then
 		self:CarryLimb(victim, limb, velocity, carry)

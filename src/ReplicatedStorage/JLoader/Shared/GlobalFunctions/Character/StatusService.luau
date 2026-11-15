@@ -305,7 +305,28 @@ end
 
 function StatusService:IsHitImmune(Entity)
 	if typeof(Entity) ~= "Instance" or not Entity:IsA("Model") then return false end
-	return self:CheckStatuses(Entity, StatusLibrary.HitImmune)
+
+	local Lifted = nil
+
+	for Status, Lifts in StatusLibrary.HitExposed do
+		if Entity:GetAttribute(Status) == true then
+			Lifted = Lifted or {}
+
+			for _, Name in Lifts do
+				Lifted[Name] = true
+			end
+		end
+	end
+
+	if not Lifted then
+		return self:CheckStatuses(Entity, StatusLibrary.HitImmune)
+	end
+
+	for _, Name in StatusLibrary.HitImmune do
+		if not Lifted[Name] and Entity:GetAttribute(Name) == true then return true end
+	end
+
+	return false
 end
 
 function StatusService:IsHitYielded(Entity)

@@ -39,6 +39,9 @@ local highlights = setmetatable({}, { __mode = "k" })
 --@ What the last hit this client drew ahead of the server left on each victim
 local predictions = setmetatable({}, { __mode = "k" })
 
+local ownTracks = setmetatable({} :: { [AnimationTrack]: boolean }, { __mode = "k" })
+local muted = setmetatable({} :: { [Animator]: RBXScriptConnection }, { __mode = "k" })
+
 local function container()
 	local existing = workspace:FindFirstChild(Settings.Container)
 	if existing then return existing end
@@ -68,10 +71,34 @@ local function reactionSet(Info, victim)
 	return Info.GetPath:ReadPath(config.hit_reaction_path)
 end
 
+--@ Another player's reaction replicates from their own client a round trip late, so every other
+--@ client plays its own copy at once and stops the replicated one when it arrives, as with NPCs.
+local function muteReplicated(animator: Animator, folder: Instance)
+	if muted[animator] then return end
+
+	local ids = {}
+
+	for _, child in folder:GetChildren() do
+		if child:IsA("Animation") then
+			ids[child.AnimationId] = true
+		end
+	end
+
+	muted[animator] = animator.AnimationPlayed:Connect(function(track)
+		if ownTracks[track] then return end
+
+		local animation = track.Animation
+
+		if animation and ids[animation.AnimationId] then
+			track:Stop(0)
+		end
+	end)
+end
+
 function Hit.PlayReaction(Info, victim)
 	local Players = game:GetService("Players")
 	local owner = Players:GetPlayerFromCharacter(victim)
-	if owner and owner ~= Players.LocalPlayer then return nil end
+	local remote = owner ~= nil and owner ~= Players.LocalPlayer
 
 	local folder = reactionSet(Info, victim)
 	if not folder then return nil end
@@ -96,7 +123,12 @@ function Hit.PlayReaction(Info, victim)
 	local animator = AnimatorService:GetAnimator(victim)
 	if not animator then return nil end
 
+	if remote then
+		muteReplicated(animator, folder)
+	end
+
 	local track = animator:LoadAnimation(options[math.random(#options)])
+	ownTracks[track] = true
 	track.Priority = Settings.ReactionPriority
 	track.Looped = false
 	track:Play(Settings.ReactionFade)

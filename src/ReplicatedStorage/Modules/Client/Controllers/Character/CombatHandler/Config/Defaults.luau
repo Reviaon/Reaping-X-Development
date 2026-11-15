@@ -29,7 +29,7 @@ return {
 
 	Finisher = {
 		ragdoll = 1.5, --@ Seconds the victim stays ragdolled and stunned
-		recovery = 0.5, --@ Seconds of hit immunity once the ragdoll ends, so the victim acts first
+		recovery = 0.5, --@ Seconds of hit immunity once the get-up ends (the get-up itself is always covered), so the victim acts first
 		speed = 40, --@ Studs per second the victim is thrown away from the attacker
 		lift = 32, --@ Studs per second of upward launch; 32 peaks about 2.6 studs up
 		spin = 540, --@ Degrees per second the victim tumbles backward in the air; 0 leaves the tumble to the hit

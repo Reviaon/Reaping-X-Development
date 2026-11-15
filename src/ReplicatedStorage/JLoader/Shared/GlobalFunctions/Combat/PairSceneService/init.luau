@@ -1190,6 +1190,27 @@ function PairSceneService:Free(scene, character: Model, held: boolean?): boolean
 	return true
 end
 
+--@ A hit is about to land on character. Its scene's Exposed table names the outcome that hit resolves
+--@ (Light, or Heavy for one that ragdolls); returns true while character is still held afterwards
+function PairSceneService:TakeHit(character: Model, heavy: boolean): boolean
+	assert(IS_SERVER, "PairSceneService:TakeHit runs on the server")
+
+	local scene = members[character]
+	if not scene or not active[scene] or scene.Freed[character] then return false end
+
+	local exposed = scene.Definition.Exposed
+	if not exposed then return false end
+
+	local side = exposed[roleOf(scene, character)]
+	local outcome = side and (if heavy then side.Heavy else side.Light)
+
+	if outcome and not scene.Outcome then
+		self:Resolve(scene, outcome)
+	end
+
+	return members[character] == scene and active[scene] == true
+end
+
 function PairSceneService:Resolve(scene, outcomeName: string): boolean
 	assert(IS_SERVER, "PairSceneService:Resolve runs on the server")
 

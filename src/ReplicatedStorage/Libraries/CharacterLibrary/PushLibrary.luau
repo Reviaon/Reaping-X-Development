@@ -73,7 +73,7 @@ return {
 		ReleaseFade = 0.3,
 
 		Attacker = {
-			Status = "IsGrappling",
+			Status = "IsChoking",
 			Intro = "GrabStartAttacker",
 			Loop = "GrabStruggleAttackerLoop",
 
@@ -83,12 +83,21 @@ return {
 		},
 
 		Victim = {
-			Status = "IsGrappled",
+			Status = "IsChoked",
 			Intro = "GrabStartVictim",
 			Loop = "GrabStruggleVictimLoop",
 		},
 
 		TimeoutOutcome = "Draw",
+
+		--@ Both statuses leave their holder hittable (StatusLibrary.HitExposed), so whoever a swing or
+		--@ arrow reaches first takes it: the held victim shields the holder. A landed hit resolves the
+		--@ outcome named here for that side, Light for any hit and Heavy for one that ragdolls; a side
+		--@ with no name for the hit stays held and takes only its damage
+		Exposed = {
+			Attacker = { Light = "Broken", Heavy = "Broken" },
+			Victim = { Heavy = "Dropped" },
+		},
 
 		HitTargets = { GrabFailAttacker = "Self" },
 
@@ -98,6 +107,8 @@ return {
 			AttackerLoses = { Attacker = "GrabFailAttacker", Victim = "GrabEscapeVictim", Launch = { Attacker = true }, Lock = true },
 			Release = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
 			Shove = { Attacker = "Push", ReleaseAt = { Victim = 0.25 }, Launch = { Victim = true } },
+			Broken = { Ragdoll = { Victim = 1.2 } }, --@ The holder was hit or pushed: the victim drops, ragdolled, at once
+			Dropped = {}, --@ The victim took a ragdolling hit: let go at once and the hit throws them
 		},
 
 		--@ What the attacker can do while holding, by name. Input is the key or button, Outcome the

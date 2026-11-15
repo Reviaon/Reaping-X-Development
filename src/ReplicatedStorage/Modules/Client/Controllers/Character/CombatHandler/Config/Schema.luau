@@ -42,6 +42,7 @@ Schema.Projectile = {
 	aim_fov = "number",
 	release_shake = "string",
 	sever_carry = "number",
+	unblockable = "boolean",
 	arm_pitch = "table",
 	aim_line = "string",
 }

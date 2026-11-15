@@ -28,8 +28,11 @@ CombatService.Settings = {
 	--@ Seconds. Floor on how often one player's lunge report is relayed.
 	LungeReportCooldown = 0.1,
 
-	--@ Hit immunity after a ragdoll; the victim loses it once one of their own hits lands or they dive.
+	--@ Hit immunity after a ragdoll, through the get-up clip and the finisher's `recovery` after it; the victim loses it once one of their own hits lands or they dive.
 	RecoveryStatus = "IsRecovering",
+
+	--@ RecoveryService source whose get-up lock the immunity waits out.
+	GetUpSource = "Ragdoll",
 
 	--@ Universal hit immunity; a dive applies it for its first DiveConfig.IFrames seconds.
 	IFrameStatus = "IFrames",
@@ -119,10 +122,17 @@ end
 function CombatService:GrantRecovery(victim: Model, finisher)
 	if finisher.recovery <= 0 then return end
 
+	local RecoveryService = GlobalFunctions.RecoveryService
+	local source = self.Settings.GetUpSource
+
+	RecoveryService.LockTime(victim, source)
+
 	task.delay(finisher.ragdoll, function()
 		if not victim.Parent or not GlobalFunctions.StatusService:IsAlive(victim) then return end
 
-		GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, finisher.recovery)
+		local getUp = RecoveryService.LockTime(victim, source)
+
+		GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, getUp + finisher.recovery)
 	end)
 end
 
@@ -142,6 +152,7 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 	local root = rootOf(victim)
 	local velocity = direction * finisher.speed + Vector3.yAxis * finisher.lift
 
+	GlobalFunctions.PairSceneService:TakeHit(victim, true)
 	GlobalFunctions.KnockbackService.Cancel(victim)
 
 	if not RagdollService.Setup(victim) then
@@ -235,8 +246,8 @@ function CombatService:ApplyLaunch(attacker: Model, victim: Model, launch): bool
 	return self:ApplyFinisher(victim, direction, launch)
 end
 
-function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, hitstun: number?)
-	if not self:CanHit(attacker, victim, profile) then return false end
+function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, hitstun: number?, unblockable: boolean?)
+	if not self:CanHit(attacker, victim, profile, unblockable) then return false end
 
 	local direction, away = GlobalFunctions.PositionService.Aim(attacker, victim)
 	if direction.Magnitude <= 0 then return false end
@@ -246,6 +257,9 @@ function CombatService:ApplyKnockback(attacker: Model, victim: Model, profile, w
 	if finisher then
 		return self:ApplyFinisher(victim, direction, finisher)
 	end
+
+	--@ Still held in a pair scene that lets it be hit: the hit lands without moving it
+	if GlobalFunctions.PairSceneService:TakeHit(victim, false) then return true end
 
 	local knockback = self:ResolveKnockback(weaponId, comboIndex)
 	if not knockback then return false end
@@ -312,8 +326,8 @@ function CombatService:ApplyDamage(attacker: Model, victim: Model, weaponId: str
 	return damage
 end
 
-function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?, contact)
-	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex) then return false end
+function CombatService:LandHit(attacker: Model, victim: Model, profile, weaponId: string, comboIndex: number, except: Player?, contact, unblockable: boolean?)
+	if not self:ApplyKnockback(attacker, victim, profile, weaponId, comboIndex, nil, unblockable) then return false end
 
 	local damage = self:ApplyDamage(attacker, victim, weaponId, comboIndex)
 

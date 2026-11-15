@@ -1,7 +1,12 @@
 return{
 	DefaultChecks = { "IsStunned", "IsSprinting", "IsDiving"},
 	HitImmune = { "IsRagdolled", "IsRecovering", "IFrames", "InPairScene", "IsCarrying" },
-	HitYield = { "IsStunned", "GuardBroken", "IsGrappled" },
+	--@ Status -> the HitImmune statuses it lifts while held: a chokehold leaves both bodies hittable
+	HitExposed = {
+		IsChoking = { "InPairScene", "IsCarrying" },
+		IsChoked = { "InPairScene" },
+	},
+	HitYield = { "IsStunned", "GuardBroken", "IsGrappled", "IsChoked" },
 	HitGuard = { "IsGuarding" },
 	ActionLock = { "IsPushing", "IsSprintPushing", "IsTackling", "InPairScene", "IsCarrying", "IsGettingUp" },
 	PropertyModes = { JumpPower = "Min" },
@@ -122,6 +127,14 @@ return{
 		};
 
 		IsGrappled = {
+			Priority = 9;
+		};
+
+		IsChoking = { --@ Holding a chokehold (PushLibrary.Grab); hittable, see HitExposed
+			Priority = 9;
+		};
+
+		IsChoked = { --@ Held in a chokehold; hittable, so they shield the holder
 			Priority = 9;
 		};
 

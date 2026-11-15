@@ -328,6 +328,22 @@ function AttackService:CancelHitbox(controller, key)
 	end
 end
 
+--@ target's pair-scene partner stands nearer the attacker and can be hit, so it takes the swing instead
+local function shielded(controller, attacker: Model, target: Model): boolean
+	local scenes = controller.PairSceneService
+	local partner = scenes and scenes.PartnerOf(target)
+
+	if not partner or partner == attacker or controller.StatusService:IsHitImmune(partner) then return false end
+
+	local from = attacker:FindFirstChild("HumanoidRootPart")
+	local mine = target:FindFirstChild("HumanoidRootPart")
+	local theirs = partner:FindFirstChild("HumanoidRootPart")
+
+	if not from or not mine or not theirs then return false end
+
+	return (theirs.Position - from.Position).Magnitude < (mine.Position - from.Position).Magnitude
+end
+
 function AttackService:ScheduleHitbox(controller, key, character, timing, options)
 	self:CancelHitbox(controller, key)
 
@@ -361,6 +377,7 @@ function AttackService:ScheduleHitbox(controller, key, character, timing, option
 		handle.onHit:Connect(function(target)
 			if controller.StatusService:IsHitYielded(character) then return end
 			if controller.StatusService:IsHitImmune(target) then return end
+			if shielded(controller, character, target) then return end
 
 			controller:Set("_lastHitTarget", target)
 			table.insert(hits, target)

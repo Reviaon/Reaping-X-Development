@@ -392,6 +392,9 @@ Notes that are not obvious:
   - It's a number or a table keyed by combo index, and `attack_speed` doesn't scale it.
   - Only the first clean hit of a swing freezes it. A guarded or immune target doesn't.
   - The victim's hit reaction holds for the same time: `Effects/Combat/Hit` resolves it from the hit's weapon and combo (`CombatConfig:ResolveHitStop`). Hits without a weapon config, like the push, don't freeze.
+- **Every client plays the hit reaction itself, players included.**
+  - A player victim's own copy replicates from their client a round trip late, so on everyone else's screen PvP hits used to react later than NPC hits.
+  - `Hit.PlayReaction` now plays a local copy on any other player's character and stops the replicated one when it arrives. Only the victim's own copy replicates.
   - `AttackService:Freeze` pauses the attacker's track, which replicates to everyone, and holds the swing's ease-out back by the same time, so the frozen frames are added to the swing, not cut from its end.
   - It plays alongside the attacker's `HitDealt` shake (`ShakeLibrary`), which `Effects/Combat/Hit` already plays on every hit.
 - **A typo'd key is silent.** `ResolveNumber` falls back to a default on an unknown or wrongly-typed
@@ -423,6 +426,9 @@ Notes that are not obvious:
 - **The release starts at the string's snap.**
   - `projectile.starts.fire = 5 / 60` skips the clip's opening over-pull. The arrow leaves at `release_at` 0, so the string now reaches rest 0.08 s after the shot instead of 0.17 s.
   - `starts` takes any clip key (`draw`, `hold`, `fire`, `reload`). `Cycle` and the observers' nock timing both subtract it from the clip length.
+- **Arrows ignore blocks.**
+  - `projectile.unblockable = true` makes `RangedService` land the hit through a guard and a counter: `LandHit` → `ApplyKnockback` → `CanHit`'s `unblockable`.
+  - A blocked arrow costs no block health; it hits like an unguarded one. Leave the key out (or false) for a projectile a block should stop.
 - **Names are load-bearing.**
   - Poses bind by part and bone name (`Bow`, `Arrow`, `HANDLE`, `MIDDLESTRING`), so a renamed one silently stops animating.
   - The arrow's motor must not be called `Arrow`. `Nock` looks the arrow up with `FindFirstChild("Arrow")`, and a Motor6D with that name would shadow it.
@@ -513,7 +519,7 @@ the mob (`ProjectileService.MarkDodge`, attributes `ProjectileDodgeFrom`/`Projec
 | `animations` | Key → Animation name in `Storage.Animations.Mobs.<Mob>` (the template's AnimSaves in Studio). |
 | `evade` | `{ range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }` (Prey tree). It runs once a predator is inside `range`, until all are past `safe`, aiming `distance` ahead every `refresh` seconds along the first `fan` angle clear of walls. While any is inside `watch` it stands and faces the nearest for a rolled `watch_time`, then goes back to wandering; it watches again only after its next run, and never naps while one is still that close. `startle` keeps it running that long after waking or a hit. Types: `MobTypes.Evade`. |
 | `notice` | `{ visual, head, offset, cooldown, lifetime }` (default on for every mob). The moment it notices a player (a hunter going from no target to one, or prey startled into `Evade` with a player among the threats), `Senses/Notice` relays `Combat.Notice` to every client. That client effect clones `visual` from `Storage.Particles.UniversalVFX` (`NoticeVfx`), hides its holder part, emits it, and keeps it `offset` studs (scaled with the mob) above the `head` bone or part for `lifetime` seconds. `cooldown` keeps one mob from repeating it; `false` turns it off. Types: `MobTypes.Notice`. |
-| `footsteps` | `{ gaits, range, min_weight }` (default off). Players near the mob feel its steps.<br>• **Gaits:** keyed like `animations` (`Run`, `Walk`, ...), each `{ at, shake }`; the client `Camera/StepShakeHandler` finds each playing gait clip and shakes its `shake` shape (ShakeLibrary) when the clip passes a share in `at`, so steps follow the playback speed. Two gaits striking together: the heavier blend weight wins.<br>• **Strength:** full at the mob, nothing at `range`; a track below `min_weight` stays quiet. Several mobs on one frame give one shake, the strongest. Nothing goes over the network.<br>• **Wolf** (`footsteps.luau`): `Run` at 0.06/0.31 with `WolfStep` (Amplifier 0.025); `Walk` at 0.44/0.94 (its diagonal pairs) with `WolfWalkStep` (0.008); timings measured from the clips' paw heights; `range` 60. Types: `MobTypes.Footsteps`, `MobTypes.Gait`. |
+| `footsteps` | `{ gaits, range, min_weight }` (default off). Players near the mob feel its steps.<br>• **Gaits:** keyed like `animations` (`Run`, `Walk`, ...), each `{ at, shake }`; the client `Camera/StepShakeHandler` finds each playing gait clip and shakes its `shake` shape (ShakeLibrary) when the clip passes a share in `at`, so steps follow the playback speed. Two gaits striking together: the heavier blend weight wins.<br>• **Strength:** full at the mob, nothing at `range`; a track below `min_weight` stays quiet. Several mobs on one frame give one shake, the strongest. Nothing goes over the network.<br>• **Wolf** (`footsteps.luau`): `Run` at 0.06/0.31 with `WolfStep` (Amplifier 0.025); `Walk` at 0.44/0.94 (its diagonal pairs) with `WolfWalkStep` (0.021); timings measured from the clips' paw heights; `range` 60. Types: `MobTypes.Footsteps`, `MobTypes.Gait`. |
 | `sleep` | `{ chance, wake_range, wake_speed, resettle, blend, animations = { lie, loop, wake } }` (Prey tree). `chance` of spawns start asleep (`Asleep` rolls once, on the first think). A noticed predator inside `wake_range` plays `wake`, then it evades; a hit skips the wake-up. After `resettle` calm seconds a sleeper walks home and lies down again (`false` stays awake). Types: `MobTypes.Sleep`. |
 
 Konsole: `mob <name> [count]` force-spawns one pack in front of you, ignoring zones and caps; `clearnpcs`
@@ -1176,10 +1182,11 @@ A ragdoll is real physics, so only its physics owner can move it: the server lau
 and the victim's own client applies the launch to a player (`KnockbackHandler:Launch`); everyone
 else sees it through replication. A ragdolled victim cannot be hit at all — `StatusService:IsHitImmune`
 (`StatusLibrary.HitImmune`) is checked by both hitboxes, the server report and `ApplyKnockback`.
-Once the ragdoll ends the victim gets `IsRecovering` for the finisher's `recovery` seconds, also in
-`HitImmune`: they can swing or dive but nobody can hit them, so they act first and the finisher can't
-be chained straight into another combo. The immunity ends early the moment one of their own hits is
-accepted (`CombatService:LandHit` removes `Settings.RecoveryStatus`), so it can't cover a whole
+Once the ragdoll ends the victim gets `IsRecovering`, also in `HitImmune`. It lasts the whole get-up
+clip (`RecoveryService.LockTime`) plus the finisher's `recovery` seconds after it: they can swing or
+dive but nobody can hit them, so they act first and the finisher can't be chained straight into
+another combo. Mobs and dummies have no get-up clip, so they get only the `recovery` seconds. The
+immunity ends early the moment one of their own hits is accepted (`CombatService:LandHit` removes `Settings.RecoveryStatus`), so it can't cover a whole
 counter-combo, or the moment they dive.
 
 - **Mobs (skinned rigs) can't use RagdollR6**, so a finisher, push or tackle takes one of two paths:
@@ -1270,7 +1277,7 @@ Right-click with shift lock pushes. The numbers live in `Libraries/CharacterLibr
 - **A push from behind becomes a chokehold.** A push that lands inside `GrabArc` behind the victim starts the `PushGrab` pair scene (`PushLibrary.Grab`) instead of launching them. Both sides play the `Default` struggle minigame from `StruggleLibrary`.
 - **The attacker walks while holding.**
   - Both bodies are locked for the grab intro. When the attacker's loop starts, `Grab.Attacker.Walk` unanchors the attacker and swaps their `InPairScene` for `IsCarrying`.
-  - `IsCarrying` in `StatusLibrary.Types` is the carry speed knob: `WalkSpeed` 8 against the base 10, and no jumping. It sits in `ActionLock` and `HitImmune`, as `InPairScene` did.
+  - `IsCarrying` in `StatusLibrary.Types` is the carry speed knob: `WalkSpeed` 8 against the base 10, and no jumping. It sits in `ActionLock` and `HitImmune`, as `InPairScene` did, but the chokehold lifts its immunity (below).
   - The victim stays anchored, tethered to the attacker's `HumanoidRootPart` at the offset the intro placed them. The server and every client re-hold it each frame, so it tracks the attacker's root as each of them sees it.
   - Chrono keeps replicating the walking attacker, because `IsCarrying` isn't one of `ChronoConfig.PauseStatuses`.
   - The minigame keeps running while they walk. Its keys (Q E R F Z X) don't overlap WASD.
@@ -1280,6 +1287,13 @@ Right-click with shift lock pushes. The numbers live in `Libraries/CharacterLibr
   - **Either one ends the minigame at once.** `StruggleService` aborts any struggle whose scene resolves from outside the minigame.
   - **Routing:** `CombatHandler` hands each command's input to `PushAttackComponent:Command` first. If the player isn't holding anyone, the key does what it normally does.
   - **To add a command,** add an entry and its outcome. A new key also goes in `KeybindsLibrary.WhiteList`.
+- **The chokehold is the one pair scene whose members can be hit.**
+  - **Statuses:** the holder carries `IsChoking` and the victim `IsChoked`. `StatusLibrary.HitExposed` maps each status to the `HitImmune` statuses it lifts (`InPairScene`, `IsCarrying`), and `StatusService:IsHitImmune` honours it. Ragdoll, recovery and i-frames still protect them. Every other pair scene stays immune.
+  - **The victim shields the holder.** An arrow raycasts into whichever body it reaches first. A swing (`AttackService` hitbox) skips a target whose scene partner stands nearer the attacker and can be hit, so the nearer body takes it.
+  - **What a hit does** is `Grab.Exposed`, per side: `Light` names the outcome any hit resolves and `Heavy` the one a ragdolling hit (a finisher or push) resolves. `CombatService` calls `PairSceneService:TakeHit` before applying knockback or a finisher.
+  - **Holder hit or pushed:** `Broken` ends the scene and the minigame at once. The victim drops, ragdolled for 1.2 s (`Outcomes.Broken.Ragdoll`), and the holder takes the hit as usual.
+  - **Victim hit:** a light hit lands its damage and hit effect but doesn't move them, and they stay held. A finisher or push resolves `Dropped`: the victim is let go at once and the hit throws them.
+  - **To expose another pair scene,** give its sides statuses listed in `HitExposed` and give it an `Exposed` table with its own outcomes.
 - **A victim escape locks both in place.** `AttackerLoses` carries `Lock = true`. On resolving it, the walk stops where the attacker stands: the attacker is anchored there with `InPairScene` back (no moving, turning or attacking), and the victim is pinned at the carried spot. The escape then plays out like any other pair scene.
 - **Walking is a PairScene feature.**
   - Any side with `Walk = { Status, Part? }` walks free once its loop starts, carrying its partner on `Part` (the root by default).
@@ -1300,7 +1314,7 @@ A dead or yielded character can't raise it, and neither can one under `GuardBrok
 
 **Block health.** Characters spawn with `BlockHealth` and `MaxBlockHealth` attributes (100, seeded
 from `AttributesLibrary`). `CombatService:ApplyKnockback` asks `BlockService:Absorb` right after the
-immunity and yield checks. A guarded victim takes no knockback, stun or finisher, and
+immunity and yield checks, unless the hit is unblockable (the bow's arrows, the wolf's grab bite). A guarded victim takes no knockback, stun or finisher, and
 loses `HitCost` (20) block health instead, so the fifth blocked hit breaks the guard: `IsGuarding`
 is removed and `GuardBroken` applied for `BreakLockout` seconds, after which block health is full
 again. Otherwise block health refills at `RegenRate` per second, starting `RegenDelay` seconds
@@ -1403,7 +1417,8 @@ from the owner's `Landed` hook.
   - RagdollR6's pose stream carries joint rotations only. Its after-exit tail (0.8 s by default) would hold the clip's torso drop at standing height on other screens.
   - `RecoveryService.Start` sets `RagdollTail = 0` on the local character, so the stream ends at exit and observers play their own copy of the clip.
   - NPCs keep the default tail.
-- **The clip is IsGettingUp, not IsRecovering.** `IsRecovering` is the attack recovery `CombatService` uses (it's in `HitImmune`). A player getting up can still be hit.
+- **The clip is IsGettingUp; the immunity is IsRecovering.** `IsGettingUp` only locks the player. `CombatService` keeps them hit-immune with `IsRecovering`, which lasts `RecoveryService.LockTime` plus the finisher's `recovery`.
+  - Without this, the immunity ran out mid-get-up and the attacker could restart the combo on a player who couldn't act yet.
 
 ---
 
