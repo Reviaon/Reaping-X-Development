@@ -25,6 +25,17 @@ function Walk.Begin(walker: Model, carried: Model, walk: Side, walkerAnchor: CFr
 	return true
 end
 
+function Walk.Stop(walker: Model, held: Model, walk: Side?, walkerFrame: CFrame, heldFrame: CFrame?)
+	walker:SetAttribute(Config.AnchorAttribute, walkerFrame)
+
+	if heldFrame then
+		held:SetAttribute(Config.AnchorAttribute, heldFrame)
+	end
+
+	Walk.End(walker, walk)
+	StatusService:SetStatus(walker, Config.Status, true)
+end
+
 function Walk.End(walker: Model, walk: Side?)
 	if walk and walk.Status then
 		StatusService:RemoveStatus(walker, walk.Status)

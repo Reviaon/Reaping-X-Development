@@ -81,6 +81,7 @@ function Animation.new(mob)
 		ClearAt = {},
 		Locomotion = nil,
 		Culled = false,
+		Limp = false,
 	}, Animation)
 end
 
@@ -101,7 +102,7 @@ function Animation:Track(key: string): AnimationTrack?
 end
 
 function Animation:PlayAction(key: string, speed: number?, position: number?): AnimationTrack?
-	if self.Culled then return nil end
+	if self.Culled or self.Limp then return nil end
 
 	local track = self:Track(key)
 	if not track then return nil end
@@ -243,7 +244,7 @@ local function playbackSpeed(config, key: string, speed: number): number
 end
 
 function Animation:UpdateLocomotion()
-	if self.Culled then return end
+	if self.Culled or self.Limp then return end
 
 	local mob = self.Mob
 	local velocity = mob.Root.AssemblyLinearVelocity
@@ -288,6 +289,16 @@ function Animation:SetCulled(culled: boolean)
 
 	if culled then
 		self:StopAll()
+	end
+end
+
+function Animation:SetLimp(limp: boolean)
+	if self.Limp == limp then return end
+
+	self.Limp = limp
+
+	if limp then
+		self:StopAll(0)
 	end
 end
 

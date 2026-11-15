@@ -4,6 +4,19 @@ local Config = require("./Config")
 
 local Build = {}
 
+export type Record = {
+	root: BasePart?,
+	base: BasePart,
+	first: string,
+	offset: CFrame,
+	height: number?,
+	joints: { JointInstance },
+	constraints: { Constraint },
+	parts: { [BasePart]: { CanCollide: boolean, Massless: boolean } },
+}
+
+Build.Records = setmetatable({} :: { [Model]: Record }, { __mode = "k" })
+
 local function bonesOf(model: Model): { [string]: Bone }
 	local bones = {}
 
@@ -142,7 +155,9 @@ local function keepApart(segments: { BasePart }, folder: Folder)
 	end
 end
 
-local function attach(part: BasePart, to: BasePart, folder: Folder)
+local function attach(part: BasePart, to: BasePart, folder: Folder, record: Record)
+	record.parts[part] = { CanCollide = part.CanCollide, Massless = part.Massless }
+
 	part.Anchored = false
 	part.CanCollide = false
 	part.Massless = true
@@ -154,7 +169,7 @@ local function attach(part: BasePart, to: BasePart, folder: Folder)
 	weld.Parent = folder
 end
 
-local function release(model: Model, root: BasePart?, base: BasePart)
+local function release(model: Model, root: BasePart?, base: BasePart, record: Record)
 	for _, part in { root, base } do
 		if not part then continue end
 
@@ -162,16 +177,18 @@ local function release(model: Model, root: BasePart?, base: BasePart)
 			if joint:IsA("JointInstance") and (joint.Part0 == base or joint.Part1 == base) and joint.Part0 ~= joint.Part1 then
 				local other = if joint.Part0 == base then joint.Part1 else joint.Part0
 
-				if other == root or other == base then
+				if (other == root or other == base) and joint.Enabled then
 					joint.Enabled = false
+					table.insert(record.joints, joint)
 				end
 			end
 		end
 	end
 
 	for _, constraint in model:GetDescendants() do
-		if constraint:IsA("Constraint") and constraint:IsDescendantOf(root or base) then
+		if constraint:IsA("Constraint") and constraint:IsDescendantOf(root or base) and constraint.Enabled then
 			constraint.Enabled = false
+			table.insert(record.constraints, constraint)
 		end
 	end
 end
@@ -240,14 +257,29 @@ function Build.Body(model: Model, definition): boolean
 		end
 	end
 
-	keepApart(segments, folder)
-	release(model, root, base)
+	local height = model:GetAttribute(Config.StandHeightAttribute)
 
-	attach(base, hips, folder)
+	local record: Record = {
+		root = root,
+		base = base,
+		first = specs[1].name,
+		offset = if root then root.CFrame:ToObjectSpace(base.CFrame) else CFrame.identity,
+		height = if typeof(height) == "number" then height else nil,
+		joints = {},
+		constraints = {},
+		parts = {},
+	}
+
+	keepApart(segments, folder)
+	release(model, root, base, record)
+
+	attach(base, hips, folder, record)
 
 	if root and root ~= base then
-		attach(root, hips, folder)
+		attach(root, hips, folder, record)
 	end
+
+	Build.Records[model] = record
 
 	folder.Parent = model
 

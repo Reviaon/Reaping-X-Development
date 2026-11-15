@@ -12,6 +12,8 @@ export type Config = {
 	FallbackLength: number,
 	Status: string,
 	StatusSource: string,
+	TailAttribute: string,
+	Tail: number,
 	Sources: { [string]: Source },
 }
 

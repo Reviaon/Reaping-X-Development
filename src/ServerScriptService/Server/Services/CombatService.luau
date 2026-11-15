@@ -37,7 +37,7 @@ CombatService.Settings = {
 	--@ Seconds. A dive report is accepted this much sooner than the dive's own cooldown, for jitter.
 	DiveReportLeniency = 0.2,
 
-	--@ A finisher on a rig with no ragdoll slides it along the ground at the finisher's speed instead.
+	--@ A finisher on a rig with no ragdoll slides it along the ground at the finisher's speed instead; a mob whose `ragdoll` has `knockdown` is bone-ragdolled (BoneRagdollService).
 	GroundLaunch = {
 		Duration = 0.9, --@ Seconds the slide lasts while its speed decays to zero
 		RampIn = 0.05, --@ Seconds to reach full speed
@@ -116,6 +116,26 @@ function CombatService:ApplyGroundLaunch(victim: Model, direction: Vector3, fini
 	return true
 end
 
+function CombatService:GrantRecovery(victim: Model, finisher)
+	if finisher.recovery <= 0 then return end
+
+	task.delay(finisher.ragdoll, function()
+		if not victim.Parent or not GlobalFunctions.StatusService:IsAlive(victim) then return end
+
+		GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, finisher.recovery)
+	end)
+end
+
+function CombatService:ApplyBoneLaunch(victim: Model, velocity: Vector3, finisher): boolean
+	if not GlobalFunctions.BoneRagdollService.Knockdown(victim, finisher.ragdoll, velocity, finisher.spin) then return false end
+
+	GlobalFunctions.StatusService:ApplyStatus(victim, GlobalFunctions.RagdollService.Settings.Status, true, finisher.ragdoll)
+	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
+	self:GrantRecovery(victim, finisher)
+
+	return true
+end
+
 function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher)
 	local RagdollService = GlobalFunctions.RagdollService
 	local TrajectoryService = GlobalFunctions.TrajectoryService
@@ -125,6 +145,10 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 	GlobalFunctions.KnockbackService.Cancel(victim)
 
 	if not RagdollService.Setup(victim) then
+		if GlobalFunctions.BoneRagdollService.CanKnockdown(victim) then
+			return self:ApplyBoneLaunch(victim, velocity, finisher)
+		end
+
 		return self:ApplyGroundLaunch(victim, direction, finisher)
 	end
 
@@ -133,14 +157,7 @@ function CombatService:ApplyFinisher(victim: Model, direction: Vector3, finisher
 	if not RagdollService.Ragdoll(victim, finisher.ragdoll, finisher.gravity) then return false end
 
 	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
-
-	if finisher.recovery > 0 then
-		task.delay(finisher.ragdoll, function()
-			if not victim.Parent or not GlobalFunctions.StatusService:IsAlive(victim) then return end
-
-			GlobalFunctions.StatusService:ApplyStatus(victim, self.Settings.RecoveryStatus, true, finisher.recovery)
-		end)
-	end
+	self:GrantRecovery(victim, finisher)
 
 	if landing then
 		landing.At = workspace:GetServerTimeNow() + landing.Time

@@ -14,6 +14,8 @@ return {
 	FallbackLength = 1, --@ Seconds locked when the clip length isn't loaded yet
 	Status = "IsGettingUp",
 	StatusSource = "Recovery",
+	TailAttribute = "RagdollTail", --@ RagdollR6 seconds of pose stream after a ragdoll; 0 hands observers straight to this clip
+	Tail = 0,
 
 	Sources = {
 		Ragdoll = { FadeIn = 0.1 }, --@ RagdollService status ends

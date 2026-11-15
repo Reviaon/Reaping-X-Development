@@ -10,4 +10,6 @@ return {
 	FrictionPerMass = 12, --@ Joint friction torque per unit of the child segment's mass, so heavy and light bodies damp alike
 	Physical = PhysicalProperties.new(0.7, 0.9, 0, 1, 1), --@ Grippy and dead, so the body settles where it falls
 	PinInterval = 0.5, --@ Seconds between pinning the segments back to the server
+	StandHeightAttribute = "MobRootHeight", --@ Root height above the ground a knocked-down body stands back up at; MobService sets it
+	GroundProbe = 12, --@ Studs below the body searched for ground when it stands back up
 }

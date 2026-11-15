@@ -1,11 +1,13 @@
 --[[@
-	**Death ragdoll**: built by `BoneRagdollService` when it dies
+	**Ragdoll**: built by `BoneRagdollService` when it dies, and when a combo finisher or push knocks it down
 	- **A segment** spans bone `from` to bone `to`, hangs off `parent` at `from`, and places the bones in `drives`
 	- **Sizes** are template studs; the model's scale (0.6) applies on top
 	- **Limbs are one segment each:** the feet end on the `Hand`/`Toe` IK bones, so thigh and foot stay folded as they died
 	- **Ears and tail** ride the head and hips
+	- **Knockdown:** it lies limp for the finisher's ragdoll time, then stands back up where it landed
 ]]
 return {
+	knockdown = true, --@ Finishers and pushes ragdoll it too, not just death
 	segments = {
 		{ name = "Hips", from = "Hip1", to = "Tail1", across = 1.5, round = true, drives = { "TorsoControl" } },
 		{ name = "Chest", parent = "Hips", from = "Spine1", to = "Head", across = 1.3, round = true, drives = { "Spine2" }, cone = 25, twist = 15 },

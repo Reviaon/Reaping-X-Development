@@ -11,5 +11,7 @@ return {
 		GrappleHit = {Amplifier = 0.025, Damper = 0.65},
 		Screech = {Amplifier = 0.045, Damper = 0.7},
 		BowRelease = {Amplifier = 0.015, Damper = 0.6},
+		WolfStep = {Amplifier = 0.025, Damper = 0.55},
+		WolfWalkStep = {Amplifier = 0.021, Damper = 0.5},
 	},
 }

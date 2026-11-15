@@ -13,7 +13,8 @@
 --
 -- State lives in attributes so it can be driven from the Properties panel during a playtest:
 --   on a rig:        RagdollEnabled, RagdollProfile, RagdollStrengthScale, RagdollDampingScale,
---                    RagdollSoftScale, RagdollUprightOnExit, RagdollGravityScale, RagdollDragScale
+--                    RagdollSoftScale, RagdollUprightOnExit, RagdollGravityScale, RagdollDragScale,
+--                    RagdollTail (seconds the simulator keeps streaming its pose after exit)
 --   on this module:  Replication ("Stream" | "Native"), Debug, AllowClientRequests
 
 local CollectionService = game:GetService("CollectionService")

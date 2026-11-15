@@ -207,6 +207,30 @@ local function nearestBone(hit: Instance?, point: Vector3): Bone?
 	return best
 end
 
+local function giveBack(pool, part: BasePart)
+	if part.Parent then
+		pool:ReturnPart(part)
+		return
+	end
+
+	local index = table.find(pool.InUse, part)
+
+	if index then
+		table.remove(pool.InUse, index)
+	end
+end
+
+local function take(pool): BasePart
+	local part = pool:GetPart()
+
+	while not part.Parent do
+		giveBack(pool, part)
+		part = pool:GetPart()
+	end
+
+	return part
+end
+
 local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vector3)
 	local reach = part.Size.X / 2 - Config.Stick.Depth
 	local placed = orient(result.Position, velocity)
@@ -215,7 +239,7 @@ local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vect
 
 	local hit = result.Instance
 	local bone = nearestBone(hit, result.Position)
-	local weld, follow
+	local weld, follow, gone
 	local returned = false
 
 	local function release()
@@ -226,11 +250,15 @@ local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vect
 			follow:Disconnect()
 		end
 
+		if gone then
+			gone:Disconnect()
+		end
+
 		if weld then
 			weld:Destroy()
 		end
 
-		pool:ReturnPart(part)
+		giveBack(pool, part)
 	end
 
 	if bone then
@@ -252,6 +280,12 @@ local function stick(pool, part: BasePart, result: RaycastResult, velocity: Vect
 		weld.Part0 = hit
 		weld.Part1 = part
 		weld.Parent = part
+
+		gone = hit.AncestryChanged:Connect(function()
+			if not hit:IsDescendantOf(workspace) then
+				release()
+			end
+		end)
 	end
 
 	task.delay(Config.Stick.Time, release)
@@ -261,7 +295,7 @@ function ProjectileService.Fire(shot, callbacks)
 	callbacks = callbacks or {}
 
 	local pool = shot.Model and poolFor(shot.Model)
-	local part = pool and pool:GetPart()
+	local part = pool and take(pool)
 	local params = ProjectileService.Params(shot, callbacks.ignore)
 	local lifetime = ProjectileService.Lifetime(shot)
 	local started = os.clock() - (if typeof(callbacks.elapsed) == "number" then math.max(callbacks.elapsed, 0) else 0)
@@ -310,7 +344,7 @@ function ProjectileService.Fire(shot, callbacks)
 			setTrail(trail, false)
 
 			if part then
-				pool:ReturnPart(part)
+				giveBack(pool, part)
 			end
 
 			if callbacks.onExpire then

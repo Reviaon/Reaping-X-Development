@@ -638,6 +638,28 @@ local function startWalk(scene, walker: Model)
 	unanchor(walker)
 end
 
+local function lockWalk(scene)
+	local walker = scene.Walker
+	if not walker then return end
+
+	scene.Walker = nil
+
+	local held = partnerIn(scene, walker)
+	local walkerRoot, heldRoot = rootOf(walker), rootOf(held)
+	if not walkerRoot or scene.Freed[walker] then return end
+
+	local heldFrame = heldRoot and not scene.Freed[held] and followFrame(held, walker) or nil
+	local walkerFrame = walkerRoot.CFrame
+
+	Walk.Stop(walker, held, scene.Definition[roleOf(scene, walker)].Walk, walkerFrame, heldFrame)
+	hold(walkerRoot, walkerFrame)
+
+	if heldRoot and heldFrame then
+		clearFollow(held)
+		hold(heldRoot, heldFrame)
+	end
+end
+
 local function animationId(animation: Animation?): string?
 	return animation and string.match(animation.AnimationId, "(%d+)%D*$")
 end
@@ -1183,6 +1205,10 @@ function PairSceneService:Resolve(scene, outcomeName: string): boolean
 
 	scene.Outcome = outcomeName
 	scene.EndsAt = nil
+
+	if outcome.Lock then
+		lockWalk(scene)
+	end
 
 	for _, sequence in scene.Sequences do
 		sequence.Stop(definition.LoopFade)

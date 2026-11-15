@@ -3,7 +3,7 @@ return {
 	scale = 1, --@ Model:ScaleTo factor
 	health = 100,
 	corpse_time = 3, --@ Seconds the body stays
-	ragdoll = nil, --@ Bone ragdoll built when it dies (BoneRagdollService): { segments ={ { name, from, to, parent, across, padding, round, drives, cone, twist, friction } } }; nil dies without one
+	ragdoll = nil, --@ Bone ragdoll built when it dies (BoneRagdollService): { knockdown, segments ={ { name, from, to, parent, across, padding, round, drives, cone, twist, friction } } }; knockdown = true also ragdolls it on finishers and pushes; nil dies without one
 
 	walk_speed = 9, --@ Wander, return and circle speed
 	run_speed = 26, --@ Chase speed
@@ -191,6 +191,14 @@ return {
 	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, animations = { lie, loop, wake } }
 
 	visuals = nil, --@ Effects module path for combo visuals
+	footsteps = false, --@ Camera shake for players near it while a locomotion clip plays (client StepShakeHandler): { gaits = { [animations key] = { at, shake } }, range, min_weight }
+	notice = { --@ Shown over its head the moment it notices a player (aggro, or prey startled by one); false shows nothing
+		visual = "NoticeVfx", --@ Asset under Storage.Particles.UniversalVFX
+		head = "Head", --@ Bone or part it sits on; the root when the rig has neither
+		offset = Vector3.new(0, 1.5, 0), --@ Studs above the head, scaled with the mob
+		cooldown = 8, --@ Fewest seconds between two notices from the same mob
+		lifetime = 1.5, --@ Seconds the effect follows the head before it is removed
+	},
 
 	animations = {}, --@ Key -> Animation name
 	animation_speeds = {}, --@ Locomotion key -> playback multiplier on top of the speed match (Run = 1.5 plays the run clip 1.5x faster)

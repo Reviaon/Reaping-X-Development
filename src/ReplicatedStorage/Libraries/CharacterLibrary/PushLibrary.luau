@@ -95,7 +95,7 @@ return {
 		Outcomes = {
 			Draw = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
 			AttackerWins = { Attacker = "GrabSuccessAttacker", Victim = "GrabFailVictim", Launch = { Victim = true } },
-			AttackerLoses = { Attacker = "GrabFailAttacker", Victim = "GrabEscapeVictim", Launch = { Attacker = true } },
+			AttackerLoses = { Attacker = "GrabFailAttacker", Victim = "GrabEscapeVictim", Launch = { Attacker = true }, Lock = true },
 			Release = { Attacker = "GrabReleaseAttacker", Victim = "GrabReleaseVictim" },
 			Shove = { Attacker = "Push", ReleaseAt = { Victim = 0.25 }, Launch = { Victim = true } },
 		},

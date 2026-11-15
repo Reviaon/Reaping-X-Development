@@ -6,6 +6,8 @@
 	  - `Ragdoll`: `Start` watches the local character's `RagdollService` status end, alive and not a morph
 	  - `TackleMiss`: `TackleAttackComponent` hands over at its get-up time
 	- **Client only:** the owner plays it and the Animator replicates it to everyone
+	- **Observers:** the ragdoll pose stream carries joint rotations only, so its after-exit tail would hold the clip at standing height
+	  - `Start` sets `TailAttribute` to `Tail` on the local character, so the stream hands observers to their own copy of the clip at exit
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -82,6 +84,8 @@ end
 
 local function watch(character: Model)
 	local was = RagdollService.IsRagdolled(character)
+
+	character:SetAttribute(Config.TailAttribute, Config.Tail)
 
 	character:GetAttributeChangedSignal(RagdollService.Settings.Status):Connect(function()
 		local now = RagdollService.IsRagdolled(character)

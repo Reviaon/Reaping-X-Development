@@ -421,7 +421,8 @@ local function exit(state)
 
 	state.ragdolled = false
 	state.blend = { from = from, start = os.clock() }
-	state.tailUntil = os.clock() + Simulator.BLEND_OUT + Simulator.TAIL
+	local tail = model:GetAttribute("RagdollTail")
+	state.tailUntil = os.clock() + (if typeof(tail) == "number" then math.max(tail, 0) else Simulator.BLEND_OUT + Simulator.TAIL)
 	if IS_SERVER and state.owner ~= nil then
 		state.owner = nil
 	end

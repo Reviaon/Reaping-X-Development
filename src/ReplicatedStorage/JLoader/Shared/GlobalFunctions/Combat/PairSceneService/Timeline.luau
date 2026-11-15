@@ -87,6 +87,7 @@ function Timeline.Play(animation: Animation, looped: boolean, position: number?)
 		TimePosition = position or 0,
 		IsPlaying = true,
 		Stopped = Signal.new(),
+		DidLoop = Signal.new(),
 	}
 
 	local signals = {}
@@ -137,6 +138,7 @@ function Timeline.Play(animation: Animation, looped: boolean, position: number?)
 			reach(last, length)
 			clock -= length
 			last = -math.huge
+			track.DidLoop:Fire()
 		end
 
 		local now = math.min(clock, length)

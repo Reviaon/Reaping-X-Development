@@ -101,6 +101,12 @@ function Pose.Start()
 	end)
 
 	CollectionService:GetInstanceRemovedSignal(Config.Tag):Connect(function(model)
+		local drives = bodies[model]
+
+		for _, drive in drives or {} do
+			drive.bone.Transform = CFrame.identity
+		end
+
 		bodies[model] = nil
 	end)
 
