@@ -25,7 +25,7 @@ DashDebris.Settings = {
 	Side = 1.6,
 	Jitter = 0.5,
 
-	Scale = NumberRange.new(0.8, 1.8),
+	Scale = NumberRange.new(0.6, 1.2),
 	Tilt = math.rad(25), --@ Most a piece leans off the floor's normal; its yaw is fully random
 
 	--@ Share of the block left under the floor once it has risen
