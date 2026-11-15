@@ -1,6 +1,7 @@
 local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
 local Obstacles = require("../../World/Obstacles")
 local Predators = require("../../Senses/Predators")
+local Notice = require("../../Senses/Notice")
 
 local function settingsOf(mob): MobTypes.Evade
 	return mob.Config.evade
@@ -35,6 +36,12 @@ return {
 		mob.Blackboard.WatchUntil = nil
 		mob:SetTarget(nil)
 		mob:Unface()
+
+		local threats: { Model } = mob.Blackboard.Predators or {}
+
+		for _, threat in threats do
+			if Notice.Show(mob, threat) then break end
+		end
 	end,
 
 	Update = function(mob, data)

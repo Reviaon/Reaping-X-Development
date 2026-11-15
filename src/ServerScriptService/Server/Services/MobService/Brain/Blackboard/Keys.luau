@@ -1,5 +1,6 @@
 return {
 	AggroAt = { Type = "number", Owner = "Mob:SetTarget" },
+	NoticedAt = { Type = "number", Owner = "Senses/Notice" },
 	Returning = { Type = "boolean", Owner = "Actions/BeginReturn, Actions/AcquireTarget, States/Return, States/Flee" },
 	Retreating = { Type = "boolean", Owner = "Actions/BeginReturn, States/Return, States/Flee, Mob:Provoke" },
 	Search = { Type = "table", Owner = "Actions/AcquireTarget, States/Search" },

@@ -7,6 +7,7 @@ local Healing = require("../Body/Healing")
 local Attacks = require("../Combat/Attacks")
 local Inspect = require("../Inspect")
 local Motion = require("../Body/Motion")
+local Notice = require("../Senses/Notice")
 local Perception = require("../Senses/Perception")
 local Rig = require("../Body/Rig")
 local Spacing = require("../Body/Spacing")
@@ -81,6 +82,10 @@ function Mob.new(kind, model: Model, home: Vector3)
 		model:SetAttribute(LAUNCH_STUN_ATTRIBUTE, self.Config.launch_stun)
 	end
 
+	if self.Config.ragdoll and self.Config.ragdoll.knockdown then
+		GlobalFunctions.BoneRagdollService.Register(model, self.Config.ragdoll)
+	end
+
 	self.Machine = StateMachine.new(self)
 	self.Animation = self.Trove:Add(Animation.new(self))
 	self.Died = self.Trove:Add(GlobalFunctions.Signal.new())
@@ -88,6 +93,10 @@ function Mob.new(kind, model: Model, home: Vector3)
 
 	self.Trove:Connect(humanoid.Died, function()
 		self:Die()
+	end)
+
+	self.Trove:Connect(model:GetAttributeChangedSignal(GlobalFunctions.BoneRagdollService.Settings.Attribute), function()
+		self.Animation:SetLimp(model:GetAttribute(GlobalFunctions.BoneRagdollService.Settings.Attribute) == true)
 	end)
 
 	self.Trove:Connect(humanoid.HealthChanged, function(health)
@@ -150,6 +159,7 @@ function Mob:SetTarget(target: Model?)
 
 	if target and not self.Target then
 		self.Blackboard.AggroAt = os.clock()
+		Notice.Show(self, target)
 	end
 
 	self.Target = target
