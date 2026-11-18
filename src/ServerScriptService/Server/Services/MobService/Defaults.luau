@@ -117,6 +117,13 @@ return {
 		lead = 0.35, --@ Seconds of target movement it aims ahead
 		cooldown = 3.5,
 		animation = nil, --@ Windup tell
+		min_range = nil, --@ Studs closer than which it never pounces; nil is attack_range
+		chance = nil, --@ Per check; nil always pounces when ready
+		retry = 1, --@ Seconds before rolling again after a failed chance
+		arc = nil, --@ { height, hold, resume, home }: a hop clip (`animation`) flown as a real arc from lift-off (`windup`, clip time) for `duration` seconds, landing `stop` studs short of the target, then the clip blends out over `blend` into the chase; nil runs it along the ground at `speed`
+		stop = nil, --@ Studs short of the target an arc pounce lands; nil is attack_range
+		blend = 0.15, --@ Seconds an arc pounce's clip fades out on landing
+		max_speed = nil, --@ Caps the gap an arc pounce covers at this times `duration`
 	},
 
 	dash = { --@ Quick hops; false turns them all off

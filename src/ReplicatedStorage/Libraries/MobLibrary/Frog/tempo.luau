@@ -6,11 +6,11 @@
 ]]
 return {
 	flurry = { 1, 2 }, --@ Combo hits before it breaks off
-	moves = { strafe = 0.45, back = 0.3, dash = 0.25 }, --@ Weights of each breather
+	moves = { strafe = 0.45, back = 0.2, dash = 0.35 }, --@ Weights of each breather
 	strafe = {
-		time = { 0.8, 1.6 }, --@ Seconds it circles the player
-		step = 35, --@ Degrees round the player it aims ahead each refresh
-		speed = "walk_speed",
+		time = { 0.6, 1.2 }, --@ Seconds it darts round the player
+		step = 50, --@ Degrees round the player it aims ahead each refresh
+		speed = "run_speed", --@ Quick repositioning, not a slow circle
 	},
 	back = {
 		distance = { 4, 8 }, --@ Studs it walks back, facing the player
