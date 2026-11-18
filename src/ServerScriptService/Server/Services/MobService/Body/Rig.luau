@@ -35,7 +35,7 @@ local function lowestPoint(model: Model): number
 	local lowest = math.huge
 
 	for _, part in model:GetDescendants() do
-		if not part:IsA("BasePart") then continue end
+		if not part:IsA("BasePart") or part.Transparency >= 1 then continue end
 
 		local frame, size = part.CFrame, part.Size
 		local extent = math.abs(frame.RightVector.Y) * size.X + math.abs(frame.UpVector.Y) * size.Y + math.abs(frame.LookVector.Y) * size.Z
