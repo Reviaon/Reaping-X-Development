@@ -58,6 +58,7 @@ export type Use = {
 	Name: string,
 	Spec: Spec,
 	At: number,
+	From: Vector3?,
 }
 
 export type Morph = {
