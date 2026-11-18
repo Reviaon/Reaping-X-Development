@@ -5,7 +5,7 @@
 	  - It clips when that ray misses but a ray inward hits a wall within `Fit.Wall` of the face; the wall's depth sets the widening
 	  - A wall must face out of the limb face (`Fit.Facing`), so hems, seams and folds turned inward never count
 	  - Deeper hits are openings (a coat's front), and rows within `Fit.Rim` of the piece's ends are hems; neither widens it
-	- **Result:** a Vector3 in the limb's axes (X and Z widen, Y stays 1), measured against the slot's R6 limb size
+	- **Result:** a Vector3 in the limb's axes (X and Z widen, Y stays 1), measured against the limb model's `Centre` size
 	- **Bake:** `require(ClothingService.Measure).Bake()` from the Studio command bar stores every piece's result as its `FitScale`
 	  - Safe in Edit; it requires nothing that loads JLoader
 ]]
@@ -108,7 +108,7 @@ function Measure.Scale(placed: Placed): Vector3?
 	local triangles, bottom, top = trianglesOf(placed)
 	if not triangles then return nil end
 
-	local half = placed.Slot.Size / 2
+	local half = placed.Base / 2
 	local low = math.max(-half.Y, bottom + fit.Rim)
 	local high = math.min(half.Y, top - fit.Rim)
 	local need = { X = 1, Z = 1 }
@@ -156,10 +156,11 @@ function Measure.Bake(): string
 
 		local placed, problem = Layout.Read(model)
 
-		if not placed then
-			table.insert(lines, `{model.Name}: {problem}`)
-			continue
+		if problem then
+			table.insert(lines, problem)
 		end
+
+		if not placed then continue end
 
 		for _, piece in placed do
 			local scale = Measure.Scale(piece)
@@ -168,7 +169,7 @@ function Measure.Bake(): string
 				piece.Source:SetAttribute(Config.ScaleAttribute, scale)
 			end
 
-			table.insert(lines, `{model.Name}.{piece.Source.Name}: {if scale then string.format("%.2f x %.2f", scale.X, scale.Z) else "mesh unreadable"}`)
+			table.insert(lines, `{model.Name}.{piece.Source.Parent.Name}.{piece.Source.Name}: {if scale then string.format("%.2f x %.2f", scale.X, scale.Z) else "mesh unreadable"}`)
 			task.wait()
 		end
 	end

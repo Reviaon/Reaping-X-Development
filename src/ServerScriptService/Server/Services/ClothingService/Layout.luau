@@ -1,89 +1,68 @@
 --[[@
-	**Layout**: reads where each piece of a set model sits on its limb
-	- **Slot:** a piece's name picks its slot, either the slot key (`LeftArm`) or the limb itself (`Left Arm`)
-	- **Body:** placed where the set's limb pieces say an R6 body stands, oriented like its largest `Torso` piece
-	  - The set Model's `BodyOffset` attribute overrides the guess
-	- **Offset:** each piece's CFrame relative to its limb's center
+	**Layout**: reads where each piece of a set sits on its limb
+	- **Limb model:** a set's child Model named after a slot key (`LeftArm`) or the limb itself (`Left Arm`)
+	- **Centre:** the limb model's `Centre` part stands exactly where the limb goes; its size is the limb the pieces were authored on
+	- **Pieces:** every other BasePart in the limb model, each at its CFrame relative to the `Centre`
+	- **Problems** (an unknown limb model, a missing `Centre`) skip that limb model and are reported, so the rest of the set still wears
 ]]
 local Config = require("./Config")
 local Types = require("./Types")
 
-type Slot = Types.Slot
 type Placed = Types.Placed
 
 local Layout = {}
 
-function Layout.SlotOf(piece: BasePart): Slot?
-	local slot = Config.Slots[piece.Name]
-	if slot then return slot end
+function Layout.LimbOf(name: string): string?
+	local limb = Config.Slots[name]
+	if limb then return limb end
 
 	for _, candidate in Config.Slots do
-		if candidate.Limb == piece.Name then return candidate end
+		if candidate == name then return candidate end
 	end
 
 	return nil
 end
 
-local function anchorOf(model: Model): BasePart?
-	local torso = Config.Slots.Torso
-	local best: BasePart? = nil
+function Layout.Read(model: Model): ({ Placed }?, string?)
+	local placed: { Placed } = {}
+	local problems: { string } = {}
 
-	for _, child in model:GetChildren() do
-		if not child:IsA("BasePart") or Layout.SlotOf(child) ~= torso then continue end
+	for _, group in model:GetChildren() do
+		if not group:IsA("Model") then continue end
 
-		if not best or child.Size.Magnitude > best.Size.Magnitude then
-			best = child
+		local limb = Layout.LimbOf(group.Name)
+
+		if not limb then
+			table.insert(problems, `{group.Name} isn't a limb in Config.Slots`)
+			continue
+		end
+
+		local centre = group:FindFirstChild(Config.Centre)
+
+		if not centre or not centre:IsA("BasePart") then
+			table.insert(problems, `{group.Name} has no {Config.Centre} part`)
+			continue
+		end
+
+		for _, piece in group:GetChildren() do
+			if piece == centre or not piece:IsA("BasePart") then continue end
+
+			table.insert(placed, {
+				Source = piece,
+				Limb = limb,
+				Base = centre.Size,
+				Offset = centre.CFrame:ToObjectSpace(piece.CFrame),
+			})
 		end
 	end
 
-	return best
-end
+	local problem = if #problems > 0 then `{model.Name}: {table.concat(problems, "; ")}` else nil
 
-local function bodyOf(model: Model, anchor: BasePart): CFrame
-	local pinned = model:GetAttribute(Config.BodyAttribute)
-	if typeof(pinned) == "CFrame" then return anchor.CFrame * pinned end
-
-	local rotation = anchor.CFrame.Rotation
-	local torso = Config.Slots.Torso
-	local sum = Vector3.zero
-	local count = 0
-
-	for _, child in model:GetChildren() do
-		if not child:IsA("BasePart") then continue end
-
-		local slot = Layout.SlotOf(child)
-		if not slot or slot == torso then continue end
-
-		sum += child.Position - rotation * slot.Offset.Position
-		count += 1
+	if #placed == 0 then
+		return nil, problem or `{model.Name} has no limb models with pieces`
 	end
 
-	if count == 0 then return anchor.CFrame end
-
-	return CFrame.new(sum / count) * rotation
-end
-
-function Layout.Read(model: Model): ({ Placed }?, string?)
-	local anchor = anchorOf(model)
-	if not anchor then return nil, `{model.Name} has no Torso piece to place the body by` end
-
-	local body = bodyOf(model, anchor)
-	local placed: { Placed } = {}
-
-	for _, child in model:GetChildren() do
-		if not child:IsA("BasePart") then continue end
-
-		local slot = Layout.SlotOf(child)
-		if not slot then continue end
-
-		table.insert(placed, {
-			Source = child,
-			Slot = slot,
-			Offset = (body * slot.Offset):Inverse() * child.CFrame,
-		})
-	end
-
-	return placed, nil
+	return placed, problem
 end
 
 return Layout
