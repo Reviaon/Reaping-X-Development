@@ -68,7 +68,7 @@ return {
 			Launch = {
 				speed = 40, --@ Studs/s sideways
 				lift = 50, --@ Studs/s up: about 6 studs, half a second airborne
-				ragdoll = 1.5,
+				ragdoll = 5, --@ Seconds down after the throw, long enough for the pack to gnaw (`gnaw.remaining`); the fourth bite and the maul's win throw through this too
 			},
 		},
 	},
