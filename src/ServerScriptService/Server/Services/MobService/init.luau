@@ -201,8 +201,10 @@ function MobService:Load()
 		if mob then
 			mob:Provoke(attacker, damage)
 
-			if mob.Team then
-				mob.Team:NoteAssault(mob, attacker)
+			local fight = Team.FightOver(attacker)
+
+			if fight then
+				fight:NoteAssault(mob, attacker)
 			end
 		end
 	end)
