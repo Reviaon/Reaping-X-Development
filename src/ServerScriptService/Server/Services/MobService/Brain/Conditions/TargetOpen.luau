@@ -1,4 +1,4 @@
-local HELD = { InPairScene = true, IsRagdolled = true }
+local HELD = { InPairScene = true, IsRagdolled = true, IsRecovering = true }
 
 return function(mob)
 	local target = mob:GetTarget()

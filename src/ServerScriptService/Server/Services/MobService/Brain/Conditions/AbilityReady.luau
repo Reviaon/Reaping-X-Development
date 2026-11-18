@@ -1,13 +1,16 @@
+local Tempo = require("../../Combat/Tempo")
+
 local random = Random.new()
 
 local HELD = { InPairScene = true }
+local RECOVERING = { IsRecovering = true }
 local RAGDOLLED = "IsRagdolled"
 
 local function usable(mob, ability): boolean
 	local users = ability.users
 	if not users then return true end
 
-	local team = mob.Team
+	local team = mob:Fight()
 	local fresh = users.fresh and os.clock() - (mob.Blackboard.AggroAt or -math.huge) <= users.fresh
 	local passive = users.passive and team ~= nil and not team:IsAttacker(mob)
 
@@ -21,9 +24,11 @@ local function open(mob, ability): (boolean, boolean)
 	local services = mob.Services
 	if services.StatusService:CheckStatuses(target, HELD) or services.PairSceneService.IsCarried(target) then return false, false end
 
-	local downed = target:GetAttribute(RAGDOLLED) == true
+	if target:GetAttribute(RAGDOLLED) == true then
+		return ability.targets_ragdolled == true, true
+	end
 
-	return not downed or ability.targets_ragdolled == true, downed
+	return not services.StatusService:CheckStatuses(target, RECOVERING), false
 end
 
 local function ready(mob, name: string, ability): boolean
@@ -42,9 +47,14 @@ local function ready(mob, name: string, ability): boolean
 	if not targetable then return false end
 
 	local key = ability.reserve or name
-	if mob.Team and mob.Team:Reserved(mob.Target, key) then return false end
+	local fight = mob:Fight()
+	if fight and fight:Reserved(mob.Target, key) then return false end
 
 	local chance = if downed and ability.ragdolled_chance then ability.ragdolled_chance else ability.chance
+
+	if Tempo.SetUp(mob, name) then
+		chance = nil
+	end
 
 	if chance and random:NextNumber() > chance then
 		readyAt[name] = now + (ability.retry or 1.5)

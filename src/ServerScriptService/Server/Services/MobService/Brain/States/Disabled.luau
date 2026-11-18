@@ -8,8 +8,10 @@ return {
 
 		mob.Blackboard.Staggered = true
 
-		if mob.Team then
-			mob.Team:ReleaseSlot(mob)
+		local fight = mob:Fight()
+
+		if fight then
+			fight:ReleaseSlot(mob)
 		end
 	end,
 

@@ -1,4 +1,5 @@
 local Attacks = require("../../Combat/Attacks")
+local Tempo = require("../../Combat/Tempo")
 local Awareness = require("../../Senses/Awareness")
 
 local IFRAMES = "IFrames"
@@ -73,7 +74,9 @@ end
 local function regroupPoint(mob, root: BasePart): Vector3
 	local pack = mob.Config.pack
 
-	if not pack or not mob.Team or mob.Team:IsAttacker(mob) then
+	local fight = mob:Fight()
+
+	if not pack or not fight or fight:IsAttacker(mob) then
 		return mob:EngagePoint(root.Position, mob.Config.attack.reach * ENGAGE_DEPTH)
 	end
 
@@ -84,6 +87,19 @@ local function regroupPoint(mob, root: BasePart): Vector3
 	end
 
 	return root.Position + outward.Unit * pack.orbit_radius
+end
+
+local function scatterPoint(mob, root: BasePart): Vector3
+	local scatter = mob.Config.gnaw.scatter
+	local outward = planar(mob.Root.Position - root.Position)
+
+	if outward.Magnitude < 1e-3 then
+		outward = -planar(mob.Root.CFrame.LookVector)
+	end
+
+	local turn = CFrame.Angles(0, math.rad(random:NextNumber(-scatter.spread, scatter.spread)), 0)
+
+	return root.Position + (turn * outward.Unit) * scatter.distance
 end
 
 local function hop(mob, dash, data, point: Vector3?): boolean
@@ -206,6 +222,9 @@ return {
 		if kind == "regroup" then
 			blackboard.Staggered = nil
 			point = root and regroupPoint(mob, root)
+		elseif kind == "scatter" then
+			blackboard.Scatter = nil
+			point = root and mob.Config.gnaw and scatterPoint(mob, root)
 		elseif kind == "sidestep" then
 			point = Awareness.Sidestep.Point(mob)
 		elseif kind == "retreat" then
@@ -213,6 +232,8 @@ return {
 			local back = if away.Magnitude > 1e-3 then away.Unit else -(lookOf(mob.Root) or Vector3.zAxis)
 
 			local pause = os.clock() + (dash.retreat_pause or 0)
+
+			Tempo.Finish(mob)
 
 			point = mob.Root.Position + back * (dash.retreat or 0)
 			blackboard.NextAttackAt = math.max(blackboard.NextAttackAt or 0, pause)
