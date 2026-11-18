@@ -135,7 +135,7 @@ function Placement.Align(definition, victim: CFrame, from: Vector3): (CFrame, CF
 	return facing, facing * CFrame.new(0, 0, -definition.Spacing) * CFrame.Angles(0, math.pi, 0)
 end
 
-function Placement.Place(definition, attacker: Model, victim: Model): (CFrame?, CFrame?)
+function Placement.Place(definition, attacker: Model, victim: Model, approach: Vector3?): (CFrame?, CFrame?)
 	local attackerRoot, victimRoot = rootOf(attacker), rootOf(victim)
 	if not attackerRoot or not victimRoot then return nil, nil end
 
@@ -145,7 +145,7 @@ function Placement.Place(definition, attacker: Model, victim: Model): (CFrame?, 
 
 	local victimHeight, attackerHeight = rootHeight(victim), rootHeight(attacker)
 	local origin = victimRoot.Position
-	local offset = attackerRoot.Position - origin
+	local offset = (approach or attackerRoot.Position) - origin
 	local originFloor = floorUnder(origin, ignore)
 
 	if not originFloor then return nil, nil end
@@ -173,7 +173,7 @@ function Placement.Place(definition, attacker: Model, victim: Model): (CFrame?, 
 				local box, size = sceneBox(definition, victimPlaced, attackerPlaced, floor, victimHeight)
 
 				if isLevel(box, size, floor, ignore) and isClear(box, size, overlapIgnore) then
-					return victimPlaced, attackerPlaced
+					return victimPlaced * (definition.Victim.Shift or CFrame.identity), attackerPlaced * (definition.Attacker.Shift or CFrame.identity)
 				end
 			end
 		end
@@ -296,15 +296,17 @@ function Placement.MeasureBounds(definition, rig: Model): ({ Min: Vector3, Max: 
 
 	local from = if definition.Facing == "Away" then Vector3.new(0, 0, 1) else Vector3.new(0, 0, -1)
 	local _, attackerAt = Placement.Align(definition, CFrame.identity, from)
+	attackerAt *= definition.Attacker.Shift or CFrame.identity
+	local victimAt = definition.Victim.Shift or CFrame.identity
 
 	sweep(definition.Attacker.Intro, attackerAt)
 	sweep(definition.Attacker.Loop, attackerAt)
-	sweep(definition.Victim.Intro, CFrame.identity)
-	sweep(definition.Victim.Loop, CFrame.identity)
+	sweep(definition.Victim.Intro, victimAt)
+	sweep(definition.Victim.Loop, victimAt)
 
 	for _, outcome in definition.Outcomes or {} do
 		sweep(outcome.Attacker, attackerAt)
-		sweep(outcome.Victim, CFrame.identity)
+		sweep(outcome.Victim, victimAt)
 	end
 
 	local function round(vector: Vector3, outward: number): string
