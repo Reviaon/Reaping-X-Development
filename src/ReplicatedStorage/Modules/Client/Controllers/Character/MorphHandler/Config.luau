@@ -46,6 +46,11 @@ return {
 
 	LeapCone = 40, --@ Degrees off the morph's facing a leap looks for a target within its range; with none it leaps straight ahead at the leap's top speed, both capped by the entry's leap_distance
 	LeapArrival = 0.8, --@ Share of the airtime a locked-on leap reaches its landing in, so the server sees it arrive before the bite lands
+	ArcHome = 14, --@ Studs/s an arc leap's landing slides after a moving target when its `leap.arc` leaves home out
+	ArcGrace = 0.5, --@ Seconds past the ability's swing an arc leap held on its seat gives up waiting for the server's answer
+	ArcVictimHeight = 3, --@ Studs from a player's root to the floor, used when no floor is found under them
+	ArcProbeUp = 2, --@ Studs above a point the floor probe starts
+	ArcProbeDown = 40, --@ Studs the floor probe reaches down
 	LungeFacing = "MorphLunge", --@ NoRotate source held while a bite lunge or leap turns the morph to face where it is going
 	LungeDepth = 0.7, --@ Share of a bite's reach it stops short of a tracked target, as the mob's step-in does
 	CoastEase = 2, --@ How a leap's overrun (the mob's leap.overrun) eases to a stop past the landing
