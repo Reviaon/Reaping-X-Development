@@ -3,7 +3,7 @@
 	- **Assembled by name:** each child module fills the key it is named after (`MobService/Config.Gather`)
 	  - `attack`: the bite combo
 	  - `abilities/<key>`: one module per ability; other config refers to an ability by its key
-	  - `rally`, `feed`, `ragdoll`, `animations`, `footsteps`: one behaviour each
+	  - `rally`, `feed`, `gnaw`, `ragdoll`, `animations`, `footsteps`: one behaviour each
 	- **This module:** identity, body and small settings; anything left out comes from `MobService/Defaults`
 ]]
 return {
