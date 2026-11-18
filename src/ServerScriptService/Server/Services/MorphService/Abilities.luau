@@ -98,7 +98,8 @@ function Abilities.Use(morph: Morph, name: unknown, settings: Settings, reply: (
 	end
 
 	local cooldown = spec.ability_cooldown or 0
-	local use: Types.Use = { Name = name, Spec = spec, At = now }
+	local root = morph.Model.PrimaryPart
+	local use: Types.Use = { Name = name, Spec = spec, At = now, From = root and root.Position }
 	local tool = morph.Tools[name]
 
 	morph.Ability = use
@@ -118,7 +119,14 @@ function Abilities.Use(morph: Morph, name: unknown, settings: Settings, reply: (
 			return
 		end
 
-		reply(name, if strike(morph, spec) > 0 then "Landed" else "Missed")
+		local hitSpec = spec
+
+		if spec.cinematic and use.From then
+			hitSpec = table.clone(spec)
+			hitSpec.from = use.From
+		end
+
+		reply(name, if strike(morph, hitSpec) > 0 then "Landed" else "Missed")
 	end)
 end
 
