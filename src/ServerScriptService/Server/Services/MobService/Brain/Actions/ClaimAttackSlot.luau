@@ -1,5 +1,5 @@
 return function(mob)
-	local team = mob.Team
+	local team = mob:Fight()
 	if not team then return true end
 
 	local root = mob:TargetRoot()
