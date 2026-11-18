@@ -42,6 +42,7 @@ return {
 		AttackerRig = "Any",
 		Facing = "Face",
 		Spacing = 0, --@ The roots stand together; the clip lifts the frog onto the face
+		LoopWith = "Victim", --@ The frog's loop restarts with the victim's, so the two never drift apart
 		Struggle = "Default", --@ StruggleLibrary profile; the scene lasts until it ends
 		IntroFade = 0.1,
 		LoopFade = 0, --@ The leap arrives with the body where this loop's first frame has it, so it cuts in; a fade blends through a low pose
