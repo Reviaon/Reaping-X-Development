@@ -65,6 +65,26 @@ export type LungeMotion = {
 	Until: number,
 }
 
+export type ArcMotion = {
+	Arc: MorphTypes.LeapArc,
+	Target: BasePart?,
+	Seat: boolean,
+	Origin: Vector3,
+	Direction: Vector3,
+	Lead: number,
+	Reach: number,
+	Most: number,
+	Start: Vector3,
+	Landing: Vector3,
+	Duration: number,
+	Speed: number,
+	At: number,
+	Until: number,
+	SteppedAt: number?,
+	Stretched: boolean,
+	Landed: boolean,
+}
+
 export type Lunge = {
 	Target: BasePart?,
 	Direction: Vector3,
@@ -94,6 +114,7 @@ export type State = {
 	DashReadyAt: number?,
 	Dash: DashMotion?,
 	Lunge: LungeMotion?,
+	Arc: ArcMotion?,
 	BusyUntil: number?,
 	Attacking: boolean?,
 	StepIn: number?,
