@@ -23,6 +23,10 @@ function Fit.Get(model: Model): (Set?, string?)
 	local placed, problem = Layout.Read(model)
 	if not placed then return nil, problem end
 
+	if problem then
+		warn(`[ClothingService] {problem}`)
+	end
+
 	local pieces: { Fitted } = {}
 
 	for _, piece in placed do
@@ -30,12 +34,13 @@ function Fit.Get(model: Model): (Set?, string?)
 		local scale = if typeof(baked) == "Vector3" then baked else Measure.Scale(piece)
 
 		if not scale then
-			warn(`[ClothingService] Couldn't read {model.Name}.{piece.Source.Name}'s mesh; it's worn unfitted. Bake it in Studio.`)
+			warn(`[ClothingService] Couldn't read {piece.Source:GetFullName()}'s mesh; it's worn unfitted. Bake it in Studio.`)
 		end
 
 		table.insert(pieces, {
 			Source = piece.Source,
-			Slot = piece.Slot,
+			Limb = piece.Limb,
+			Base = piece.Base,
 			Offset = piece.Offset,
 			Scale = scale or Vector3.one,
 		})

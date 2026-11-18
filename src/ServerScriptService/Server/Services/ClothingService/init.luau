@@ -1,8 +1,10 @@
 --[[@
 	**ClothingService**: dresses players in 3D layered clothing sets
 	- **Sets:** every Model in `ServerStorage.Clothing`, found by name and numbered in natural order (`Set1`, `Set2`, …)
-	- **Choice:** the player's `ClothingSet` attribute, re-applied on every respawn and after a morph turns back
+	- **Choice:** saved in the player's data (`Saved`), re-applied on every respawn and after a morph turns back
+	  - `Config.Default` until they choose; a spawn waits for their data before dressing
 	  - Morph bodies are never dressed
+	- **Avatar:** every player body has its own Roblox accessories and clothing stripped, with or without a set (`Avatar`)
 	- **Konsole:** `outfit <number|name|off> [player]`
 ]]
 local Players = game:GetService("Players")
@@ -10,9 +12,11 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 
+local Avatar = require("@self/Avatar")
 local Config = require("@self/Config")
 local Dress = require("@self/Dress")
 local Fit = require("@self/Fit")
+local Saved = require("@self/Saved")
 
 local ClothingService = Jloader.CreateService({ Name = script.Name })
 
@@ -60,11 +64,6 @@ local function apply(character: Model, name: string?)
 	Dress.Wear(character, set)
 end
 
-local function chosen(player: Player): string?
-	local name = player:GetAttribute(Config.Attribute)
-	return if typeof(name) == "string" then name else nil
-end
-
 function ClothingService:GetNames(): { string }
 	local names = {}
 	local source = folder()
@@ -90,11 +89,11 @@ function ClothingService:GetNames(): { string }
 end
 
 function ClothingService:Current(player: Player): string?
-	return chosen(player)
+	return Saved.Get(player)
 end
 
 function ClothingService:Wear(player: Player, name: string?)
-	player:SetAttribute(Config.Attribute, name)
+	Saved.Set(player, name)
 
 	local character = player.Character
 
@@ -142,15 +141,18 @@ end
 
 function ClothingService:Init()
 	local function track(player: Player)
-		if Config.Default and not chosen(player) then
-			player:SetAttribute(Config.Attribute, Config.Default)
-		end
-
 		local function dress(character: Model)
 			task.spawn(function()
 				if not character:WaitForChild("Torso", 10) then return end
+				if GlobalFunctions.CharacterService.MorphOf(character) then return end
 
-				local name = chosen(player)
+				if Config.StripAvatar then
+					Avatar.Guard(character)
+				end
+
+				Saved.Wait(player)
+
+				local name = Saved.Get(player)
 
 				if name and character.Parent then
 					apply(character, name)
