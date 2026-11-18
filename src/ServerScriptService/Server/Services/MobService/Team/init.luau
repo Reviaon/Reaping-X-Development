@@ -1,93 +1,72 @@
+--[[@
+	**Team**: how mobs work together, in two kinds of group
+	- **Pack** (`Team.Join`, keyed by spawn group): packmates share targets, sightings and reach, and balance who hunts whom
+	- **Fight** (`Team.Fight`, keyed by the target): every mob on one target, whatever its kind or pack
+	  - Takes turns at the lead (`Slots`), hands the lead to the next in line, rings the target while waiting (`Orbit`)
+	  - Holds one grab per key at a time (`Reservations`) and sends a waiting mob in when a member is hit (`BreakIns`)
+	  - A mob's own `pack` settings decide how it plays its part; `pack = false` attacks freely but still rings and reserves
+]]
 local Config = require("@self/Config")
+local Group = require("@self/Group")
 
-local PARTS = {
+local Pack = Group.Class({
 	require("@self/Targets"),
 	require("@self/Balance"),
+	require("@self/Reach"),
+	require("@self/Sightings"),
+}, "pack")
+
+local Fight = Group.Class({
 	require("@self/Slots"),
 	require("@self/BreakIns"),
 	require("@self/Reservations"),
 	require("@self/Orbit"),
-	require("@self/Reach"),
-	require("@self/Sightings"),
-}
+}, "fight")
+
+local packs = Group.Registry(Pack)
+local fights = Group.Registry(Fight)
 
 local Team = {}
-Team.__index = Team
 Team.Settings = Config
 
-for _, part in PARTS do
-	for name, method in part.Methods do
-		assert(Team[name] == nil, `[Team] two parts define {name}`)
-		Team[name] = method
-	end
+function Pack:Leave(mob)
+	packs.Leave(self, mob)
 end
 
-local teams = {}
-
-local function create(key: any)
-	local team = { Key = key, Members = {} }
-
-	for _, part in PARTS do
-		for field, value in part.State() do
-			team[field] = value
-		end
-	end
-
-	return setmetatable(team, Team)
+function Fight:Leave(mob)
+	fights.Leave(self, mob)
 end
 
 function Team.Join(mob, key: any)
-	if key == nil then return nil end
-
-	local team = teams[key]
-
-	if not team then
-		team = create(key)
-		teams[key] = team
-	end
-
-	team.Members[mob] = true
+	local team = packs.Join(mob, key)
 	mob.Team = team
 
 	return team
 end
 
 function Team.Get(key: any)
-	return teams[key]
+	return packs.Get(key)
 end
 
-function Team:Describe(mob): { string }
-	local members = 0
+function Team.Fight(mob, target: Model?)
+	local fight = mob.FightGroup
 
-	for _ in self.Members do
-		members += 1
+	if fight and fight.Key ~= target then
+		mob.FightGroup = nil
+		fight:Leave(mob)
+		fight = nil
 	end
 
-	local lines = { `pack of {members}` }
-
-	for _, part in PARTS do
-		if part.Describe then
-			for _, line in part.Describe(self, mob) do
-				table.insert(lines, line)
-			end
-		end
+	if target and not fight then
+		fight = fights.Join(mob, target)
+		mob.FightGroup = fight
 	end
 
-	return lines
+	return fight
 end
 
-function Team:Leave(mob)
-	self.Members[mob] = nil
-
-	for _, part in PARTS do
-		if part.Forget then
-			part.Forget(self, mob)
-		end
-	end
-
-	if next(self.Members) == nil then
-		teams[self.Key] = nil
-	end
+function Team.FightOver(target: Model)
+	return fights.Get(target)
 end
 
 return Team
