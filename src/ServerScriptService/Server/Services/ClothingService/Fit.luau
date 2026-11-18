@@ -1,15 +1,11 @@
 --[[@
 	**Fit**: a set model ready to wear, cached once per model
-	- **Offsets** come from `Layout`
-	- **Widening** is each piece's baked `FitScale`, or measured now when it has none
-	  - An unreadable mesh is worn unwidened, with a warning
+	- **Pieces** come from `Layout` exactly as authored: their own size, at their offset from their limb model's `Centre`
+	- Nothing is widened or rescaled, so a set fits a player the way it sits on its example R6 rig
 ]]
-local Config = require("./Config")
 local Layout = require("./Layout")
-local Measure = require("./Measure")
 local Types = require("./Types")
 
-type Fitted = Types.Fitted
 type Set = Types.Set
 
 local Fit = {}
@@ -27,26 +23,7 @@ function Fit.Get(model: Model): (Set?, string?)
 		warn(`[ClothingService] {problem}`)
 	end
 
-	local pieces: { Fitted } = {}
-
-	for _, piece in placed do
-		local baked = piece.Source:GetAttribute(Config.ScaleAttribute)
-		local scale = if typeof(baked) == "Vector3" then baked else Measure.Scale(piece)
-
-		if not scale then
-			warn(`[ClothingService] Couldn't read {piece.Source:GetFullName()}'s mesh; it's worn unfitted. Bake it in Studio.`)
-		end
-
-		table.insert(pieces, {
-			Source = piece.Source,
-			Limb = piece.Limb,
-			Base = piece.Base,
-			Offset = piece.Offset,
-			Scale = scale or Vector3.one,
-		})
-	end
-
-	local set: Set = { Name = model.Name, Pieces = pieces }
+	local set: Set = { Name = model.Name, Pieces = placed }
 	Cache[model] = set
 
 	return set, nil

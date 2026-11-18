@@ -847,29 +847,17 @@ shaped tables.
   - It holds one Model per limb, named after its slot: `Torso`, `Head`, `LeftArm`, `RightArm`, `LeftLeg` or `RightLeg`, or the limb itself (`Left Arm`).
   - Each limb model has a `Centre` part, standing exactly where that limb goes and sized like it (1×2×1, 2×2×1 for the torso), plus its pieces.
   - Several pieces may share a limb. `Set1F` wears a shirt and a belt, both on `Torso`.
-  - The old flat `Set1`…`Set4` are parked in `ServerStorage.ClothingArchive` and never read.
 - **Adding a set is adding a model.**
-  - Fit each piece around its limb model's `Centre` in Studio, the way it should sit, and drop the set in the folder. No code changes.
-  - Then bake its fit from the Studio command bar and save the place:
-    `print(require(game.ServerScriptService.Server.Services.ClothingService.Measure).Bake())`
-  - Re-bake whenever a piece moves or is resized. A `FitScale` copied over from another set is stale.
+  - Dress an R6 rig in Studio with each limb model's `Centre` on its limb, the way the set should look (`Workspace.UpdatedClothing` holds the four sets on their `R6RigExample` rigs).
+  - Drop the set in the folder and save the place. No code changes and no baking: it fits players exactly as it sits on that rig.
   - `Config.Slots` maps limb model names to character limbs. A new slot (a hat on `Head`) is one line there.
 - **Where a piece sits** (`Layout`):
   - Each piece keeps its CFrame relative to its limb model's `Centre`, so it's welded to the limb exactly as authored.
   - Welds under a `Centre` are ignored; only the parts' CFrames matter.
   - A limb model that isn't a known slot, or that has no `Centre`, is skipped with a warning. The rest of the set is still worn.
-- **How a piece is fitted so no limb clips through** (`Measure`, `Fit`):
-  - `Measure` reads the piece's real triangles (`EditableMesh`) and tests a grid of points on the limb's four side faces.
-    - A point clips when a ray out of the face misses the piece, but a ray inward hits an outward-facing wall within the outer 40% of the limb.
-    - The deepest such wall sets how much wider (X) and deeper (Z) the piece must be to sit `Fit.Margin` (0.04 studs) outside the limb. The piece keeps its length.
-  - Rounded sleeves can't cover a box-shaped R6 limb's corners at their authored size, so pieces widen ×1.0–1.21. Sleeves and legs land around ×1.15.
-  - The test skips what widening can't fix:
-    - Hems, shoulder seams and folds that turn inward (`Fit.Rim`, `Fit.Facing`).
-    - Deep openings like a coat's front (`Fit.Wall`).
-  - **Bake** stores the result on each piece as a `FitScale` attribute, so live servers never read meshes. An unbaked piece is measured on first wear, and worn unfitted with a warning if its mesh can't be read.
+- **Nothing is rescaled** (`Fit`): a piece is worn at its own size and its authored offset. The old mesh-measured widening (`Measure`, `FitScale`) is gone, since the authored fit is the intended one.
 - **How it's worn** (`Dress`):
-  - Each piece is sized to the wearer's real limb: its `FitScale`, times the limb's `Size` over its `Centre`'s size, scaled around the limb's center.
-    - A bigger or smaller limb gets a matching piece. A 1.3×2.4×1.3 arm was checked exactly.
+  - Each piece is welded to its limb at its offset from its `Centre`, so on a player it sits exactly where it sits on the example rig (checked: 0.0000 studs off on all four sets).
   - The pieces sit in a `Clothing` Model inside the character, named `Clothing<Piece>` so none shadows a limb.
   - Each is welded to its limb, so it follows animations and ragdolls.
   - Pieces never collide, aren't hit by queries or arrows, and add no mass.

@@ -1,7 +1,7 @@
 --[[@
 	**Layout**: reads where each piece of a set sits on its limb
 	- **Limb model:** a set's child Model named after a slot key (`LeftArm`) or the limb itself (`Left Arm`)
-	- **Centre:** the limb model's `Centre` part stands exactly where the limb goes; its size is the limb the pieces were authored on
+	- **Centre:** the limb model's `Centre` part stands exactly where the limb goes
 	- **Pieces:** every other BasePart in the limb model, each at its CFrame relative to the `Centre`
 	- **Problems** (an unknown limb model, a missing `Centre`) skip that limb model and are reported, so the rest of the set still wears
 ]]
@@ -50,7 +50,6 @@ function Layout.Read(model: Model): ({ Placed }?, string?)
 			table.insert(placed, {
 				Source = piece,
 				Limb = limb,
-				Base = centre.Size,
 				Offset = centre.CFrame:ToObjectSpace(piece.CFrame),
 			})
 		end

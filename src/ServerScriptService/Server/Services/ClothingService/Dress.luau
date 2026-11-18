@@ -1,8 +1,7 @@
 --[[@
 	**Dress**: puts a fitted set on a character and takes it off
 	- **Worn pieces** live in one Model named `Container` inside the character, so taking a set off is one destroy
-	- **Each piece** is welded to its limb at its fitted offset, so it follows animations and ragdolls
-	  - It's sized to the wearer's real limb: its `Fit` widening, times the limb's size over its `Centre`'s size, around the limb's center
+	- **Each piece** is welded to its limb at its authored offset and size, so it follows animations and ragdolls
 	  - It never collides, is queried or touched, and adds no mass
 	  - Prefixed names keep it from shadowing a limb in a `FindFirstChild` search
 	- **Missing limbs** are skipped, so a partial body wears what it can
@@ -13,7 +12,6 @@
 local Config = require("./Config")
 local Types = require("./Types")
 
-type Fitted = Types.Fitted
 type Set = Types.Set
 
 local Dress = {}
@@ -51,22 +49,6 @@ local function reveal(character: Model)
 	end
 end
 
-local function along(axis: Vector3, scale: Vector3): number
-	return math.abs(axis.X) * scale.X + math.abs(axis.Y) * scale.Y + math.abs(axis.Z) * scale.Z
-end
-
-local function sized(fitted: Fitted, limb: BasePart): (Vector3, CFrame)
-	local scale = fitted.Scale * (limb.Size / fitted.Base)
-	local rotation = fitted.Offset.Rotation
-	local size = fitted.Source.Size * Vector3.new(
-		along(rotation.XVector, scale),
-		along(rotation.YVector, scale),
-		along(rotation.ZVector, scale)
-	)
-
-	return size, CFrame.new(fitted.Offset.Position * scale) * rotation
-end
-
 function Dress.Strip(character: Model)
 	local container = character:FindFirstChild(Config.Container)
 
@@ -85,19 +67,18 @@ function Dress.Wear(character: Model, set: Set): number
 
 	local worn = 0
 
-	for _, fitted in set.Pieces do
-		local limb = character:FindFirstChild(fitted.Limb)
+	for _, placed in set.Pieces do
+		local limb = character:FindFirstChild(placed.Limb)
 		if not limb or not limb:IsA("BasePart") then continue end
 
-		local size, offset = sized(fitted, limb)
-		local piece = fitted.Source:Clone()
-		piece.Name = Config.PiecePrefix .. fitted.Source.Name
+		local offset = placed.Offset
+		local piece = placed.Source:Clone()
+		piece.Name = Config.PiecePrefix .. placed.Source.Name
 		piece.Anchored = false
 		piece.CanCollide = false
 		piece.CanQuery = false
 		piece.CanTouch = false
 		piece.Massless = true
-		piece.Size = size
 		piece.CFrame = limb.CFrame * offset
 
 		local weld = Instance.new("Weld")
@@ -109,7 +90,7 @@ function Dress.Wear(character: Model, set: Set): number
 		piece.Parent = container
 		worn += 1
 
-		if Config.HideLimbs and fitted.Source:GetAttribute(Config.ShowLimbAttribute) ~= true then
+		if Config.HideLimbs and placed.Source:GetAttribute(Config.ShowLimbAttribute) ~= true then
 			hide(limb)
 		end
 	end
