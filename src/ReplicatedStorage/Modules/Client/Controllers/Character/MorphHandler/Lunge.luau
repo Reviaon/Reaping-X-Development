@@ -1,6 +1,7 @@
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local MathService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Utility/MathService")
 
+local ArcLeap = require("./ArcLeap")
 local Config = require("./Config")
 local Targets = require("./Targets")
 local Types = require("./Types")
@@ -57,6 +58,8 @@ local function arrive(session: Session, motion: Types.LungeMotion, speed: number
 end
 
 function Lunge.Stop(session: Session)
+	ArcLeap.Stop(session)
+
 	if not session.State.Lunge then return end
 
 	session.State.Lunge = nil
@@ -65,6 +68,8 @@ function Lunge.Stop(session: Session)
 end
 
 function Lunge.Release(session: Session)
+	ArcLeap.Stop(session)
+
 	local motion = session.State.Lunge
 	if not motion then return end
 
@@ -110,7 +115,7 @@ function Lunge.Start(session: Session, lunge: Types.Lunge)
 	end
 end
 
-function Lunge.Leap(session: Session, spec: { leap: Types.Leap?, reach: number, range: number?, windup: number }, cap: number?)
+function Lunge.Leap(session: Session, spec: { leap: Types.Leap?, reach: number, range: number?, windup: number, recovery: number?, speed: number? }, cap: number?)
 	local jump = spec.leap
 	if not jump then return end
 
@@ -123,11 +128,16 @@ function Lunge.Leap(session: Session, spec: { leap: Types.Leap?, reach: number, 
 	local direction = session:Look()
 	local distance, speed
 
+	if jump.arc and jump.airtime then
+		ArcLeap.Start(session, spec, target, direction, cap)
+		return
+	end
+
 	if target then
 		local offset = (target.Position + target.AssemblyLinearVelocity * FLAT * (jump.lead or 0) - root.Position) * FLAT
 
 		distance = math.min(math.max(offset.Magnitude - spec.reach, 0), limit)
-		speed = jump.speed or math.min(distance / (airtime * Config.LeapArrival), top)
+		speed = jump.speed or math.min(distance / (airtime * (jump.arrival or Config.LeapArrival)), top)
 
 		if offset.Magnitude > 1e-3 then
 			direction = offset.Unit
@@ -190,6 +200,8 @@ function Lunge.Bite(session: Session, spec: Types.BiteSpec, tuning: Types.BiteTu
 end
 
 function Lunge.Step(session: Session)
+	if ArcLeap.Step(session) then return end
+
 	local motion = session.State.Lunge
 	if not motion then return end
 
