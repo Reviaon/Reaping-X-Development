@@ -1,6 +1,7 @@
 return {
 	AggroAt = { Type = "number", Owner = "Mob:SetTarget" },
 	NoticedAt = { Type = "number", Owner = "Senses/Notice" },
+	ConfusedAt = { Type = "number", Owner = "Senses/Notice" },
 	Returning = { Type = "boolean", Owner = "Actions/BeginReturn, Actions/AcquireTarget, States/Return, States/Flee" },
 	Retreating = { Type = "boolean", Owner = "Actions/BeginReturn, States/Return, States/Flee, Mob:Provoke" },
 	Search = { Type = "table", Owner = "Actions/AcquireTarget, States/Search" },
@@ -11,6 +12,10 @@ return {
 	PendingAbility = { Type = "string", Owner = "Conditions/AbilityReady" },
 	AbilityReadyAt = { Type = "table", Owner = "Conditions/AbilityReady, States/Attack" },
 
+	Flurry = { Type = "table", Owner = "Combat/Tempo" },
+	Breather = { Type = "table", Owner = "Combat/Tempo" },
+	Setup = { Type = "table", Owner = "Combat/Tempo, States/Attack" },
+
 	FlankReadyAt = { Type = "number", Owner = "Conditions/FlankReady, States/Dash" },
 	NextPounceAt = { Type = "number", Owner = "States/Pounce, States/Dash" },
 	Staggered = { Type = "boolean", Owner = "States/Disabled, States/Dash" },
@@ -20,6 +25,8 @@ return {
 	FleeUntil = { Type = "number", Owner = "States/Rally" },
 
 	Food = { Type = "Instance", Owner = "Conditions/FoodNearby" },
+	Gnawing = { Type = "Instance", Owner = "States/Gnaw" },
+	Scatter = { Type = "boolean", Owner = "States/Gnaw, States/Dash" },
 	Chewing = { Type = "Instance", Owner = "States/Feed" },
 	Finished = { Type = "table", Owner = "States/Feed" },
 
