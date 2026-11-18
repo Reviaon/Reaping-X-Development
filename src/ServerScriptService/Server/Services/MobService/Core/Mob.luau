@@ -13,6 +13,7 @@ local Rig = require("../Body/Rig")
 local Spacing = require("../Body/Spacing")
 local Threat = require("../Combat/Threat")
 local StateMachine = require("../Brain/StateMachine")
+local Team = require("../Team")
 local Tree = require("../Brain/Tree")
 
 local Mob = {}
@@ -48,9 +49,11 @@ function Mob.new(kind, model: Model, home: Vector3)
 		Memory = {},
 		Target = nil,
 		Team = nil,
+		FightGroup = nil,
 		Moving = false,
 		Stopping = false,
 		Halted = false,
+		Arc = nil,
 		Speed = 0,
 		DesiredSpeed = 0,
 		FacePoint = nil,
@@ -152,9 +155,13 @@ function Mob:GetTarget(): Model?
 	return self.Target
 end
 
+function Mob:Fight()
+	return Team.Fight(self, if self.Dead then nil else self:GetTarget())
+end
+
 function Mob:SetTarget(target: Model?)
-	if target ~= self.Target and self.Team then
-		self.Team:ReleaseSlot(self)
+	if target ~= self.Target then
+		Team.Fight(self, nil)
 	end
 
 	if target and not self.Target then
@@ -339,6 +346,8 @@ function Mob:Step(dt: number)
 end
 
 function Mob:LeaveTeam()
+	Team.Fight(self, nil)
+
 	local team = self.Team
 	if not team then return end
 
@@ -356,6 +365,7 @@ function Mob:Think(dt: number)
 	self.Separation = if self.Crowd then Spacing.Push(self, self.Crowd) else Vector3.zero
 
 	Tree.Tick(self.Tree, self, dt)
+	Notice.Confuse(self)
 	self.Machine:Update(dt)
 	Healing.Step(self, dt)
 	self:KeepSpace()

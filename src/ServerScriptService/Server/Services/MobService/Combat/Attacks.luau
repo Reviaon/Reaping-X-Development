@@ -169,6 +169,7 @@ function Attacks.Grab(mob, target: Model, spec): boolean
 	local scene = nil
 
 	scene = PairSceneService:Begin(cinematic, attacker, target, {
+		From = spec.from,
 		OnRelease = function(_, outcome: string?)
 			if looped then
 				looped:Disconnect()
@@ -272,8 +273,9 @@ end
 function Attacks.Strike(mob, spec): number
 	local root = mob.Root
 	local look = root.CFrame.LookVector
-	local from = root.Position + look * (spec.reach_from or 0)
-	local to = root.Position + look * spec.reach
+	local base = root.Position + Vector3.yAxis * (spec.reach_height or 0)
+	local from = base + look * (spec.reach_from or 0)
+	local to = base + look * spec.reach
 	local hits = 0
 
 	for _, target in Perception.PlayersAlong(from, to, spec.radius) do

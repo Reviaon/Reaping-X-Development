@@ -11,8 +11,10 @@ local REPOSITION_TIMEOUT = 4
 local random = Random.new()
 
 local function orbitAngle(mob, center: Vector3, lead: number): number
-	if mob.Team then
-		return mob.Team:OrbitAngle(mob, center, lead)
+	local fight = mob:Fight()
+
+	if fight then
+		return fight:OrbitAngle(mob, center, lead)
 	end
 
 	local offset = mob.Root.Position - center
@@ -50,7 +52,7 @@ local function angleAround(mob, center: Vector3): number
 end
 
 local function chooseReposition(mob, data, center: Vector3)
-	local pack = mob.Config.pack
+	local pack = mob.Config.circling
 	local chance = pack.reposition_chance or 0
 
 	if mob:DistanceTo(center) >= pack.orbit_radius * INSIDE_RATIO then return end
@@ -69,7 +71,7 @@ local function repositionPoint(mob, data, center: Vector3): Vector3?
 	local reposition = data.Reposition
 	if not reposition then return nil end
 
-	local point = ringPoint(center, reposition.Angle, mob.Config.pack.orbit_radius)
+	local point = ringPoint(center, reposition.Angle, mob.Config.circling.orbit_radius)
 
 	if mob:DistanceTo(point) <= REPOSITION_ARRIVE or os.clock() >= reposition.Until then
 		data.Reposition = nil
@@ -80,7 +82,7 @@ local function repositionPoint(mob, data, center: Vector3): Vector3?
 end
 
 local function plan(mob, data, center: Vector3)
-	local pack = mob.Config.pack
+	local pack = mob.Config.circling
 	local radius = pack.orbit_radius
 	local fromCenter = mob:DistanceTo(center)
 	local sprintTo = repositionPoint(mob, data, center)
@@ -110,8 +112,10 @@ end
 
 return {
 	Enter = function(mob, data)
-		if mob.Team then
-			mob.Team:SetOrbiting(mob, true)
+		local fight = mob:Fight()
+
+		if fight then
+			fight:SetOrbiting(mob, true)
 		end
 
 		local root = mob:TargetRoot()
@@ -148,8 +152,10 @@ return {
 	end,
 
 	Exit = function(mob)
-		if mob.Team then
-			mob.Team:SetOrbiting(mob, false)
+		local fight = mob.FightGroup
+
+		if fight then
+			fight:SetOrbiting(mob, false)
 		end
 
 		mob:Stop()

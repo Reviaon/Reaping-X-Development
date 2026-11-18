@@ -10,8 +10,10 @@ return {
 	Enter = function(mob, data)
 		data.MovedAt = nil
 
-		if mob.Team then
-			mob.Team:ReleaseSlot(mob)
+		local fight = mob:Fight()
+
+		if fight then
+			fight:ReleaseSlot(mob)
 		end
 
 		Path.Drop(mob)

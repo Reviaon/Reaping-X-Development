@@ -29,8 +29,10 @@ return {
 		mob:Stop()
 		mob:Unface()
 
-		if mob.Team then
-			mob.Team:ReleaseSlot(mob)
+		local fight = mob:Fight()
+
+		if fight then
+			fight:ReleaseSlot(mob)
 		end
 
 		Attacks.Shot(mob, rally.visual)

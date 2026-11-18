@@ -33,8 +33,16 @@ return function(B)
 					B.State("Dash", { args = { kind = "sidestep" }, force = true }),
 				}),
 				B.Sequence({
+					B.Condition("Scattering"),
+					B.State("Dash", { args = { kind = "scatter" } }),
+				}),
+				B.Sequence({
 					B.Condition("Regrouping"),
 					B.State("Dash", { args = { kind = "regroup" } }),
+				}),
+				B.Sequence({
+					B.Condition("GnawReady"),
+					B.State("Gnaw"),
 				}),
 				B.Sequence({
 					B.Condition("TargetUnreachable"),
@@ -46,6 +54,14 @@ return function(B)
 					B.Condition("AttackReady"),
 					B.Condition("LaneClear"),
 					B.State("Attack", { args = { ability = true } }),
+				}),
+				B.Sequence({
+					B.Condition("BreatherDue", { kind = "dash" }),
+					B.State("Dash", { args = { kind = "retreat" } }),
+				}),
+				B.Sequence({
+					B.Condition("BreatherDue"),
+					B.State("Breather"),
 				}),
 				B.Sequence({
 					B.Action("ClaimAttackSlot"),
