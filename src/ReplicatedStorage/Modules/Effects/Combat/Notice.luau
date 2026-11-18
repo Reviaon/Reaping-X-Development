@@ -49,6 +49,16 @@ local function hide(effect: Instance)
 	end
 end
 
+local function drop(effect: Instance, names: any)
+	if typeof(names) ~= "table" then return end
+
+	for _, attachment in effect:GetDescendants() do
+		if attachment:IsA("Attachment") and table.find(names, attachment.Name) then
+			attachment:Destroy()
+		end
+	end
+end
+
 function Notice.Emit(Info)
 	local character = rawget(Info, "Character")
 	local name = rawget(Info, "Visual")
@@ -78,6 +88,8 @@ function Notice.Emit(Info)
 	if not effect.Effect then return end
 
 	hide(effect.Effect)
+
+	drop(effect.Effect, rawget(Info, "Drop"))
 
 	local function follow()
 		if anchor.Parent then
