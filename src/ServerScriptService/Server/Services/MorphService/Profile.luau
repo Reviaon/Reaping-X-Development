@@ -1,5 +1,7 @@
 local HttpService = game:GetService("HttpService")
 
+local Jloader = require("@game/ReplicatedStorage/JLoader")
+
 local MorphTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MorphTypes")
 local Attacks = require("../MobService/Combat/Attacks")
 local Types = require("./Types")
@@ -25,6 +27,31 @@ local function pick(source: { [string]: any }, keys: { string }): { [string]: an
 	end
 
 	return picked
+end
+
+local function clientLeap(spec: Spec): { [string]: any }?
+	local leap = spec.leap
+	if not leap then return nil end
+
+	local arc = leap.arc
+	if not arc then return leap end
+
+	local copy = table.clone(leap)
+	local sent = table.clone(arc)
+	local cinematic = spec.cinematic
+
+	sent.seat = nil
+
+	if arc.seat and cinematic then
+		local _, placed = Jloader.GlobalFunctions.PairSceneService.Align(cinematic, CFrame.identity, -Vector3.zAxis)
+		local lands = placed * (cinematic.Attacker.Shift or CFrame.identity) * CFrame.new(arc.seat)
+
+		sent.lands = { x = lands.X, y = lands.Y, z = lands.Z }
+	end
+
+	copy.arc = sent
+
+	return copy
 end
 
 local function holds(entry: MorphTypes.Entry): { [string]: boolean }
@@ -107,6 +134,7 @@ function Profile.Get(library: Instance, MobService: any, name: string): Profile
 	for _, ability in order do
 		local spec = Attacks.Ability(mob, ability) :: Spec
 		local picked = pick(spec, CLIENT_ABILITY)
+		picked.leap = clientLeap(spec)
 
 		picked.name = ability
 		picked.label = Profile.Label(ability)
