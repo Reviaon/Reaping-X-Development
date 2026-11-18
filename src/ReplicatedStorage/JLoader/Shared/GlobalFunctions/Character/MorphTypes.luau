@@ -43,15 +43,27 @@ export type Entry = {
 
 export type AbilityResult = "Rejected" | "Interrupted" | "Missed" | "Landed"
 
+export type LeapArc = {
+	height: number,
+	hold: number,
+	resume: number,
+	contact: number,
+	seat: Vector3?,
+	lands: { x: number, y: number, z: number }?,
+	home: number?,
+}
+
 export type Leap = {
 	delay: number?,
 	speed: number?,
 	airtime: number?,
+	arrival: number?,
 	max_speed: number?,
 	lead: number?,
 	track: number?,
 	overrun: number?,
 	settle: number?,
+	arc: LeapArc?,
 }
 
 export type Ability = {

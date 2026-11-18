@@ -39,10 +39,66 @@ export type Footsteps = {
 
 export type Notice = {
 	visual: string,
+	emit: string?,
 	head: string,
 	offset: Vector3,
 	cooldown: number,
 	lifetime: number,
+}
+
+export type Confuse = Notice & {
+	range: number,
+}
+
+export type Scatter = {
+	distance: number,
+	spread: number,
+}
+
+export type Gnaw = {
+	animation: string,
+	visual: string?,
+	marker: string,
+	damage: number,
+	remaining: number,
+	distance: number,
+	gnawers: number,
+	speed: string | number,
+	scatter: Scatter,
+}
+
+export type TempoStrafe = {
+	time: { number },
+	step: number,
+	speed: string | number,
+}
+
+export type TempoBack = {
+	distance: { number },
+	speed: string | number,
+}
+
+export type TempoSetup = {
+	ability: string,
+	chance: number,
+	margin: number,
+	speed: string | number,
+	hold: number,
+}
+
+export type Tempo = {
+	flurry: { number },
+	moves: { [string]: number },
+	strafe: TempoStrafe,
+	back: TempoBack,
+	setup: TempoSetup | false,
+}
+
+export type Breather = {
+	Kind: string,
+	Side: number,
+	Distance: number,
+	Time: number,
 }
 
 return {}
