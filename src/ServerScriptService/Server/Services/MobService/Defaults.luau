@@ -22,22 +22,26 @@ return {
 		time = 8, --@ Seconds it hunts around the last place it or a packmate saw the prey
 		radius = 14, --@ Studs around that place it sniffs through
 	},
+	
 	healing = { --@ Slow healing at home once calm (no prey, not returning or searching); false never heals
 		rate = 0.02, --@ Share of max health regained per second
 		delay = 10, --@ Seconds after its last hurt before healing starts
 		range = nil, --@ Studs from home it heals within; nil is wander_radius
 	},
+
 	spawn = { --@ How MobSpawnService zones spawn it; a zone's Cap and Respawn attributes override
 		group = { 1, 1 }, --@ How many spawn together, rolled per wave
 		respawn = 45, --@ Seconds after the last kill before a cleared zone spawns again
 		spread = 16, --@ Studs around the first spawn point the rest of the group lands within
 	},
+	
 	sight = { --@ Line of sight for noticing and keeping targets; false sees through everything
 		interval = 0.3, --@ Seconds one look at a target stays fresh
 		memory = 6, --@ Seconds it keeps a target it can't see; any packmate's sighting renews it
 		hear_range = 18, --@ Studs it senses players within, walls or not
 		eye_height = 1.5, --@ Studs above its root it looks from
 	},
+
 	threat = { --@ Who it fights once provoked: a decaying ledger per player
 		decay = 12, --@ Seconds a player's threat takes to fade to zero
 		provoke = 60, --@ Threat for any hostile act (hit, push, tackle, rally call)
@@ -78,6 +82,7 @@ return {
 		damage = 10,
 		reach = nil, --@ Studs ahead of the root; nil derives it
 		reach_from = 0, --@ Studs ahead of the root the hit starts
+		reach_height = 0, --@ Studs above the root the hit line runs; a short mob raises it to a player's chest
 		radius = 4, --@ Studs around the reach line
 		step_in = 12, --@ Windup walk-in speed; 0 holds still
 		step_in_lead = nil, --@ Seconds before the hit the step-in surges; nil walks in from the start
@@ -162,7 +167,10 @@ return {
 		regroup = true, --@ Hops back out after a stun
 	},
 
+	circling = nil, --@ The ring Orbit keeps while its target can't be attacked; nil is `pack`, or for a mob without one a ring derived from its reach that it walks round without repositioning
+
 	abilities = nil, --@ Named special attacks
+	tempo = false, --@ Breaking off between flurries so a lone fighter isn't attack after attack (Combat/Tempo): { flurry = { min, max } attacks, moves = { strafe, back, dash = weight }, strafe = { time, step, speed }, back = { distance, speed }, setup = { ability, chance, margin, speed, hold } or false }; dash reuses the `dash.retreat` hop, and setup backs out past an ability's min_range when the target is too close for it
 
 	pack = { --@ Shared target, turn-taking, circling
 		max_attackers = 1,
@@ -186,6 +194,7 @@ return {
 
 	rally = false, --@ Calling for help when badly hurt
 	feed = false, --@ Eating corpses when idle
+	gnaw = false, --@ Huddling round a long-ragdolled target to chew on it, then scattering when it gets up: { animation, visual, marker, damage, remaining, distance, gnawers, speed, scatter = { distance, spread } }
 
 	evade = false, --@ Prey running from predators (Prey tree): { range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }; runs inside range until all are past safe, then watches one inside watch for watch_time; players and whoever hurt it always count
 	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, animations = { lie, loop, wake } }
@@ -193,11 +202,21 @@ return {
 	visuals = nil, --@ Effects module path for combo visuals
 	footsteps = false, --@ Camera shake for players near it while a locomotion clip plays (client StepShakeHandler): { gaits = { [animations key] = { at, shake } }, range, min_weight }
 	notice = { --@ Shown over its head the moment it notices a player (aggro, or prey startled by one); false shows nothing
-		visual = "NoticeVfx", --@ Asset under Storage.Particles.UniversalVFX
+		visual = "AttentionVfx", --@ Asset under Storage.Particles.UniversalVFX
+		emit = "Notice", --@ The asset's Attachment only this mark plays; other marks' emit attachments are dropped, shared ones always play
 		head = "Head", --@ Bone or part it sits on; the root when the rig has neither
-		offset = Vector3.new(0, 1.5, 0), --@ Studs above the head, scaled with the mob
+		offset = Vector3.new(0, 1.5, 0), --@ Studs above the head the asset's centre sits, scaled with the mob
 		cooldown = 8, --@ Fewest seconds between two notices from the same mob
 		lifetime = 1.5, --@ Seconds the effect follows the head before it is removed
+	},
+	confuse = { --@ Shown over its head while it's idle and a player is within range but unnoticed: out of sight and beyond sight.hear_range; false shows nothing
+		visual = "AttentionVfx",
+		emit = "Confuse",
+		range = 40, --@ Studs a hidden player makes it suspicious from
+		head = "Head",
+		offset = Vector3.new(0, 1.5, 0),
+		cooldown = 10, --@ Fewest seconds between two confusions, and after a notice before one
+		lifetime = 1.5,
 	},
 
 	animations = {}, --@ Key -> Animation name
