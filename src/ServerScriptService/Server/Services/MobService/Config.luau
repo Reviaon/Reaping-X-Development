@@ -9,6 +9,7 @@ Config.Settings = {
 	ClearanceMargin = 12,
 	OrbitReachRatio = 2.4,
 	MinOrbitRadius = 18,
+	SoloOrbitDrift = 0.5,
 }
 
 local function isList(value): boolean
@@ -88,10 +89,19 @@ function Config.Derive(config, body)
 		end
 	end
 
+	local orbitRadius = math.max(attack.reach * settings.OrbitReachRatio, settings.MinOrbitRadius)
+
 	if config.pack then
 		config.pack.clearance = config.pack.clearance or attack.reach + settings.ClearanceMargin
-		config.pack.orbit_radius = config.pack.orbit_radius or math.max(attack.reach * settings.OrbitReachRatio, settings.MinOrbitRadius)
+		config.pack.orbit_radius = config.pack.orbit_radius or orbitRadius
 	end
+
+	config.circling = config.circling or config.pack or {
+		orbit_radius = orbitRadius,
+		orbit_drift = settings.SoloOrbitDrift,
+		reposition_chance = 0,
+		retreat_speed = config.walk_speed,
+	}
 
 	return config
 end

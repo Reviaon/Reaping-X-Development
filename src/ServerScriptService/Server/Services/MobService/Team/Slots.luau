@@ -2,6 +2,8 @@ local Geometry = require("./Geometry")
 
 local Slots = {}
 
+local SETTLED = 0.9
+
 function Slots.State()
 	return {
 		Slots = {},
@@ -82,7 +84,12 @@ function Slots.Methods:Crowded(mob, target: Model, center: Vector3, clearance: n
 	for member in self.Members do
 		if member == mob or member.Dead or not member.Root or member.Target ~= target then continue end
 
-		if Geometry.Planar(member.Root.Position, center) < clearance then
+		local distance = Geometry.Planar(member.Root.Position, center)
+		local ring = member.Config.circling
+
+		if self.Orbiting[member] and ring and distance >= ring.orbit_radius * SETTLED then continue end
+
+		if distance < clearance then
 			return true
 		end
 	end

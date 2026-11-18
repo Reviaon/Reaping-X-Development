@@ -585,10 +585,24 @@ local function adopt(scene, character: Model, track: AnimationTrack)
 	end))
 
 	if track.Looped then
+		local leads = scene.Definition.LoopWith == roleOf(scene, character)
+
 		table.insert(scene.Connections, track.DidLoop:Connect(function()
-			if active[scene] and not scene.Outcome then
-				PairSceneService.Looped:Fire(scene, character, track)
+			if not active[scene] or scene.Outcome then return end
+
+			if IS_SERVER and typeof(track) == "Instance" then
+				track.TimePosition = track.TimePosition
 			end
+
+			if leads then
+				for _, partnerTrack in scene.Tracks[partnerIn(scene, character)] or {} do
+					if partnerTrack.Looped and partnerTrack.IsPlaying then
+						partnerTrack.TimePosition = 0
+					end
+				end
+			end
+
+			PairSceneService.Looped:Fire(scene, character, track)
 		end))
 	end
 
@@ -949,7 +963,7 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 		definition.Victim = side
 	end
 
-	local victimPlaced, attackerPlaced = Placement.Place(definition, attacker, victim)
+	local victimPlaced, attackerPlaced = Placement.Place(definition, attacker, victim, options.From)
 	if not victimPlaced or not attackerPlaced then return nil, "no clear ground for the scene" end
 
 	nextId += 1
@@ -1383,11 +1397,11 @@ function PairSceneService.FreeHeld()
 	end
 end
 
-function PairSceneService.Predict(character: Model, definition, partner: Model)
+function PairSceneService.Predict(character: Model, definition, partner: Model, from: Vector3?)
 	local root = rootOf(character)
 	if not root then return nil end
 
-	local _, placed = Placement.Place(definition, character, partner)
+	local _, placed = Placement.Place(definition, character, partner, from)
 	if not placed then return nil end
 
 	hold(root, placed)

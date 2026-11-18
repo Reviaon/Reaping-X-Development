@@ -1,5 +1,7 @@
 local MathService = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Utility/MathService")
 
+local Arc = require("./Arc")
+
 local Motion = {}
 
 Motion.Settings = {
@@ -167,6 +169,7 @@ local function coast(mob, dt: number)
 end
 
 function Motion.Step(mob, dt: number)
+	if Arc.Step(mob, dt) then return end
 	if mob.Halted then return end
 
 	coast(mob, dt)
