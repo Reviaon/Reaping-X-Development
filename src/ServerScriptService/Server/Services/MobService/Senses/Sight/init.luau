@@ -1,6 +1,7 @@
 local Perception = require("./Perception")
 local Eyes = require("@self/Eyes")
 local Memory = require("@self/Memory")
+local Stealth = require("@self/Stealth")
 
 local Sight = {}
 
@@ -42,7 +43,23 @@ function Sight.Sees(mob, target: Model): boolean
 end
 
 function Sight.Notices(mob, target: Model): boolean
-	return Sight.Hears(mob, target) or Sight.Sees(mob, target)
+	if Stealth.Hides(mob, target) then
+		local close = distanceTo(mob, target) <= Stealth.Reach(mob)
+
+		if close then
+			Stealth.Alert(mob, target)
+		end
+
+		return close
+	end
+
+	local noticed = Sight.Hears(mob, target) or Sight.Sees(mob, target)
+
+	if noticed and Stealth.Sneaking(target) then
+		Stealth.Alert(mob, target)
+	end
+
+	return noticed
 end
 
 function Sight.LastSeen(mob, target: Model): (number, Vector3?)
@@ -112,7 +129,11 @@ function Sight.Describe(mob): { string }
 			table.insert(senses, string.format("pack saw %.1fs ago", now - shared.At))
 		end
 
-		if Sight.Hears(mob, target) then
+		if Stealth.Hides(mob, target) then
+			table.insert(senses, string.format("sneaking (noticed within %.0f)", Stealth.Reach(mob)))
+		elseif Stealth.Sneaking(target) and Stealth.Alerted(mob, target) then
+			table.insert(senses, "sneaking, but it's alerted")
+		elseif Sight.Hears(mob, target) then
 			table.insert(senses, "heard")
 		end
 

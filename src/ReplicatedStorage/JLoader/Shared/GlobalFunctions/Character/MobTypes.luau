@@ -67,6 +67,11 @@ export type Gnaw = {
 	scatter: Scatter,
 }
 
+export type Sneak = {
+	notice: number,
+	forget: number,
+}
+
 export type TempoStrafe = {
 	time: { number },
 	step: number,

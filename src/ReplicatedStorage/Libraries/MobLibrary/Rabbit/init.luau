@@ -28,6 +28,7 @@ return {
 	spawn = { group = { 2, 4 }, spread = 10 }, --@ Rabbits per zone spawn
 
 	sight = { eye_height = 0.6, hear_range = 14 },
+	sneak = { notice = 7 }, --@ Skittish: bolts from a sneaking player sooner than a hunter would notice one
 	search = false,
 	pounce = false,
 	dash = false,

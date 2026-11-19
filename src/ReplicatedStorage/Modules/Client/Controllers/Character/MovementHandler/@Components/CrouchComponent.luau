@@ -1,5 +1,17 @@
 --@ Crouching
+local Jloader = require("@game/ReplicatedStorage/JLoader")
+
 local CrouchComponent = {}
+
+local stealth = nil
+
+local function report(sneaking: boolean)
+	stealth = stealth or Jloader.GetService("StealthService")
+
+	if stealth then
+		stealth.ReportSneak:Fire(sneaking)
+	end
+end
 
 function CrouchComponent:Init()
 end
@@ -25,6 +37,7 @@ function CrouchComponent:Activate(controller)
 	if not CrouchComponent:CanActivate(controller) then return end
 
 	controller.StatusService:SetStatus(Character, "IsCrouching", true)
+	report(true)
 
 	local track = controller.AnimatorService:PlayTrack(Character, "CrouchIdle", {
 		Speed = 1,
@@ -41,6 +54,7 @@ function CrouchComponent:Deactivate(controller)
 
 	if controller.StatusService:CheckStatuses(Character, { IsCrouching = true }) then
 		controller.StatusService:RemoveStatus(Character, "IsCrouching")
+		report(false)
 	end
 
 	local track = controller.CrouchIdle

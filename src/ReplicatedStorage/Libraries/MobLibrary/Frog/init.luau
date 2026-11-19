@@ -41,6 +41,7 @@ return {
 		},
 	},
 	sight = { eye_height = 0.8, hear_range = 14 },
+	sneak = { notice = 4 }, --@ Short senses: a sneaking player can get close before it notices
 
 	dash = { --@ Slippery: hops out of swings and combos and around a guard far more than the wolf
 		visual = "Dash", --@ FrogVisuals jump and landing dust per dash

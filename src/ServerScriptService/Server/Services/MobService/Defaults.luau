@@ -41,6 +41,10 @@ return {
 		hear_range = 18, --@ Studs it senses players within, walls or not
 		eye_height = 1.5, --@ Studs above its root it looks from
 	},
+	sneak = { --@ How a sneaking (crouching) player is sensed; false ignores sneaking
+		notice = 5, --@ Studs a sneaker is noticed within, seen or not; further off they only confuse it (the `confuse` mark) until they attack or come this close
+		forget = 6, --@ Seconds a noticed sneaker stays noticed by sight and hearing as normal, renewed every time it senses them; after that sneaking hides them again
+	},
 
 	threat = { --@ Who it fights once provoked: a decaying ledger per player
 		decay = 12, --@ Seconds a player's threat takes to fade to zero
