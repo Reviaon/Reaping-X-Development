@@ -19,6 +19,7 @@ local PairSceneService = {
 	Launched = Signal.new(),
 	Struck = Signal.new(),
 	Looped = Signal.new(),
+	Left = Signal.new(),
 
 	Align = Placement.Align,
 	Place = Placement.Place,
@@ -38,6 +39,8 @@ local heldFrames = setmetatable({}, { __mode = "k" })
 local sceneTracks = setmetatable({}, { __mode = "k" })
 local guards = {}
 local followBones = setmetatable({}, { __mode = "k" })
+local trackBones = setmetatable({}, { __mode = "k" })
+local FLAT = Vector3.new(1, 0, 1)
 local nextId = 0
 local stepper = nil
 
@@ -78,11 +81,72 @@ local function shaken(character: Model, frame: CFrame, across: Vector3): CFrame
 	return CFrame.new(position) * CFrame.Angles(0, math.rad(shake.X) * twist, 0) * frame.Rotation
 end
 
+local function trackFrame(character: Model, partner: Model?): CFrame?
+	local boneName = character:GetAttribute(Config.TrackAttribute)
+	local partName = character:GetAttribute(Config.TrackPartAttribute)
+	local anchor = character:GetAttribute(Config.AnchorAttribute)
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if typeof(boneName) ~= "string" or typeof(partName) ~= "string" or typeof(anchor) ~= "CFrame" or not partner then return nil end
+	if not root or not root:IsA("BasePart") then return nil end
+
+	local bone = trackBones[character]
+
+	if not bone or bone.Name ~= boneName or not bone:IsDescendantOf(character) then
+		bone = character:FindFirstChild(boneName, true)
+		trackBones[character] = bone
+	end
+
+	local part = partner:FindFirstChild(partName)
+	if not bone or not bone:IsA("Bone") or not part or not part:IsA("BasePart") then return nil end
+
+	local point = character:GetAttribute(Config.TrackPointAttribute)
+	local pivotLocal = character:GetAttribute(Config.TrackPivotAttribute)
+	local limit = character:GetAttribute(Config.TrackLimitAttribute)
+
+	point = if typeof(point) == "Vector3" then point else Vector3.zero
+	pivotLocal = if typeof(pivotLocal) == "Vector3" then pivotLocal else Vector3.zero
+	limit = if typeof(limit) == "Vector2" then limit else Config.TrackLimit
+
+	local pivot = anchor:PointToWorldSpace(pivotLocal)
+	local from = anchor:PointToWorldSpace(root.CFrame:PointToObjectSpace(bone.TransformedWorldCFrame.Position)) - pivot
+	local to = part.CFrame:PointToWorldSpace(point) - pivot
+	local flatFrom, flatTo = from * FLAT, to * FLAT
+
+	if flatFrom.Magnitude < 1e-3 or flatTo.Magnitude < 1e-3 then return nil end
+
+	local most = math.rad(limit.X)
+	local yaw = math.clamp(math.atan2(flatFrom:Cross(flatTo).Y, flatFrom:Dot(flatTo)), -most, most)
+	local turn = CFrame.fromAxisAngle(Vector3.yAxis, yaw)
+	local turned = turn:VectorToWorldSpace(from)
+	local axis = turned:Cross(to)
+
+	if axis.Magnitude > 1e-6 then
+		turn = CFrame.fromAxisAngle(axis.Unit, math.min(math.atan2(axis.Magnitude, turned:Dot(to)), most)) * turn
+	end
+
+	local slide = math.clamp(to.Magnitude - from.Magnitude, -limit.Y, limit.Y)
+
+	return CFrame.new(pivot) * turn * CFrame.new(-pivot) * anchor + to.Unit * slide
+end
+
+local function startTrack(character: Model, track)
+	character:SetAttribute(Config.TrackAttribute, track.Bone)
+	character:SetAttribute(Config.TrackPartAttribute, track.Part)
+	character:SetAttribute(Config.TrackPointAttribute, track.Point or Vector3.zero)
+	character:SetAttribute(Config.TrackPivotAttribute, track.Pivot or Vector3.zero)
+	character:SetAttribute(Config.TrackLimitAttribute, Vector2.new(track.Angle or Config.TrackLimit.X, track.Slide or Config.TrackLimit.Y))
+end
+
 local function followFrame(character: Model, partner: Model?, partsOnly: boolean?): CFrame?
 	local targetName = character:GetAttribute(Config.FollowAttribute)
 	local offset = character:GetAttribute(Config.FollowOffsetAttribute)
 
-	if typeof(targetName) ~= "string" or typeof(offset) ~= "CFrame" or not partner then return nil end
+	if typeof(targetName) ~= "string" or typeof(offset) ~= "CFrame" then
+		return trackFrame(character, partner)
+	end
+
+	if not partner then return nil end
 
 	local partnerRoot = partner:FindFirstChild("HumanoidRootPart")
 	if not partnerRoot then return nil end
@@ -121,9 +185,15 @@ end
 
 local function clearFollow(character: Model)
 	followBones[character] = nil
+	trackBones[character] = nil
 	character:SetAttribute(Config.FollowAttribute, nil)
 	character:SetAttribute(Config.FollowOffsetAttribute, nil)
 	character:SetAttribute(Config.FollowShakeAttribute, nil)
+	character:SetAttribute(Config.TrackAttribute, nil)
+	character:SetAttribute(Config.TrackPartAttribute, nil)
+	character:SetAttribute(Config.TrackPointAttribute, nil)
+	character:SetAttribute(Config.TrackPivotAttribute, nil)
+	character:SetAttribute(Config.TrackLimitAttribute, nil)
 end
 
 local function anchorOf(character: Instance?): CFrame?
@@ -598,6 +668,10 @@ local function adopt(scene, character: Model, track: AnimationTrack)
 				for _, partnerTrack in scene.Tracks[partnerIn(scene, character)] or {} do
 					if partnerTrack.Looped and partnerTrack.IsPlaying then
 						partnerTrack.TimePosition = 0
+
+						if partnerTrack.Speed == 0 then
+							partnerTrack:AdjustSpeed(1)
+						end
 					end
 				end
 			end
@@ -690,7 +764,10 @@ local function sceneIds(definition): string
 	end
 
 	for _, side in { definition.Attacker, definition.Victim } do
-		add(side.Intro)
+		for _, name in PairSceneService.Intros(side) do
+			add(name)
+		end
+
 		add(side.Loop)
 	end
 
@@ -775,6 +852,11 @@ function PairSceneService.PlayTrack(character: Model, name: string, looped: bool
 	return track
 end
 
+function PairSceneService.Intros(side): { string }
+	local intro = side.Intro
+	return if typeof(intro) == "table" then intro elseif intro then { intro } else {}
+end
+
 function PairSceneService.Sequence(character: Model, side, definition, age: number?, onTrack: ((AnimationTrack) -> ())?, shadow: boolean?)
 	local sequence = { Tracks = {}, Stopped = false, Thread = nil }
 	local skip = age or 0
@@ -793,18 +875,39 @@ function PairSceneService.Sequence(character: Model, side, definition, age: numb
 		return track
 	end
 
-	local intro = play(side.Intro, false, definition.IntroFade, skip)
+	local intros = PairSceneService.Intros(side)
+	local intro = play(intros[1], false, definition.IntroFade, skip)
 
 	sequence.Thread = task.spawn(function()
 		local began = os.clock()
 
-		while intro and intro.Length <= 0 and os.clock() - began < 1 do
-			task.wait()
+		for index = 1, #intros do
+			local started = os.clock()
+
+			while intro and intro.Length <= 0 and os.clock() - started < 1 do
+				task.wait()
+			end
+
+			local length = intro and intro.Length or 0
+			local offset = if index == 1 then skip else 0
+
+			task.wait(math.max(length - offset - definition.LoopFade - (os.clock() - started), 0))
+
+			if sequence.Stopped then
+				sequence.Thread = nil
+				return
+			end
+
+			if index == #intros then break end
+
+			local nextIntro = play(intros[index + 1], false, definition.LoopFade)
+
+			if intro then
+				intro:Stop(definition.LoopFade)
+			end
+
+			intro = nextIntro
 		end
-
-		local length = intro and intro.Length or 0
-
-		task.wait(math.max(length - skip - definition.LoopFade - (os.clock() - began), 0))
 
 		sequence.Thread = nil
 		if sequence.Stopped then return end
@@ -876,6 +979,19 @@ local function releaseReason(scene): string?
 	return nil
 end
 
+local function holdFollowers(scene)
+	local leader = scene.Definition.LoopWith
+	if not scene.Definition.LoopHold or not leader or scene.Outcome then return end
+
+	local follower = if leader == "Victim" then scene.Attacker else scene.Victim
+
+	for _, track in scene.Tracks[follower] or {} do
+		if track.Looped and track.IsPlaying and track.Speed ~= 0 and track.Length > 0 and track.TimePosition >= track.Length - Config.HoldLastFrame then
+			track:AdjustSpeed(0)
+		end
+	end
+end
+
 local function step()
 	for scene in active do
 		local reason = releaseReason(scene)
@@ -902,6 +1018,8 @@ local function step()
 				continue
 			end
 		end
+
+		holdFollowers(scene)
 
 		for _, character in { scene.Attacker, scene.Victim } do
 			local root, anchor = rootOf(character), anchorOf(character)
@@ -979,6 +1097,7 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 		Predicted = options.Predicted == true,
 		Sequences = {},
 		OutcomeTracks = {},
+		OutcomeRoles = {},
 		Tracks = {},
 		Freed = {},
 		Left = {},
@@ -1012,7 +1131,7 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 		members[character] = scene
 	end
 
-	local age = options.Age or 0
+	local age = options.Age or definition.StartAt or 0
 
 	table.insert(scene.Sequences, PairSceneService.Sequence(victim, definition.Victim, definition, age, function(track)
 		adopt(scene, victim, track)
@@ -1053,6 +1172,8 @@ function PairSceneService:Begin(definition, attacker: Model, victim: Model, opti
 
 		if follow then
 			startFollow(character, if character == attacker then victim else attacker, follow)
+		elseif side.Track then
+			startTrack(character, side.Track)
 		end
 
 		if side.Ragdoll then
@@ -1201,6 +1322,8 @@ function PairSceneService:Free(scene, character: Model, held: boolean?): boolean
 		Walk.End(character, side.Walk)
 	end
 
+	PairSceneService.Left:Fire(scene, character)
+
 	return true
 end
 
@@ -1223,6 +1346,32 @@ function PairSceneService:TakeHit(character: Model, heavy: boolean): boolean
 	end
 
 	return members[character] == scene and active[scene] == true
+end
+
+local function easeAnchors(scene, outcomeName: string, outcome)
+	local duration = outcome.ShiftTime or 0
+
+	for role, shift in outcome.Shift or {} do
+		local character = if role == "Attacker" then scene.Attacker else scene.Victim
+		local from = anchorOf(character)
+		if not from then continue end
+
+		local to = from * shift
+
+		task.spawn(function()
+			local began = os.clock()
+
+			while active[scene] and scene.Outcome == outcomeName and not scene.Freed[character] do
+				local alpha = if duration > 0 then math.min((os.clock() - began) / duration, 1) else 1
+
+				character:SetAttribute(Config.AnchorAttribute, from:Lerp(to, alpha * alpha * (3 - 2 * alpha)))
+
+				if alpha >= 1 then return end
+
+				RunService.Heartbeat:Wait()
+			end
+		end)
+	end
 end
 
 function PairSceneService:Resolve(scene, outcomeName: string): boolean
@@ -1258,8 +1407,21 @@ function PairSceneService:Resolve(scene, outcomeName: string): boolean
 
 		if track then
 			table.insert(scene.OutcomeTracks, track)
+			scene.OutcomeRoles[track] = roleOf(scene, character)
 			adopt(scene, character, track)
 		end
+	end
+
+	easeAnchors(scene, outcomeName, outcome)
+
+	for role, delay in outcome.LeaveAt or {} do
+		local character = if role == "Attacker" then scene.Attacker else scene.Victim
+
+		task.delay(delay, function()
+			if active[scene] and scene.Outcome == outcomeName then
+				self:Free(scene, character)
+			end
+		end)
 	end
 
 	PairSceneService.Resolved:Fire(scene, outcomeName)
@@ -1282,6 +1444,7 @@ function PairSceneService:Resolve(scene, outcomeName: string): boolean
 
 			for _, track in scene.OutcomeTracks do
 				if not track.IsPlaying then continue end
+				if outcome.EndWith and scene.OutcomeRoles[track] ~= outcome.EndWith then continue end
 
 				if track.Length <= 0 then
 					finished = finished and os.clock() - began > 1
