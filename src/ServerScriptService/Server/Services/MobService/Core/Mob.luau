@@ -109,7 +109,7 @@ function Mob.new(kind, model: Model, home: Vector3)
 			self.HurtAt = os.clock()
 
 			if reactions and #reactions > 0 and not self:IsArmored() then
-				self.Animation:PlayAction(reactions[random:NextInteger(1, #reactions)])
+				self.Animation:PlayReaction(self.Animation:Variant(reactions[random:NextInteger(1, #reactions)]))
 			end
 
 			task.defer(function()
