@@ -20,6 +20,7 @@ return {
 
 		for _, key in mob.Config.hurt_animations or {} do
 			mob.Animation:Stop(key, HURT_FADE)
+			mob.Animation:Stop(mob.Animation.Settings.EngagedPrefix .. key, HURT_FADE)
 		end
 	end,
 }
