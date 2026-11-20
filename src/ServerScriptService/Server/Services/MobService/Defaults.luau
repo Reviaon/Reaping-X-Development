@@ -156,6 +156,7 @@ return {
 			range = nil, --@ nil is twice attack_range
 			radius = nil, --@ nil is attack_range
 			run_chance = 0.4, --@ Chance it runs wide instead of dashing
+			posture = nil, --@ "ground": a mob with a `stance` drops out of it and always runs round facing its path; the Hunter tree shifts it back into the stance after
 			run_radius = 1.5,
 			step = 40, --@ Degrees it aims ahead per tick
 			timeout = 2,
@@ -180,7 +181,7 @@ return {
 
 	circling = nil, --@ The ring Orbit keeps while its target can't be attacked; nil is `pack`, or for a mob without one a ring derived from its reach that it walks round without repositioning
 
-	abilities = nil, --@ Named special attacks
+	abilities = nil, --@ Named special attacks; `follow_up = true` marks one only reached through another cinematic's `Then`, `cast_visual` is a timeline played as its clip starts, `posture = "ground" | "stance"` limits it to one side of `stance`, and `faced` (degrees) only lets it fire while the target looks at the mob
 	tempo = false, --@ Breaking off between flurries so a lone fighter isn't attack after attack (Combat/Tempo): { flurry = { min, max } attacks, moves = { strafe, back, dash = weight }, strafe = { time, step, speed }, back = { distance, speed }, setup = { ability, chance, margin, speed, hold } or false }; dash reuses the `dash.retreat` hop, and setup backs out past an ability's min_range when the target is too close for it
 
 	pack = { --@ Shared target, turn-taking, circling
@@ -208,7 +209,9 @@ return {
 	gnaw = false, --@ Huddling round a long-ragdolled target to chew on it, then scattering when it gets up: { animation, visual, marker, damage, remaining, distance, gnawers, speed, scatter = { distance, spread } }
 
 	evade = false, --@ Prey running from predators (Prey tree): { range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }; runs inside range until all are past safe, then watches one inside watch for watch_time; players and whoever hurt it always count
-	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, animations = { lie, loop, wake } }
+	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, blend, animations = { lie, loop, wake } }
+	lurk = false, --@ While its target is held in another pair scene and it isn't (Hunter tree, `States/Lurk`): { band = { min, max } studs from the target's body, nip = { first, every, damage, animation, visual, windup, recovery, reach, speed, approach } }; it keeps to the band and now and then slides in to `reach`, bites (damage at `windup`) and backs out
+	stance = false, --@ A combat posture it shifts into on getting a target and out of on losing it (Hunter tree, `States/Stance`): { enter, exit, enter_speed, exit_speed, blend }; while in it `Engaged<Key>` clips replace locomotion and hurt clips
 
 	visuals = nil, --@ Effects module path for combo visuals
 	footsteps = false, --@ Camera shake for players near it while a locomotion clip plays (client StepShakeHandler): { gaits = { [animations key] = { at, shake } }, range, min_weight }
@@ -230,6 +233,6 @@ return {
 		lifetime = 1.5,
 	},
 
-	animations = {}, --@ Key -> Animation name
+	animations = {}, --@ Key -> Animation name; `Engaged<Key>` (EngagedIdle, EngagedWalk, EngagedHurt1...) replaces that locomotion or hurt clip while engaged: in its `stance` if it has one, else while it has a target
 	animation_speeds = {}, --@ Locomotion key -> playback multiplier on top of the speed match (Run = 1.5 plays the run clip 1.5x faster)
 }

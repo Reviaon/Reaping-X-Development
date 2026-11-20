@@ -522,13 +522,24 @@ function CombatService:Stun(victim: Model, seconds: number?)
 	getBlockService():Lock(victim, seconds)
 end
 
-function CombatService:SceneStrike(target: Model, hit)
+function CombatService:SceneStrike(target: Model, hit, attacker: Model?)
 	local humanoid = target:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
 
 	if hit.Damage > 0 then
 		humanoid:TakeDamage(hit.Damage)
 	end
+
+	if not attacker then return end
+
+	local weaponId = hit.Weapon or "Melee"
+	local comboIndex = hit.Combo or 1
+	local weaponConfig = CombatConfig.WeaponConfig[weaponId]
+	local hitbox = weaponConfig and CombatConfig:ResolveAttackTiming(nil, comboIndex, weaponConfig).hitbox
+	local payload = GlobalFunctions.AttackService:HitPayload(attacker, target, hitbox and hitbox.effect, weaponId, comboIndex)
+
+	payload.Info.Still = true
+	getEffectRelay().CreateVisual:FireAll(payload)
 end
 
 function CombatService:Init()
@@ -560,8 +571,8 @@ function CombatService:Init()
 		end
 	end)
 
-	GlobalFunctions.PairSceneService.Struck:Connect(function(_, _, target, hit)
-		self:SceneStrike(target, hit)
+	GlobalFunctions.PairSceneService.Struck:Connect(function(_, attacker, target, hit)
+		self:SceneStrike(target, hit, attacker)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

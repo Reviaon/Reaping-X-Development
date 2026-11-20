@@ -36,6 +36,7 @@ return {
 	StartledUntil = { Type = "number", Owner = "States/Wake" },
 	Asleep = { Type = "boolean", Owner = "Conditions/Asleep, States/Sleep, States/Wake" },
 	Sleeper = { Type = "boolean", Owner = "Conditions/Asleep" },
+	Stanced = { Type = "boolean", Owner = "States/Stance, States/Dash" },
 
 	AimWindow = { Type = "table", Owner = "Senses/Awareness/Draw" },
 	Sidestep = { Type = "table", Owner = "Senses/Awareness/Sidestep" },

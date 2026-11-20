@@ -166,6 +166,8 @@ function Attacks.Grab(mob, target: Model, spec): boolean
 	local PairSceneService = Jloader.GlobalFunctions.PairSceneService
 	local cinematic = spec.cinematic
 	local looped: RBXScriptConnection? = nil
+	local left: RBXScriptConnection? = nil
+	local settled = false
 	local scene = nil
 
 	scene = PairSceneService:Begin(cinematic, attacker, target, {
@@ -175,9 +177,24 @@ function Attacks.Grab(mob, target: Model, spec): boolean
 				looped:Disconnect()
 			end
 
-			Attacks.Settle(mob, target, cinematic, outcome)
+			if left then
+				left:Disconnect()
+			end
+
+			if not settled then
+				Attacks.Settle(mob, target, cinematic, outcome)
+			end
 		end,
 	})
+
+	if scene then
+		left = PairSceneService.Left:Connect(function(leaving, character: Model)
+			if leaving ~= scene or character ~= attacker or settled then return end
+
+			settled = true
+			Attacks.Settle(mob, target, cinematic, scene.Outcome)
+		end)
+	end
 
 	if scene then
 		CombatService.Provoked:Fire(attacker, target)
@@ -206,8 +223,8 @@ function Attacks.Settle(mob, target: Model, cinematic, outcome: string?)
 	end
 
 	if result.Retreat and mob.Machine and not mob.Dead then
-		local root = target:FindFirstChild("HumanoidRootPart")
-		mob.Machine:Request("Dash", { kind = "retreat", from = if root and root:IsA("BasePart") then root.Position else nil }, true)
+		local body = target:FindFirstChild("Torso") or target:FindFirstChild("HumanoidRootPart")
+		mob.Machine:Request("Dash", { kind = "retreat", from = if body and body:IsA("BasePart") then body.Position else nil }, true)
 	end
 end
 
@@ -239,7 +256,18 @@ function Attacks.Hit(mob, target: Model, spec): boolean
 	return true
 end
 
+function Attacks.Nip(mob, target: Model?, nip)
+	if not target or mob.Dead then return end
+
+	service():SceneStrike(target, { Damage = nip.damage }, mob.Model)
+end
+
 function Attacks.Visual(mob, spec)
+	if spec.ability then
+		Attacks.Shot(mob, spec.cast_visual, spec.speed)
+		return
+	end
+
 	local path = mob.Config.visuals
 	if not path or not spec.index then return end
 

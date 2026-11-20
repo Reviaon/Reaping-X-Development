@@ -16,6 +16,9 @@ Animation.Settings = {
 	ExclusiveFade = 0.15,
 	ActionFade = 0.1,
 	CullFade = 0.3,
+	EngagedPrefix = "Engaged",
+	ActionPriority = Enum.AnimationPriority.Action,
+	ReactionPriority = Enum.AnimationPriority.Action2,
 }
 
 local resolved = {}
@@ -101,19 +104,45 @@ function Animation:Track(key: string): AnimationTrack?
 	return track
 end
 
+function Animation:ClearLayer(priority: Enum.AnimationPriority, keep: AnimationTrack?)
+	for key, track in self.Tracks do
+		if track ~= keep and track.IsPlaying and track.Priority == priority then
+			self:Stop(key)
+		end
+	end
+end
+
 function Animation:PlayAction(key: string, speed: number?, position: number?): AnimationTrack?
 	if self.Culled or self.Limp then return nil end
 
 	local track = self:Track(key)
 	if not track then return nil end
 
-	track.Priority = Enum.AnimationPriority.Action
+	self:ClearLayer(Animation.Settings.ActionPriority, track)
+
+	track.Priority = Animation.Settings.ActionPriority
 	track.Looped = false
 	track:Play(Animation.Settings.ActionFade, 1, speed or 1)
 
 	if position then
 		track.TimePosition = position
 	end
+
+	return track
+end
+
+function Animation:PlayReaction(key: string): AnimationTrack?
+	if self.Culled or self.Limp then return nil end
+
+	local track = self:Track(key)
+	if not track then return nil end
+
+	self:ClearLayer(Animation.Settings.ReactionPriority, track)
+	self:ClearLayer(Animation.Settings.ActionPriority)
+
+	track.Priority = Animation.Settings.ReactionPriority
+	track.Looped = false
+	track:Play(Animation.Settings.ActionFade)
 
 	return track
 end
@@ -183,6 +212,26 @@ function Animation:Blocked(key: string): boolean
 	return blocked
 end
 
+function Animation:Engaged(): boolean
+	local mob = self.Mob
+
+	if mob.Config.stance then
+		return mob.Blackboard.Stanced == true
+	end
+
+	return mob.Target ~= nil
+end
+
+function Animation:Variant(key: string): string
+	local engaged = Animation.Settings.EngagedPrefix .. key
+
+	if self:Engaged() and self.Mob.Config.animations[engaged] ~= nil then
+		return engaged
+	end
+
+	return key
+end
+
 function Animation:StopAll(fade: number?)
 	for _, track in self.Tracks do
 		if track.IsPlaying then
@@ -208,33 +257,43 @@ local function forwardKey(config, speed: number, current: string?): string
 	return if speed >= midpoint + margin then "Run" else "Walk"
 end
 
-local function locomotionKey(mob, planar: Vector3, current: string?): string
+local function baseKey(key: string): string
+	local prefix = Animation.Settings.EngagedPrefix
+	return if string.sub(key, 1, #prefix) == prefix then string.sub(key, #prefix + 1) else key
+end
+
+local function locomotionKey(animation, planar: Vector3, current: string?): string
+	local mob = animation.Mob
 	local speed = planar.Magnitude
 	local config = mob.Config
 
-	if speed < Animation.Settings.IdleThreshold then return "Idle" end
+	if speed < Animation.Settings.IdleThreshold then return animation:Variant("Idle") end
 
 	local relative = mob.Root.CFrame:VectorToObjectSpace(planar)
 	local forward, side = -relative.Z, relative.X
 	local key
 
 	if forward >= math.abs(side) then
-		key = forwardKey(config, speed, current)
+		key = forwardKey(config, speed, current and baseKey(current))
 	elseif -forward >= math.abs(side) then
 		key = "WalkBack"
 	else
 		key = if side > 0 then "WalkRight" else "WalkLeft"
 	end
 
+	local variant = animation:Variant(key)
+	if variant ~= key then return variant end
+
 	if config.animations[key] == nil then
-		return "Walk"
+		return animation:Variant("Walk")
 	end
 
 	return key
 end
 
 local function playbackSpeed(config, key: string, speed: number): number
-	local reference = PLAYBACK_REFERENCE[key] and config[PLAYBACK_REFERENCE[key]]
+	local base = baseKey(key)
+	local reference = PLAYBACK_REFERENCE[base] and config[PLAYBACK_REFERENCE[base]]
 	if not reference or reference <= 0 then return 1 end
 
 	local range = Animation.Settings.PlaybackRange
@@ -249,7 +308,7 @@ function Animation:UpdateLocomotion()
 	local mob = self.Mob
 	local velocity = mob.Root.AssemblyLinearVelocity
 	local planar = Vector3.new(velocity.X, 0, velocity.Z)
-	local key = locomotionKey(mob, planar, self.Locomotion)
+	local key = locomotionKey(self, planar, self.Locomotion)
 
 	if key ~= self.Locomotion then
 		local blocked = self:Blocked(key)
@@ -266,7 +325,7 @@ function Animation:UpdateLocomotion()
 		local track = self:Track(key)
 
 		if track then
-			track.Priority = if key == "Idle" then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Movement
+			track.Priority = if baseKey(key) == "Idle" then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Movement
 			track.Looped = true
 			track:Play(Animation.Settings.LocomotionFade)
 		end
