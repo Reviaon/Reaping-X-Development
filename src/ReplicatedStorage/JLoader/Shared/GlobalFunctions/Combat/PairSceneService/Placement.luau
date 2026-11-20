@@ -259,7 +259,15 @@ function Placement.MeasureBounds(definition, rig: Model): ({ Min: Vector3, Max: 
 
 	local low, high = Vector3.one * math.huge, -Vector3.one * math.huge
 
-	local function sweep(name: string?, rootAt: CFrame)
+	local function sweep(name: (string | { string })?, rootAt: CFrame)
+		if typeof(name) == "table" then
+			for _, each in name do
+				sweep(each, rootAt)
+			end
+
+			return
+		end
+
 		local animation = name and library:FindFirstChild(name, true)
 		if not animation then return end
 
