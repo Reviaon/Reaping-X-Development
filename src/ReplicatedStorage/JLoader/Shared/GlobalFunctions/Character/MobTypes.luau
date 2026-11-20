@@ -99,6 +99,34 @@ export type Tempo = {
 	setup: TempoSetup | false,
 }
 
+export type Stance = {
+	range: number,
+	leave: number,
+	enter: string,
+	exit: string,
+	enter_speed: number,
+	exit_speed: number,
+	blend: number,
+}
+
+export type Nip = {
+	first: { number },
+	every: { number },
+	damage: number,
+	animation: string?,
+	visual: string?,
+	windup: number,
+	recovery: number,
+	reach: number,
+	speed: number,
+	approach: number,
+}
+
+export type Lurk = {
+	band: { number },
+	nip: Nip,
+}
+
 export type Breather = {
 	Kind: string,
 	Side: number,
