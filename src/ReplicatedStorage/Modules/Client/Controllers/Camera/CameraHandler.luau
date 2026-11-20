@@ -371,10 +371,18 @@ local function sceneProfile(name: string?)
 end
 
 local function findFocus(controller): (Model?, {}?)
-	local partner, name = controller.PairSceneService.PartnerOf(controller.Character)
+	local character = controller.Character
+	local scenes = controller.PairSceneService
+	local partner, name = scenes.PartnerOf(character)
 
 	if partner and getTorso(partner) then
 		return partner, sceneProfile(name)
+	end
+
+	local id = character and character:GetAttribute(scenes.Settings.SceneAttribute)
+
+	if typeof(id) == "string" then
+		return nil, sceneProfile(string.match(id, "^(.-)#"))
 	end
 
 	return nil, nil
@@ -509,6 +517,8 @@ function CameraHandler:UpdateOrigin(DeltaTime, controller)
 
 	if partner then
 		target = torso.Position:Lerp(getTorso(partner).Position, profile.Blend) + height
+	elseif profile then
+		target = torso.Position + height
 	end
 
 	local returning = Camera.CameraSubject == origin and (origin.Position - home).Magnitude > DynamicLibrary.SettleDistance
