@@ -6,6 +6,11 @@ return function(B)
 		}),
 
 		B.Sequence({
+			B.Condition("StanceShift", { exit = true }),
+			B.State("Stance"),
+		}),
+
+		B.Sequence({
 			B.Condition("Fleeing"),
 			B.State("Flee"),
 		}),
@@ -33,6 +38,10 @@ return function(B)
 					B.State("Dash", { args = { kind = "sidestep" }, force = true }),
 				}),
 				B.Sequence({
+					B.Condition("Lurking"),
+					B.State("Lurk"),
+				}),
+				B.Sequence({
 					B.Condition("Scattering"),
 					B.State("Dash", { args = { kind = "scatter" } }),
 				}),
@@ -54,6 +63,10 @@ return function(B)
 					B.Condition("AttackReady"),
 					B.Condition("LaneClear"),
 					B.State("Attack", { args = { ability = true } }),
+				}),
+				B.Sequence({
+					B.Condition("StanceShift"),
+					B.State("Stance"),
 				}),
 				B.Sequence({
 					B.Condition("BreatherDue", { kind = "dash" }),
