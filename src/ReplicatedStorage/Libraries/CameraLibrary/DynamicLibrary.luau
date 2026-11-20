@@ -45,6 +45,9 @@ return {
 		TackleGrappleBack = {},
 		PushStruggle = {},
 		PushGrab = {},
+		SnakeConstrict = { Blend = 0 },
+		SnakeCrush = { Blend = 0 },
+		SnakeLatch = { Blend = 0 },
 	},
 
 	Sway = {
