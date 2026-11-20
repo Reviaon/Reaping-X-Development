@@ -274,9 +274,10 @@ function Hit.Emit(Info)
 
 	Hit.Shake(victim, Info.Attacker)
 
+	local still = rawget(Info, "Still")
 	local highlight = Hit.Highlight(victim)
-	local effect = Hit.SpawnParticles(victim, Info.Effect, rawget(Info, "Point"), rawget(Info, "Normal"))
-	local track = Hit.PlayReaction(Info, victim)
+	local effect = if still then nil else Hit.SpawnParticles(victim, Info.Effect, rawget(Info, "Point"), rawget(Info, "Normal"))
+	local track = if still then nil else Hit.PlayReaction(Info, victim)
 
 	Hit.Freeze(track, CombatConfig:ResolveHitStop(rawget(Info, "WeaponId"), rawget(Info, "ComboIndex")))
 
