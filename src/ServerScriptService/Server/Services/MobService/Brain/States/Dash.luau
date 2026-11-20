@@ -51,7 +51,7 @@ local function animate(mob, dash, data, direction: Vector3, now: number)
 	if animation and (animation ~= data.Animation or now - (data.AnimatedAt or 0) >= REANIMATE) then
 		data.Animation = animation
 		data.AnimatedAt = now
-		mob.Animation:PlayAction(animation, dash.playback)
+		mob.Animation:PlayAction(mob.Animation:Variant(animation), dash.playback)
 		Attacks.Shot(mob, dash.visual, dash.playback)
 	end
 end
@@ -129,7 +129,12 @@ local function startFlank(mob, dash, data): boolean
 	if not look then return false end
 
 	local radius = flank.radius or mob:Setting("attack_range")
-	local run = random:NextNumber() < (flank.run_chance or 0)
+	local grounded = flank.posture == "ground" and mob.Config.stance ~= nil
+	local run = grounded or random:NextNumber() < (flank.run_chance or 0)
+
+	if grounded then
+		mob.Blackboard.Stanced = false
+	end
 	local offset = planar(mob.Root.Position - root.Position)
 	local sign = if angleFrom(look, offset) >= 0 then 1 else -1
 
@@ -164,10 +169,15 @@ local function stepFlank(mob, dash, data): boolean
 			local outward = if offset.Magnitude > 1e-3 then offset.Unit else -planar(mob.Root.CFrame.LookVector)
 			local point = center + outward * flank.Radius
 
-			mob:Face(center)
+			if flank.Run then
+				mob:Unface()
+			else
+				mob:Face(center)
+				animate(mob, dash, data, point - mob.Root.Position, now)
+			end
+
 			mob:MoveTo(point, dash.speed)
 			mob:Burst(dash.speed)
-			animate(mob, dash, data, point - mob.Root.Position, now)
 
 			return false
 		end
