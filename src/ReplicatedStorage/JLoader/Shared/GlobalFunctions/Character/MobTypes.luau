@@ -127,6 +127,53 @@ export type Lurk = {
 	nip: Nip,
 }
 
+export type Alert = {
+	animation: string,
+	speed: number?,
+	hold: number?,
+	visual: string?,
+	cooldown: number,
+}
+
+export type Flight = {
+	altitude: number,
+	climb: number,
+	descent: number,
+	radius: number,
+	step: number,
+	speed: string | number,
+	land: string,
+	land_lift: number,
+	pace: number?,
+}
+
+export type CryStun = {
+	range: number,
+	duration: number,
+	start: string?,
+	loop: string?,
+}
+
+export type Cry = {
+	start: string,
+	loop: string,
+	finish: string,
+	air: string?,
+	call: number,
+	hold: { number },
+	air_hold: { number }?,
+	every: { number },
+	radius: number,
+	kinds: { string }?,
+	stun: CryStun?,
+	shake: string?,
+}
+
+export type Swoop = {
+	first: { number },
+	every: { number },
+}
+
 export type Breather = {
 	Kind: string,
 	Side: number,
