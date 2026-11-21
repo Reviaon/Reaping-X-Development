@@ -37,6 +37,11 @@ return {
 	Asleep = { Type = "boolean", Owner = "Conditions/Asleep, States/Sleep, States/Wake" },
 	Sleeper = { Type = "boolean", Owner = "Conditions/Asleep" },
 	Stanced = { Type = "boolean", Owner = "States/Stance, States/Dash" },
+	Alerted = { Type = "Instance", Owner = "Conditions/Alerting, States/Alert" },
+	AlertedAt = { Type = "number", Owner = "Conditions/Alerting, States/Alert" },
+	CryAt = { Type = "number", Owner = "States/Cry, States/Land" },
+	SwoopAt = { Type = "number", Owner = "Conditions/SwoopDue" },
+	SwoopFrom = { Type = "number", Owner = "Conditions/SwoopDue" },
 
 	AimWindow = { Type = "table", Owner = "Senses/Awareness/Draw" },
 	Sidestep = { Type = "table", Owner = "Senses/Awareness/Sidestep" },
