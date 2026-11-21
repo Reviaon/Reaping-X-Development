@@ -79,8 +79,9 @@ local function buildRoot(model: Model, base: BasePart, config)
 
 	local rootSize = size * (rigConfig.root_scale or settings.DefaultRootScale)
 	local hipHeight = size.Y * (rigConfig.hip_ratio or settings.DefaultHipRatio)
-	local center = Vector3.new(bounds.Position.X, lowestPoint(model) + hipHeight + rootSize.Y / 2, bounds.Position.Z)
-	local look = flat(base.CFrame.LookVector)
+	local floor = if rigConfig.floor ~= nil then base.Position.Y - rigConfig.floor * (config.scale or 1) else lowestPoint(model)
+	local center = Vector3.new(bounds.Position.X, floor + hipHeight + rootSize.Y / 2, bounds.Position.Z)
+	local look = flat((base.CFrame * CFrame.Angles(0, math.rad(rigConfig.turn or 0), 0)).LookVector)
 
 	local root = Instance.new("Part")
 	root.Name = settings.RootName

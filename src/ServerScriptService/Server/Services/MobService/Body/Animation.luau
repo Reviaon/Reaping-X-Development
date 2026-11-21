@@ -2,6 +2,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
 
+local Attacks = require("../Combat/Attacks")
+local Flight = require("./Flight")
+
 local Animation = {}
 Animation.__index = Animation
 
@@ -19,6 +22,7 @@ Animation.Settings = {
 	EngagedPrefix = "Engaged",
 	ActionPriority = Enum.AnimationPriority.Action,
 	ReactionPriority = Enum.AnimationPriority.Action2,
+	ShotGap = 0.25,
 }
 
 local resolved = {}
@@ -81,6 +85,8 @@ function Animation.new(mob)
 		Mob = mob,
 		Animator = mob.Humanoid:FindFirstChildOfClass("Animator"),
 		Tracks = {},
+		Looping = {},
+		ShotAt = {},
 		ClearAt = {},
 		Locomotion = nil,
 		Culled = false,
@@ -102,6 +108,30 @@ function Animation:Track(key: string): AnimationTrack?
 	self.Tracks[key] = track
 
 	return track
+end
+
+function Animation:Shot(visual: string, speed: number)
+	local now = os.clock()
+	if now - (self.ShotAt[visual] or -math.huge) < Animation.Settings.ShotGap then return end
+
+	self.ShotAt[visual] = now
+	Attacks.Shot(self.Mob, visual, speed)
+end
+
+function Animation:Visual(key: string, track: AnimationTrack)
+	local mob = self.Mob
+	local visual = mob.Config.clip_visuals and mob.Config.clip_visuals[key]
+	if not visual then return end
+
+	self:Shot(visual, track.Speed)
+
+	if self.Looping[track] then return end
+
+	self.Looping[track] = track.DidLoop:Connect(function()
+		if track.IsPlaying and not self.Culled and not self.Limp then
+			self:Shot(visual, track.Speed)
+		end
+	end)
 end
 
 function Animation:ClearLayer(priority: Enum.AnimationPriority, keep: AnimationTrack?)
@@ -127,6 +157,8 @@ function Animation:PlayAction(key: string, speed: number?, position: number?): A
 	if position then
 		track.TimePosition = position
 	end
+
+	self:Visual(key, track)
 
 	return track
 end
@@ -215,6 +247,10 @@ end
 function Animation:Engaged(): boolean
 	local mob = self.Mob
 
+	if mob.Config.flight then
+		return Flight.Airborne(mob)
+	end
+
 	if mob.Config.stance then
 		return mob.Blackboard.Stanced == true
 	end
@@ -250,8 +286,19 @@ local PLAYBACK_REFERENCE = {
 	Run = "run_speed",
 }
 
-local function forwardKey(config, speed: number, current: string?): string
-	local midpoint = (config.walk_speed + config.run_speed) / 2
+local function paces(mob): { [string]: number }
+	local config = mob.Config
+	local flight = config.flight
+
+	if flight and flight.pace and Flight.Airborne(mob) then
+		return { walk_speed = flight.pace, run_speed = flight.pace * 2 }
+	end
+
+	return { walk_speed = config.walk_speed, run_speed = config.run_speed }
+end
+
+local function forwardKey(pace: { [string]: number }, speed: number, current: string?): string
+	local midpoint = (pace.walk_speed + pace.run_speed) / 2
 	local margin = if current == "Run" then -Animation.Settings.RunHysteresis else Animation.Settings.RunHysteresis
 
 	return if speed >= midpoint + margin then "Run" else "Walk"
@@ -274,7 +321,7 @@ local function locomotionKey(animation, planar: Vector3, current: string?): stri
 	local key
 
 	if forward >= math.abs(side) then
-		key = forwardKey(config, speed, current and baseKey(current))
+		key = forwardKey(paces(mob), speed, current and baseKey(current))
 	elseif -forward >= math.abs(side) then
 		key = "WalkBack"
 	else
@@ -291,9 +338,10 @@ local function locomotionKey(animation, planar: Vector3, current: string?): stri
 	return key
 end
 
-local function playbackSpeed(config, key: string, speed: number): number
+local function playbackSpeed(mob, key: string, speed: number): number
+	local config = mob.Config
 	local base = baseKey(key)
-	local reference = PLAYBACK_REFERENCE[base] and config[PLAYBACK_REFERENCE[base]]
+	local reference = PLAYBACK_REFERENCE[base] and paces(mob)[PLAYBACK_REFERENCE[base]]
 	if not reference or reference <= 0 then return 1 end
 
 	local range = Animation.Settings.PlaybackRange
@@ -328,13 +376,14 @@ function Animation:UpdateLocomotion()
 			track.Priority = if baseKey(key) == "Idle" then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Movement
 			track.Looped = true
 			track:Play(Animation.Settings.LocomotionFade)
+			self:Visual(key, track)
 		end
 	end
 
 	local track = self.Tracks[key]
 	if not track then return end
 
-	local speed = playbackSpeed(mob.Config, key, planar.Magnitude)
+	local speed = playbackSpeed(mob, key, planar.Magnitude)
 
 	if math.abs(track.Speed - speed) > Animation.Settings.PlaybackEpsilon then
 		track:AdjustSpeed(speed)
@@ -362,11 +411,16 @@ function Animation:SetLimp(limp: boolean)
 end
 
 function Animation:Destroy()
+	for _, connection in self.Looping do
+		connection:Disconnect()
+	end
+
 	for _, track in self.Tracks do
 		track:Stop(0)
 		track:Destroy()
 	end
 
+	table.clear(self.Looping)
 	table.clear(self.Tracks)
 	self.Locomotion = nil
 end

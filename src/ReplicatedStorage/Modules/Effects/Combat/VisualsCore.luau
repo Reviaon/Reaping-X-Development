@@ -11,6 +11,8 @@ local DEFAULT_LIFETIME = 3
 
 local DEFAULT_PREFIXES = { "Attack", "Hit" }
 local DEFAULT_KNOCK_INTERVAL = 0.08
+local GROUND_LIFT = 3
+local GROUND_REACH = 80
 local RIG_ATTRIBUTE = "EquippedWeapon"
 
 local function ReadAssets(controller, settings)
@@ -113,6 +115,46 @@ local function ApplyRecolor(effect: Instance, recolor)
 			descendant.Color = ColorSequence.new(recolor.Color)
 		end
 	end
+end
+
+--@ A `Ground` spec drops the asset's pivot to that many studs above the floor under it, so dust authored on the ground stays there while the host flies
+local function GroundIgnore(): Instance?
+	local world = workspace:FindFirstChild("World")
+	return world and world:FindFirstChild("Live")
+end
+
+local function Grounded(pivot: CFrame, height: number, ignore: { Instance? }): CFrame
+	local filter = {}
+
+	for _, instance in ignore do
+		if instance then
+			table.insert(filter, instance)
+		end
+	end
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = filter
+
+	local origin = pivot.Position + Vector3.yAxis * GROUND_LIFT
+	local hit = workspace:Raycast(origin, Vector3.yAxis * -GROUND_REACH, params)
+	if not hit then return pivot end
+
+	return pivot + Vector3.yAxis * (hit.Position.Y + height - pivot.Y)
+end
+
+--@ A grounded effect that rides its host follows it along the floor instead of welding, so it neither trails behind nor sinks as the host lands
+local function FollowGround(effect, host: Instance, offset: CFrame, height: number, ignore: { Instance? })
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local model = effect.Effect
+		if not model or not model.Parent or not host.Parent then
+			connection:Disconnect()
+			return
+		end
+
+		effect:SetCFrame(Grounded(host:GetPivot() * offset, height, ignore))
+	end)
 end
 
 local function CancelList(spec, settings)
@@ -283,9 +325,18 @@ function VisualsCore.SpawnEffect(controller, settings, asset, host, spec)
 		pivot = pivot * spec.CFrame
 	end
 
+	local ground = if typeof(spec.Ground) == "number" then spec.Ground else nil
+	local ignore = { character, attack_vfx.Effect, GroundIgnore() }
+
+	if ground then
+		pivot = Grounded(pivot, ground, ignore)
+	end
+
 	attack_vfx:SetCFrame(pivot)
 
-	if spec.Weld ~= false then
+	if ground and spec.Weld ~= false then
+		FollowGround(attack_vfx, host, host:GetPivot():ToObjectSpace(pivot), ground, ignore)
+	elseif spec.Weld ~= false then
 		attack_vfx:Weld(host)
 	end
 

@@ -7,6 +7,7 @@ return {
 
 	walk_speed = 9, --@ Wander, return and circle speed
 	run_speed = 26, --@ Chase speed
+	chase_speed = "run_speed", --@ Speed key (or studs/s) Chase runs at
 	acceleration = 40,
 	deceleration = 46,
 	turn_speed = 6, --@ Radians per second
@@ -211,9 +212,14 @@ return {
 	evade = false, --@ Prey running from predators (Prey tree): { range, safe, watch, watch_time, distance, speed, refresh, startle, fan, predators }; runs inside range until all are past safe, then watches one inside watch for watch_time; players and whoever hurt it always count
 	sleep = false, --@ Prey sleeping at home (Prey tree): { chance, wake_range, wake_speed, resettle, blend, animations = { lie, loop, wake } }
 	lurk = false, --@ While its target is held in another pair scene and it isn't (Hunter tree, `States/Lurk`): { band = { min, max } studs from the target's body, nip = { first, every, damage, animation, visual, windup, recovery, reach, speed, approach } }; it keeps to the band and now and then slides in to `reach`, bites (damage at `windup`) and backs out
+	alert = false, --@ A clip it plays on getting a fresh target, before anything else (Hunter tree, `States/Alert`): { animation, speed, hold, visual, cooldown }; a new target inside cooldown seconds of the last alert skips it
+	swoop = false, --@ The Alarm tree's attack run: { first, every } seconds (rolled) between runs; it lands, walks in at chase_speed and throws one `attack`, then takes off again
+	flight = false, --@ Lifting off the ground (`Body/Flight`, the Alarm tree): { altitude, climb, descent, radius, step, speed, land, land_lift, pace }; pace is the studs/s its flight clips play at 1x, so they speed up with it; while lifted the `Engaged<Key>` clips are its flight set
+	cry = false, --@ The alarm call (Alarm tree, `States/Cry`): { start, loop, finish, air, call, hold, air_hold, every, radius, kinds, stun = { range, duration, start, loop }, shake }; while it cries the bird carries `IsCrying` and fires the `shake` visuals method; at `call` seconds every mob within radius (of `kinds`, nil for all) turns on its target and players within stun.range are stunned and cower
 	stance = false, --@ A combat posture it shifts into on getting a target and out of on losing it (Hunter tree, `States/Stance`): { enter, exit, enter_speed, exit_speed, blend }; while in it `Engaged<Key>` clips replace locomotion and hurt clips
 
 	visuals = nil, --@ Effects module path for combo visuals
+	clip_visuals = nil, --@ Animation key -> `visuals` method fired when that clip starts and every time it loops (`Body/Animation:Visual`), at the clip's playback speed; covers locomotion (`Idle`, `Run`, `EngagedIdle`...), idle actions and state clips
 	footsteps = false, --@ Camera shake for players near it while a locomotion clip plays (client StepShakeHandler): { gaits = { [animations key] = { at, shake } }, range, min_weight }
 	notice = { --@ Shown over its head the moment it notices a player (aggro, or prey startled by one); false shows nothing
 		visual = "AttentionVfx", --@ Asset under Storage.Particles.UniversalVFX
