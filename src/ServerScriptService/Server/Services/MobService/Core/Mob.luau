@@ -5,6 +5,7 @@ local Animation = require("../Body/Animation")
 local Blackboard = require("../Brain/Blackboard")
 local Healing = require("../Body/Healing")
 local Attacks = require("../Combat/Attacks")
+local Flight = require("../Body/Flight")
 local Inspect = require("../Inspect")
 local Motion = require("../Body/Motion")
 local Notice = require("../Senses/Notice")
@@ -54,6 +55,7 @@ function Mob.new(kind, model: Model, home: Vector3)
 		Stopping = false,
 		Halted = false,
 		Arc = nil,
+		Altitude = 0,
 		Speed = 0,
 		DesiredSpeed = 0,
 		FacePoint = nil,
@@ -342,6 +344,7 @@ end
 function Mob:Step(dt: number)
 	if self.Dead then return end
 
+	Flight.Step(self, dt)
 	Motion.Step(self, dt)
 end
 

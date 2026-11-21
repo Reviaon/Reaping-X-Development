@@ -34,6 +34,10 @@ return function(B)
 					B.State("Rally"),
 				}),
 				B.Sequence({
+					B.Condition("Alerting"),
+					B.State("Alert"),
+				}),
+				B.Sequence({
 					B.Condition("ProjectileIncoming"),
 					B.State("Dash", { args = { kind = "sidestep" }, force = true }),
 				}),

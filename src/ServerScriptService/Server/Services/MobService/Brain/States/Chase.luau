@@ -63,11 +63,11 @@ return {
 
 		if data.MovedAt and now - data.MovedAt < REFRESH then return end
 
-		local lead = math.min(mob:Setting("chase_lead"), distance / math.max(mob:Setting("run_speed"), 1))
+		local lead = math.min(mob:Setting("chase_lead"), distance / math.max(mob:Setting(mob:Setting("chase_speed")), 1))
 		local waypoint = Path.Steer(mob, root.Position, mob:GetTarget())
 
 		data.MovedAt = now
-		mob:MoveTo(waypoint or mob:EngagePoint(mob:LeadPoint(lead), Attacks.StandOff(spec)), "run_speed")
+		mob:MoveTo(waypoint or mob:EngagePoint(mob:LeadPoint(lead), Attacks.StandOff(spec)), mob:Setting("chase_speed"))
 	end,
 
 	Exit = function(mob)

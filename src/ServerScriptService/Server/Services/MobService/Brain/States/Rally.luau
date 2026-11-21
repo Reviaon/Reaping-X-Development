@@ -1,5 +1,6 @@
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local Attacks = require("../../Combat/Attacks")
+local Call = require("../../Combat/Call")
 
 local FALLBACK_LENGTH = 3
 local SCREECHING = "IsScreeching"
@@ -8,13 +9,7 @@ local function call(mob, rally)
 	local target = mob:GetTarget()
 	if not target then return end
 
-	for other in Jloader.GetService("MobService"):GetMobs() do
-		if other == mob or other.Dead or other.Name ~= mob.Name or not other.Root then continue end
-
-		if (other.Root.Position - mob.Root.Position).Magnitude <= rally.radius then
-			other:Provoke(target)
-		end
-	end
+	Call.Provoke(mob, target, rally.radius, { mob.Name })
 end
 
 return {
