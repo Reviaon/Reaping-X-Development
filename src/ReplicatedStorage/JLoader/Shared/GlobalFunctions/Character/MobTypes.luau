@@ -133,25 +133,102 @@ export type Alert = {
 	hold: number?,
 	visual: string?,
 	cooldown: number,
+	loop: string?,
+	loop_hold: { number }?,
+}
+
+export type ClipVisual = string | {
+	visual: string,
+	every: number?,
+	below: number?,
 }
 
 export type Flight = {
 	altitude: number,
+	bob: { number }?,
 	climb: number,
 	descent: number,
-	radius: number,
-	step: number,
+	band: { number },
 	speed: string | number,
+	dart_speed: (string | number)?,
+	agility: number?,
+	hold: { number }?,
+	moves: { [string]: number },
+	pursue_beyond: number?,
+	pursue_speed: (string | number)?,
 	land: string,
 	land_lift: number,
+	land_settle: number?,
 	pace: number?,
 }
 
-export type CryStun = {
-	range: number,
-	duration: number,
+export type RagdollSegment = {
+	name: string,
+	from: string?,
+	to: string?,
+	chain: { string }?,
+	parent: string?,
+	across: (number | Vector2 | { number } | { Vector2 })?,
+	padding: number?,
+	round: boolean?,
+	drives: { string }?,
+	cone: number?,
+	twist: (number | { number })?,
+	friction: number?,
+}
+
+export type Ragdoll = {
+	knockdown: boolean?,
+	segments: { RagdollSegment },
+}
+
+export type Offer = {
+	action: string,
+	object: string?,
+	reach: number,
+	offset: Vector3?,
+	press: number?,
+}
+
+export type Gesture = {
 	start: string?,
 	loop: string?,
+	duration: number,
+	spacing: number?,
+	side: number?,
+}
+
+export type Answer = Offer & Gesture
+
+export type Greet = {
+	range: number,
+	circle: { number },
+	flight: { [string]: any }?,
+	distance: number,
+	startup: string?,
+	bow: string?,
+	hold: { number },
+	answer: Answer?,
+	follow: { number },
+	follow_distance: number,
+	follow_altitude: number,
+	fly_chance: number,
+	cooldown: { number },
+	give_up: number,
+}
+
+export type Startle = {
+	range: number,
+	near: number,
+	duration: { number },
+	altitude: number,
+	speed: string | number,
+	distance: number,
+}
+
+export type Mourn = {
+	radius: number,
+	kinds: { string }?,
 }
 
 export type Cry = {
@@ -159,13 +236,13 @@ export type Cry = {
 	loop: string,
 	finish: string,
 	air: string?,
+	air_finish: string?,
 	call: number,
 	hold: { number },
 	air_hold: { number }?,
 	every: { number },
 	radius: number,
 	kinds: { string }?,
-	stun: CryStun?,
 	shake: string?,
 }
 
