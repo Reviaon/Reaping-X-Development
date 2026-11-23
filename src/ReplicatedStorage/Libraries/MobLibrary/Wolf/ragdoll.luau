@@ -1,26 +1,32 @@
 --[[@
 	**Death ragdoll**: built by `BoneRagdollService` when it dies
-	- **A segment** spans bone `from` to bone `to`, hangs off `parent` at `from`, and places the bones in `drives`
+	- **A segment** spans bone `from` to bone `to`, hangs off `parent` at `from`, and places the bones in `drives`; a `chain` is one segment per bone in the list, each hanging off the last
 	- **Sizes** are template studs; the model's scale applies on top
 	- **Limits:** `cone` and `twist` are degrees from the pose at death
+	- **Body:** hips, chest, neck and head; the jaw hangs and the ears flop
+	- **Legs** bend at every joint down to the paw
+	- **Tail:** one link per tail bone
 ]]
-return {
+local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
+
+local ragdoll: MobTypes.Ragdoll = {
 	segments = {
 		{ name = "Hips", from = "Spine1", to = "Bone7", across = Vector2.new(2.4, 2.8), round = true, drives = { "TorsoControl" } },
-		{ name = "Chest", parent = "Hips", from = "Spine1", to = "Spine3", across = Vector2.new(2.6, 3.2), round = true, drives = { "Spine2" }, cone = 20, twist = 15 },
-		{ name = "Head", parent = "Chest", from = "Neck", to = "Tongue2", across = Vector2.new(1.6, 1.8), padding = 1.2, drives = { "Neck" }, cone = 40, twist = 25 },
+		{ name = "Chest", parent = "Hips", from = "Spine1", to = "Spine3", across = Vector2.new(2.6, 3.2), round = true, drives = { "Spine2" }, cone = 30, twist = 20 },
+		{ name = "Neck", parent = "Chest", from = "Spine3", to = "Neck", across = 2, round = true, drives = { "Spine3" }, cone = 35, twist = 25 },
+		{ name = "Head", parent = "Neck", from = "Neck", to = "Tongue2", across = Vector2.new(1.6, 1.8), padding = 1.2, drives = { "Neck" }, cone = 45, twist = 30 },
+		{ name = "Jaw", parent = "Head", from = "Bone18", to = "Tongue2", across = Vector2.new(1, 0.5), padding = 0.6, drives = { "Bone18" }, cone = 20, twist = 5 },
+		{ name = "EarR", parent = "Head", from = "Tail.R", to = "Tail1.R", across = Vector2.new(0.7, 0.2), padding = 0.4, drives = { "Tail.R" }, cone = 45, twist = 20 },
+		{ name = "EarL", parent = "Head", from = "Tail.L", to = "Tail1.L", across = Vector2.new(0.7, 0.2), padding = 0.4, drives = { "Tail.L" }, cone = 45, twist = 20 },
 
-		{ name = "ArmR", parent = "Chest", from = "Shoulder.R", to = "Arm.R", across = 0.9, drives = { "Shoulder.R" }, cone = 50, twist = 15 },
-		{ name = "PawR", parent = "ArmR", from = "Arm.R", to = "Fot.R", across = 0.7, padding = 0.6, drives = { "Arm.R" }, cone = 50, twist = 5 },
-		{ name = "ArmL", parent = "Chest", from = "Shoulder.L", to = "Arm.L", across = 0.9, drives = { "Shoulder.L" }, cone = 50, twist = 15 },
-		{ name = "PawL", parent = "ArmL", from = "Arm.L", to = "Fot.L", across = 0.7, padding = 0.6, drives = { "Arm.L" }, cone = 50, twist = 5 },
+		{ name = "ArmR", parent = "Chest", chain = { "Shoulder.R", "Arm.R", "Fot.R", "Fingers3.R" }, across = { 0.9, 0.7 }, cone = 65, twist = 20 },
+		{ name = "ArmL", parent = "Chest", chain = { "Shoulder.L", "Arm.L", "Fot.L", "Fingers3.L" }, across = { 0.9, 0.7 }, cone = 65, twist = 20 },
 
-		{ name = "ThighR", parent = "Hips", from = "Thigh.R", to = "Shin.R", across = 1.1, drives = { "Thigh.R" }, cone = 50, twist = 15 },
-		{ name = "ShinR", parent = "ThighR", from = "Shin.R", to = "Toe.R", across = 0.7, padding = 0.8, drives = { "Shin.R", "Toe.R" }, cone = 50, twist = 5 },
-		{ name = "ThighL", parent = "Hips", from = "Thigh.L", to = "Shin.L", across = 1.1, drives = { "Thigh.L" }, cone = 50, twist = 15 },
-		{ name = "ShinL", parent = "ThighL", from = "Shin.L", to = "Toe.L", across = 0.7, padding = 0.8, drives = { "Shin.L", "Toe.L" }, cone = 50, twist = 5 },
+		{ name = "LegR", parent = "Hips", chain = { "Thigh.R", "Shin.R", "Toe.R", "BackToes3.R" }, across = { 1.1, 0.7 }, cone = 65, twist = 20 },
+		{ name = "LegL", parent = "Hips", chain = { "Thigh.L", "Shin.L", "Toe.L", "BackToes3.L" }, across = { 1.1, 0.7 }, cone = 65, twist = 20 },
 
-		{ name = "TailBase", parent = "Hips", from = "Bone7", to = "Tail4", across = 0.8, drives = { "Bone7" }, cone = 35, twist = 10 },
-		{ name = "TailTip", parent = "TailBase", from = "Tail4", to = "Tail8", across = 0.6, drives = { "Tail4" }, cone = 35, twist = 10 },
+		{ name = "Tail", parent = "Hips", chain = { "Bone7", "Tail2", "Tail3", "Tail4", "Tail5", "Tail6", "Tail7", "Tail8" }, across = { 0.8, 0.5 }, cone = 45, twist = 15 },
 	},
 }
+
+return ragdoll

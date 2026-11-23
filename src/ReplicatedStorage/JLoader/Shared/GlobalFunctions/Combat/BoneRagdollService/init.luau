@@ -23,10 +23,10 @@ function BoneRagdollService.CanKnockdown(model: Model): boolean
 	return RunService:IsServer() and Knockdown.Can(model)
 end
 
-function BoneRagdollService.Knockdown(model: Model, duration: number, velocity: Vector3, spin: number?): boolean
+function BoneRagdollService.Knockdown(model: Model, duration: number, velocity: Vector3, spin: number?, gravity: number?): boolean
 	assert(RunService:IsServer(), "BoneRagdollService.Knockdown runs on the server")
 
-	return Knockdown.Start(model, duration, velocity, spin)
+	return Knockdown.Start(model, duration, velocity, spin, gravity)
 end
 
 function BoneRagdollService.Start()

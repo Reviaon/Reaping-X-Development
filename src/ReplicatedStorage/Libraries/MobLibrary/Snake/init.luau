@@ -8,6 +8,7 @@
 	  - `abilities/crush`: it drops the player to the floor and chokes them, then lets go and they seize on the ground
 	  - `lurk`: after the crush it keeps its distance from the seizing player and nips at them
 	  - `tempo`: a bite or two, then it repositions round the player or backs off
+	  - `ragdoll`: the body that ragdolls when it dies, or when a finisher or push knocks it down
 	  - `animations`: clip names; the `Engaged` keys are the stance set
 	- **Brain:** the shared `Hunter` tree
 	- **This module:** identity, body and small settings; anything left out comes from `MobService/Defaults`

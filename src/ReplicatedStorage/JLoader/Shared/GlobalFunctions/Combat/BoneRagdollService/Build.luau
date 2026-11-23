@@ -1,4 +1,5 @@
 local CollectionService = game:GetService("CollectionService")
+local PhysicsService = game:GetService("PhysicsService")
 
 local Config = require("./Config")
 
@@ -46,12 +47,63 @@ local function across(value: unknown, scale: number): Vector2
 	return Vector2.new(Config.Thickness, Config.Thickness) * scale
 end
 
-local function twistOf(value: unknown): (number, number)
+local function twistOf(value: any): (number, number)
 	if typeof(value) == "table" then return value[1], value[2] end
 
 	local twist = if typeof(value) == "number" then value else Config.Twist
 
 	return -twist, twist
+end
+
+local function taper(value: any, index: number, links: number): any
+	if typeof(value) ~= "table" then return value end
+
+	local first, last = value[1], value[2] or value[1]
+	local alpha = if links > 1 then (index - 1) / (links - 1) else 0
+
+	if typeof(first) == "Vector2" and typeof(last) == "Vector2" then return first:Lerp(last, alpha) end
+	if typeof(first) == "number" and typeof(last) == "number" then return first + (last - first) * alpha end
+
+	return first
+end
+
+local function expand(specs)
+	local flat = {}
+
+	for _, spec in specs do
+		local chain = spec.chain
+
+		if typeof(chain) ~= "table" then
+			table.insert(flat, spec)
+			continue
+		end
+
+		local links = #chain - 1
+
+		for index = 1, links do
+			local link = table.clone(spec)
+			local drives = { chain[index] }
+
+			if index == 1 then
+				for _, extra in spec.drives or {} do
+					table.insert(drives, extra)
+				end
+			end
+
+			link.chain = nil
+			link.name = `{spec.name}{index}`
+			link.from = chain[index]
+			link.to = chain[index + 1]
+			link.parent = if index == 1 then spec.parent else `{spec.name}{index - 1}`
+			link.drives = drives
+			link.across = taper(spec.across, index, links)
+			link.padding = if index == links then spec.padding else nil
+
+			table.insert(flat, link)
+		end
+	end
+
+	return flat
 end
 
 local function segmentFrame(from: Vector3, to: Vector3, base: CFrame): CFrame
@@ -61,7 +113,7 @@ local function segmentFrame(from: Vector3, to: Vector3, base: CFrame): CFrame
 	return CFrame.lookAt((from + to) / 2, to, up)
 end
 
-local function makeSegment(spec, bones, scale: number, base: CFrame): (BasePart?, CFrame)
+local function makeSegment(spec, bones, scale: number, base: CFrame, group: string): (BasePart?, CFrame)
 	local from, to = bones[spec.from], bones[spec.to]
 
 	if not from or not to then
@@ -93,6 +145,7 @@ local function makeSegment(spec, bones, scale: number, base: CFrame): (BasePart?
 	part.CanCollide = true
 	part.CanQuery = false
 	part.CanTouch = false
+	part.CollisionGroup = group
 	part.CustomPhysicalProperties = Config.Physical
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
@@ -140,7 +193,7 @@ local function join(spec, parent: BasePart, child: BasePart, axes: CFrame, pivot
 	socket.TwistLowerAngle = lower
 	socket.TwistUpperAngle = upper
 	socket.Restitution = 0
-	socket.MaxFrictionTorque = child:GetMass() * (spec.friction or Config.FrictionPerMass)
+	socket.MaxFrictionTorque = child:GetMass() * workspace.Gravity * math.max(child.Size.X, child.Size.Y, child.Size.Z) / 2 * (spec.friction or Config.Friction)
 	socket.Parent = folder
 end
 
@@ -210,8 +263,10 @@ end
 function Build.Body(model: Model, definition): boolean
 	if model:HasTag(Config.Tag) then return true end
 
-	local specs = definition and definition.segments
-	if typeof(specs) ~= "table" or #specs == 0 then return false end
+	local defined = definition and definition.segments
+	if typeof(defined) ~= "table" or #defined == 0 then return false end
+
+	local specs = expand(defined)
 
 	local bones = bonesOf(model)
 	local first = bones[specs[1].from]
@@ -233,7 +288,7 @@ function Build.Body(model: Model, definition): boolean
 	local segments = {}
 
 	for _, spec in specs do
-		local part, frame = makeSegment(spec, bones, scale, base.CFrame)
+		local part, frame = makeSegment(spec, bones, scale, base.CFrame, base.CollisionGroup)
 
 		if part then
 			built[spec.name] = part
@@ -270,7 +325,10 @@ function Build.Body(model: Model, definition): boolean
 		parts = {},
 	}
 
-	keepApart(segments, folder)
+	if PhysicsService:CollisionGroupsAreCollidable(base.CollisionGroup, base.CollisionGroup) then
+		keepApart(segments, folder)
+	end
+
 	release(model, root, base, record)
 
 	attach(base, hips, folder, record)

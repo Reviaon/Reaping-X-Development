@@ -137,7 +137,7 @@ function CombatService:GrantRecovery(victim: Model, finisher)
 end
 
 function CombatService:ApplyBoneLaunch(victim: Model, velocity: Vector3, finisher): boolean
-	if not GlobalFunctions.BoneRagdollService.Knockdown(victim, finisher.ragdoll, velocity, finisher.spin) then return false end
+	if not GlobalFunctions.BoneRagdollService.Knockdown(victim, finisher.ragdoll, velocity, finisher.spin, finisher.gravity) then return false end
 
 	GlobalFunctions.StatusService:ApplyStatus(victim, GlobalFunctions.RagdollService.Settings.Status, true, finisher.ragdoll)
 	GlobalFunctions.StatusService:ApplyStatus(victim, "IsStunned", true, finisher.ragdoll)
