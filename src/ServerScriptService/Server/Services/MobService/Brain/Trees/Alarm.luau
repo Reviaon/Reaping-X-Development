@@ -17,7 +17,7 @@ return function(B)
 		}),
 
 		B.Sequence({
-			B.Action("AcquireTarget"),
+			B.Action("AcquireTarget", { provoked = true }),
 			B.Selector({
 				B.Sequence({
 					B.Condition("BeyondLeash"),
@@ -31,7 +31,10 @@ return function(B)
 							B.Condition("LandToCry"),
 							B.State("Land"),
 						}),
-						B.State("Cry"),
+						B.Sequence({
+							B.Condition("CryPoised"),
+							B.State("Cry"),
+						}),
 					}),
 				}),
 				B.Sequence({
@@ -49,7 +52,33 @@ return function(B)
 						B.State("Chase"),
 					}),
 				}),
-				B.State("Circle"),
+				B.State("Flit"),
+			}),
+		}),
+
+		B.Sequence({
+			B.Condition("Startled"),
+			B.State("FlyOff"),
+		}),
+
+		B.Sequence({
+			B.Condition("Visiting"),
+			B.Selector({
+				B.Sequence({
+					B.Condition("VisitStage", { stage = "circle" }),
+					B.State("Escort"),
+				}),
+				B.Sequence({
+					B.Condition("VisitStage", { stage = "greet" }),
+					B.Selector({
+						B.Sequence({
+							B.Condition("Airborne"),
+							B.State("Land"),
+						}),
+						B.State("Greet"),
+					}),
+				}),
+				B.State("Follow"),
 			}),
 		}),
 

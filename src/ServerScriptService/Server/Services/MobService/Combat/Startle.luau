@@ -2,7 +2,7 @@
 	**Startle**: an attack that comes near a passive bird spooks it, hit or miss (`startle`)
 	- **Melee:** any swing from within `startle.range` studs of it
 	- **Ranged:** a shot whose line passes within `startle.near` studs of it, ahead of the archer
-	- **Spooked** birds fly off (`States/FlyOff`) for `startle.duration` seconds; one already in alarm (provoked) ignores it
+	- **Spooked** birds fly off (`States/Alarm/FlyOff`) for `startle.duration` seconds; one already in alarm (provoked) ignores it
 ]]
 local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
 

@@ -69,6 +69,7 @@ function Mob.new(kind, model: Model, home: Vector3)
 		NextThinkAt = now + random:NextNumber(0, 0.25),
 		LastHealth = humanoid.Health,
 		HurtAt = nil,
+		LastProvoker = nil,
 		Healing = false,
 		Overhead = nil,
 		Dead = false,
@@ -178,6 +179,7 @@ function Mob:Provoke(attacker: Model, damage: number?)
 	if self.Dead or not Perception.IsValidTarget(attacker) then return end
 
 	Threat.Hit(self, attacker, damage)
+	self.LastProvoker = attacker
 	self.Blackboard.Returning = false
 	self.Blackboard.Retreating = false
 end
