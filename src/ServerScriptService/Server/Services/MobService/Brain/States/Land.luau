@@ -2,6 +2,7 @@ local Flight = require("../../Body/Flight")
 local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
 
 local FALLBACK_LENGTH = 1
+local LAND_FADE = 0.25
 
 local function settingsOf(mob): MobTypes.Flight
 	return mob.Config.flight
@@ -40,8 +41,9 @@ return {
 		if data.Track == nil then return end
 
 		local length = if data.Track and data.Track.Length > 0 then data.Track.Length else FALLBACK_LENGTH
+		local settle = math.min(flight.land_settle or length, length)
 
-		if os.clock() - data.At >= length and lift <= Flight.Settings.Airborne then
+		if os.clock() - data.At >= settle and lift <= Flight.Settings.Airborne then
 			data.Done = true
 		end
 	end,
@@ -51,8 +53,8 @@ return {
 			mob.Blackboard.CryAt = nil
 		end
 
-		if not data.Done and data.Track then
-			mob.Animation:Stop(settingsOf(mob).land)
+		if data.Track then
+			mob.Animation:Stop(settingsOf(mob).land, LAND_FADE)
 		end
 	end,
 }
