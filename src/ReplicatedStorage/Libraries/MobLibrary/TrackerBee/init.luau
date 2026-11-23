@@ -4,6 +4,7 @@
 	  - `alert`: the rage on spotting prey (`Bee Rage Aggro`), before it hunts
 	  - `attack`: the stinger dash (`Bee Startup Dash Attack`)
 	  - `abilities/latch`: it flies onto the player's back and stings while they run in place, until they shake it off
+	  - `ragdoll`: the body that ragdolls when it dies (it is too big to be knocked down)
 	  - `animations`: clip names
 	- **Brain:** the shared `Hunter` tree; it always flies at its authored height, so it needs no `flight`
 	- **This module:** identity, body and small settings; anything left out comes from `MobService/Defaults`

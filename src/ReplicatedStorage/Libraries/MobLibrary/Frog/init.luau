@@ -5,6 +5,7 @@
 	  - `abilities/latch`: a leap onto the player's face, held by `FrogLatch`
 	  - `abilities/tongue_latch`: the tongue grabs from range, held by `FrogTongueLatch`; winning it pulls the frog on into `latch`
 	  - `tempo`: short flurries broken up by strafes, back-offs and hops, plus backing out to leap
+	  - `ragdoll`: the body that ragdolls when it dies, or when a finisher or push knocks it down
 	  - `animations`: clip names
 	- **Brain:** the shared `Hunter` tree; it takes turns with any mob fighting the same player (`pack`)
 	- **This module:** identity, body and small settings; anything left out comes from `MobService/Defaults`

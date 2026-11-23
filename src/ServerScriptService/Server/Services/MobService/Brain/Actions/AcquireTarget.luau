@@ -54,7 +54,9 @@ return function(mob, args)
 	local detect = mob:Setting(args.detect or "detect_range")
 	local team = mob.Team
 	local previous = mob.Target
-	local target = if team then packTarget(mob, team, lose, detect) else soloTarget(mob, lose, detect)
+	local target = if args.provoked then mob:Provoker()
+		elseif team then packTarget(mob, team, lose, detect)
+		else soloTarget(mob, lose, detect)
 	local blackboard = mob.Blackboard
 
 	mob:SetTarget(target)

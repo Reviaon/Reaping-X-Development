@@ -2,6 +2,7 @@
 	**Flight**: lifts a mob off the ground by raising its Humanoid's `HipHeight`
 	- **Altitude:** states set `mob.Altitude` (studs above standing); each frame `Step` eases the lift toward it at `flight.climb` going up, `flight.descent` coming down
 	- **Airborne:** lifted past `Settings.Airborne` studs; `Body/Animation` then plays the `Engaged<Key>` clips, so the flight set replaces the ground set
+	- **Ragdolled:** while it lies limp the lift drops to standing, so it climbs again from the ground when it gets up rather than snapping back to height
 	- **Off** for any mob without a `flight` config
 ]]
 local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
@@ -34,6 +35,11 @@ end
 function Flight.Step(mob, dt: number)
 	local flight = settingsOf(mob)
 	if not flight then return end
+
+	if mob.Animation and mob.Animation.Limp then
+		mob.Humanoid.HipHeight = base(mob)
+		return
+	end
 
 	local goal = mob.Altitude or 0
 	local lift = Flight.Lift(mob)

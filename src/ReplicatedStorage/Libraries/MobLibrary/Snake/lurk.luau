@@ -1,6 +1,6 @@
 --[[@
 	**Lurk**: once it lets go of a seizing player, the snake keeps its distance and darts in to nip them
-	- **While:** its target is still held in the crush scene it backed out of (`Conditions/Lurking`)
+	- **While:** its target is still held in the crush scene it backed out of (`Conditions/Hunter/Lurking`)
 	- **Distance:** it holds `band` studs from the player's body, facing them
 	- **Nips:** every `nip.every` seconds it slides in to `nip.reach`, stops and bites with the stance bite, and backs out again
 ]]

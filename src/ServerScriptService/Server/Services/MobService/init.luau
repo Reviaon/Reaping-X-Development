@@ -14,6 +14,8 @@ local Spacing = require("@self/Body/Spacing")
 local Config = require("@self/Config")
 local Tree = require("@self/Brain/Tree")
 local Dodge = require("@self/Combat/Dodge")
+local Mourn = require("@self/Combat/Mourn")
+local Startle = require("@self/Combat/Startle")
 local Awareness = require("@self/Senses/Awareness")
 local Inspect = require("@self/Inspect")
 
@@ -137,6 +139,10 @@ function MobService:Spawn(name: string, ground: Vector3, options)
 	Mobs[mob] = true
 	ByModel[model] = mob
 
+	mob.Died:Connect(function()
+		Mourn.React(Mobs, mob)
+	end)
+
 	mob.Destroying:Connect(function()
 		Mobs[mob] = nil
 		ByModel[model] = nil
@@ -213,10 +219,12 @@ function MobService:Load()
 
 	CombatService.Swung:Connect(function(attacker)
 		Dodge.React(Mobs, attacker, CombatService)
+		Startle.React(Mobs, attacker)
 	end)
 
 	Jloader.GetService("RangedService").Fired:Connect(function(archer, origin, direction)
 		Awareness.Release.React(Mobs, archer, origin, direction)
+		Startle.React(Mobs, archer, origin, direction)
 	end)
 
 	Stats = Telemetry.new(self.Folder, self.Settings.TelemetryInterval)

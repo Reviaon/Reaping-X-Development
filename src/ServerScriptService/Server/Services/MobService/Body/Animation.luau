@@ -2,6 +2,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
 
+local MobTypes = require("@game/ReplicatedStorage/JLoader/Shared/GlobalFunctions/Character/MobTypes")
+
 local Attacks = require("../Combat/Attacks")
 local Flight = require("./Flight")
 
@@ -110,9 +112,9 @@ function Animation:Track(key: string): AnimationTrack?
 	return track
 end
 
-function Animation:Shot(visual: string, speed: number)
+function Animation:Shot(visual: string, speed: number, gap: number?)
 	local now = os.clock()
-	if now - (self.ShotAt[visual] or -math.huge) < Animation.Settings.ShotGap then return end
+	if now - (self.ShotAt[visual] or -math.huge) < (gap or Animation.Settings.ShotGap) then return end
 
 	self.ShotAt[visual] = now
 	Attacks.Shot(self.Mob, visual, speed)
@@ -120,16 +122,25 @@ end
 
 function Animation:Visual(key: string, track: AnimationTrack)
 	local mob = self.Mob
-	local visual = mob.Config.clip_visuals and mob.Config.clip_visuals[key]
-	if not visual then return end
+	local entry: MobTypes.ClipVisual? = mob.Config.clip_visuals and mob.Config.clip_visuals[key]
+	if not entry then return end
 
-	self:Shot(visual, track.Speed)
+	local visual = if type(entry) == "table" then entry.visual else entry
+	local gap = if type(entry) == "table" then entry.every else nil
+	local below = if type(entry) == "table" then entry.below else nil
+
+	local function fire()
+		if below and Flight.Lift(mob) > below then return end
+		self:Shot(visual, track.Speed, gap)
+	end
+
+	fire()
 
 	if self.Looping[track] then return end
 
 	self.Looping[track] = track.DidLoop:Connect(function()
 		if track.IsPlaying and not self.Culled and not self.Limp then
-			self:Shot(visual, track.Speed)
+			fire()
 		end
 	end)
 end
