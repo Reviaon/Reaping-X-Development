@@ -69,6 +69,12 @@ local function morphNames()
 	return names
 end
 
+local function soundPaths()
+	local paths = Jloader.GlobalFunctions.SoundService:Paths()
+	table.insert(paths, "stop")
+	return paths
+end
+
 local function resolve(query, names)
 	if type(query) ~= "string" or query == "" then
 		return nil, "nothing named"
@@ -311,6 +317,33 @@ function Implementations.giveWeaponServer(context)
 	end
 
 	return context.reply(("gave %s to %s"):format(given, target.Name))
+end
+
+function Implementations.soundServer(context)
+	local character = context.entity.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return context.err("no-character", "you have no body to play it on")
+	end
+
+	local Sounds = Jloader.GlobalFunctions.SoundService
+	local query = table.concat(argumentsOf(context), " ")
+
+	if string.lower(query) == "stop" then
+		local playing = #Sounds:Find(nil, root)
+		Sounds:StopAll(root)
+		return context.reply(("stopped %d sound(s)"):format(playing))
+	end
+
+	local path, why = resolve(query, Sounds:Paths())
+
+	if not path then
+		return context.err("unknown-sound", why)
+	end
+
+	Sounds:Play(path, { Parent = root })
+	return context.reply(("playing %s"):format(path))
 end
 
 function Implementations.giveAllServer(context)
@@ -1028,6 +1061,22 @@ function KonsoleService:Init()
 				type = "string",
 				required = false,
 				suggestions = { "on", "off", "toggle" },
+			},
+		},
+	})
+
+	Konsole.define({
+		name = "sound",
+		rank = settings.CommandRank,
+		aliases = { "sfx", "playsound" },
+		description = "Plays a sound from Libraries.SoundLibrary on you by its path (Weapons.Dagger.Hit); 'sound stop' silences them.",
+		server = "soundServer",
+		args = {
+			{
+				name = "path",
+				type = "string",
+				required = true,
+				suggestions = soundPaths(),
 			},
 		},
 	})

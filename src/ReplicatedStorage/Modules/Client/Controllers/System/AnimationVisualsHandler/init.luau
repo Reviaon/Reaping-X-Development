@@ -30,12 +30,22 @@ local function index()
 	local library = find(ReplicatedStorage, Config.Animations)
 	if not library then return end
 
-	for name, entries in Config.Visuals do
-		local animation = library:FindFirstChild(name, true)
-		local id = animation and animation:IsA("Animation") and idOf(animation.AnimationId)
+	for _, source in { Config.Visuals, Config.Sounds } do
+		for name, entries in source do
+			local animation = library:FindFirstChild(name, true)
+			local id = animation and animation:IsA("Animation") and idOf(animation.AnimationId)
+			if not id then continue end
 
-		if id then
-			visualsById[id] = entries
+			local list = visualsById[id]
+
+			if not list then
+				list = {}
+				visualsById[id] = list
+			end
+
+			for _, entry in entries do
+				table.insert(list, entry)
+			end
 		end
 	end
 end
@@ -148,6 +158,20 @@ local function mount(entry, host: Model)
 	task.delay(Config.Lifetime, mounted.Destroy, mounted)
 end
 
+local function sound(entry, character: Model): Sound?
+	local host = character
+
+	if entry.Anchor == "Partner" then
+		host = GlobalFunctions.PairSceneService.PartnerOf(character)
+		if not host then return nil end
+	end
+
+	local root = host:FindFirstChild("HumanoidRootPart")
+	if not root then return nil end
+
+	return GlobalFunctions.SoundService:TryPlay(entry.Sound, { Parent = root })
+end
+
 local function emit(entry, character: Model, start: CFrame?)
 	local host = character
 
@@ -212,7 +236,13 @@ local function onTrack(character: Model, track: AnimationTrack)
 			return
 		end
 
-		emit(entry, character, start)
+		if entry.Sound then
+			sound(entry, character)
+		end
+
+		if entry.Effect then
+			emit(entry, character, start)
+		end
 	end
 
 	local function judge(position: number)
@@ -229,8 +259,16 @@ local function onTrack(character: Model, track: AnimationTrack)
 		end
 	end
 
+	local held: { Sound } = {}
+
 	for _, entry in entries do
-		if entry.Marker then
+		if entry.Hold then
+			local playing = entry.Sound and track.WeightTarget >= Config.MinWeight and sound(entry, character)
+
+			if playing then
+				table.insert(held, playing)
+			end
+		elseif entry.Marker then
 			table.insert(connections, track:GetMarkerReachedSignal(entry.Marker):Connect(function()
 				fire(entry)
 			end))
@@ -271,6 +309,10 @@ local function onTrack(character: Model, track: AnimationTrack)
 	table.insert(connections, track.Stopped:Connect(function()
 		for _, connection in connections do
 			connection:Disconnect()
+		end
+
+		if #held > 0 then
+			GlobalFunctions.SoundService:Stop(held, Config.HoldFade)
 		end
 	end))
 end

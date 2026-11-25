@@ -8,6 +8,7 @@
 	- **Prints** (`Prints`): the kind's part under `MovementVFX.Footstep` is recoloured to the floor's colour and emitted through ForgeVFX
 	  - Authored in grey: each emitter keeps its shade relative to the brightest in its part
 	  - Pooled copies are used in turn, so recolouring one never repaints prints still fading
+	- **Sounds** (`Sounds`): each plant plays the kind's `Footsteps` sound from the leg, `Run` at `Config.Sounds.RunSpeed` and over, `Walk` under it
 	- **Pebbles** (`Pebbles`): at sprint speed each plant flicks a few tiny blocks of the floor's material and colour back behind the runner
 	- **A new ground** is a new part under `Footstep` and lines in `Config.Kinds` / `Config.Materials`
 ]]
@@ -22,6 +23,7 @@ local Config = require("@self/Config")
 local Ground = require("@self/Ground")
 local Pebbles = require("@self/Pebbles")
 local Prints = require("@self/Prints")
+local Sounds = require("@self/Sounds")
 local Stride = require("@self/Stride")
 local Types = require("@self/Types")
 
@@ -89,6 +91,7 @@ local function rescan()
 
 		if (root.Position - origin).Magnitude <= Config.Range and watchOf(character) then
 			keep[character] = true
+			Sounds.MuteDefaults(root)
 		end
 	end
 
@@ -123,6 +126,7 @@ local function step(watch: Types.Watch)
 		if not ground then continue end
 
 		Prints.Step(ground, heading)
+		Sounds.Step(foot.Leg, ground, speed)
 
 		if speed >= Config.Pebbles.Speed then
 			Pebbles.Kick(ground, heading)

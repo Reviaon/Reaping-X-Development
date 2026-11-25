@@ -3,13 +3,20 @@ local ProjectileService = require("@game/ReplicatedStorage/JLoader/Shared/Global
 
 local Weapon = {}
 
-function Weapon.Speed(Character: Model?, projectile, key: string): number
+function Weapon.TierSpeed(Character: Model?, projectile, key: string): number
 	if not Config.TierClips[key] then return 1 end
 
 	local tier = ProjectileService.Tier(projectile, Character)
 	local speed = tier and tier.draw
 
 	return if typeof(speed) == "number" and speed > 0 then speed else 1
+end
+
+function Weapon.Speed(Character: Model?, projectile, key: string): number
+	local speeds = projectile.speeds
+	local base = typeof(speeds) == "table" and speeds[key]
+
+	return (if typeof(base) == "number" and base > 0 then base else 1) * Weapon.TierSpeed(Character, projectile, key)
 end
 
 function Weapon.Of(controller)

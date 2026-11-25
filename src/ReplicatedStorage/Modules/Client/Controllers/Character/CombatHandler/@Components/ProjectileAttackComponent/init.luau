@@ -9,6 +9,7 @@ local Nock = require("@self/Nock")
 local Shot = require("@self/Shot")
 local Observe = require("@self/Observe")
 local Line = require("@self/Line")
+local Sounds = require("@self/Sounds")
 
 local ProjectileAttackComponent = {}
 
@@ -128,6 +129,7 @@ function ProjectileAttackComponent:Deactivate(controller, _combatState)
 		state.nocked = false
 	end
 
+	Sounds.Cancel(controller.Character)
 	Cycle.Finish(controller, state)
 end
 

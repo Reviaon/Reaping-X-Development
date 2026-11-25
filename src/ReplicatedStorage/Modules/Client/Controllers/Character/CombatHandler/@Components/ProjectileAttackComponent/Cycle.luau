@@ -2,6 +2,7 @@ local Config = require("./Config")
 local Weapon = require("./Weapon")
 local Aim = require("./Aim")
 local Shot = require("./Shot")
+local Sounds = require("./Sounds")
 
 local Cycle = {}
 
@@ -95,6 +96,8 @@ function Cycle.Enter(controller, state, phase: string)
 	local fades = Config.Fades
 
 	Cycle.Unwatch(state)
+
+	Sounds.Phase(controller.Character, projectile, phase, state.phase)
 
 	state.phase = phase
 	state.phaseStart = os.clock()

@@ -2,6 +2,7 @@ local Config = require("./Config")
 local Weapon = require("./Weapon")
 local Aim = require("./Aim")
 local Nock = require("./Nock")
+local Sounds = require("./Sounds")
 
 local Observe = {}
 
@@ -27,6 +28,14 @@ local function clipLength(controller, character: Model, id: string, projectile, 
 	return math.max(clipLengths[name] - Weapon.Start(projectile, key), 0) / speed
 end
 
+local function cutShort(view): boolean
+	local previous = view.phase
+	if previous == "Drawing" or previous == "Holding" then return true end
+	if previous ~= "Reloading" then return false end
+
+	return os.clock() - (view.phaseStart or 0) < (view.clipLength or 0)
+end
+
 function Observe.Step(controller, dt: number)
 	local world = workspace:FindFirstChild("World")
 	local living = world and world:FindFirstChild("Live")
@@ -43,6 +52,11 @@ function Observe.Step(controller, dt: number)
 		local view = views[character]
 
 		if not projectile then
+			if view and view.phase and cutShort(view) then
+				Sounds.Cancel(character)
+				view.phase = nil
+			end
+
 			if view and view.armSettings and (view.armPitch or 0) ~= 0 then
 				Aim.PitchArms(character, view, view.armSettings, 0, dt)
 			end
@@ -61,6 +75,12 @@ function Observe.Step(controller, dt: number)
 		local at = character:GetAttribute("ProjectileStateAt") or 0
 
 		if view.at ~= at or view.phase ~= phase then
+			if phase == "Idle" and cutShort(view) then
+				Sounds.Cancel(character)
+			elseif workspace:GetServerTimeNow() - at <= Config.SoundFreshness then
+				Sounds.Phase(character, projectile, phase, view.phase)
+			end
+
 			view.at = at
 			view.phase = phase
 			view.phaseStart = os.clock() - math.max(0, workspace:GetServerTimeNow() - at)

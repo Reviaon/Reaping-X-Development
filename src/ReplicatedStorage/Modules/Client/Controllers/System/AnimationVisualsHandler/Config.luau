@@ -7,6 +7,7 @@ return {
 
 	Lifetime = 4,
 	MinWeight = 0.1,
+	HoldFade = 0.2, --@ Seconds a Hold sound fades out over when its clip stops
 
 	TorsoParts = { "UpperTorso", "Torso" },
 
@@ -76,6 +77,44 @@ return {
 		GrabFailVictim = {
 			{ At = 0.55, Effect = "headlockbreakneckdrop", Mount = "crack" },
 			{ At = 1.1, Effect = "headlockbreakneckdrop" },
+		},
+	},
+
+	Sounds = { --@ Clip -> SoundLibrary paths cued on it: At (seconds, or a list) or Marker as in Visuals; Hold plays from the clip's start until it stops; Anchor = "Partner" plays from the scene partner
+		TackleMiss = {
+			{ Marker = "DiveMiss", Sound = "Abilities.Tackle.Miss" },
+		},
+
+		TackleHitAttackerLoop = {
+			{ Marker = "Hit", Sound = "Abilities.Tackle.FacePunch", Anchor = "Partner" }, --@ The victim's face, on each punch
+		},
+
+		TackleHitVictimBackLoop = {
+			{ At = { 0.3, 0.917, 2.13, 2.7, 4.8 }, Sound = "Abilities.Tackle.FaceSlam" }, --@ Same beats as BackGrappleVariantHit
+		},
+
+		Push = {
+			{ At = 0.18, Sound = "Abilities.Push.Whiff" },
+		},
+
+		SprintPush = {
+			{ At = 0.25, Sound = "Abilities.Push.Whiff" }, --@ PushLibrary.Sprint.HitboxDelay
+		},
+
+		GrabStartVictim = {
+			{ At = 0.17, Sound = "Abilities.Grab.Hit" }, --@ Where the victim's head first jerks in the clip
+		},
+
+		GrabStruggleVictimLoop = {
+			{ Hold = true, Sound = "Abilities.Grab.Loop" },
+		},
+
+		GrabFailAttacker = {
+			{ Marker = "Hit", Sound = "Abilities.Grab.Fail" }, --@ The victim breaks free
+		},
+
+		GrabFailVictim = {
+			{ At = 0.55, Sound = "Abilities.Grab.NeckDamaged" }, --@ The neck crack
 		},
 	},
 }

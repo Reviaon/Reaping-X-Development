@@ -35,6 +35,12 @@ export type PebbleSettings = {
 	PoolGrowth: number,
 }
 
+export type StepSounds = {
+	Kinds: { [string]: string },
+	RunSpeed: number,
+	Mute: { string },
+}
+
 export type Config = {
 	Assets: { string },
 	Pebble: { string },
@@ -50,6 +56,7 @@ export type Config = {
 	Rearm: number,
 	RayUp: number,
 	RayDepth: number,
+	Sounds: StepSounds,
 	PrintPool: number,
 	Pebbles: PebbleSettings,
 }

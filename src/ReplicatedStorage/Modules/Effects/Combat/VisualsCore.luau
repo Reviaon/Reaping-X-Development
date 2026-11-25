@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 
 local Jloader = require("@game/ReplicatedStorage/JLoader")
 local StatusLibrary = require("@game/ReplicatedStorage/Libraries/CharacterLibrary/StatusLibrary")
+local CombatSounds = require("./CombatSounds")
 
 local VisualsCore = {}
 
@@ -470,6 +471,7 @@ function VisualsCore.Attack(controller, settings)
 			frame = frame,
 			run = function()
 				Track(watch, VisualsCore.SpawnAttack(controller, settings, comboIndex, root))
+				CombatSounds.Swing(character, rawget(controller, "WeaponId"), comboIndex)
 			end,
 		},
 	}
