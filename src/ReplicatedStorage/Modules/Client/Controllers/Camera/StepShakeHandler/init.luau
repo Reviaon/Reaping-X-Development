@@ -3,6 +3,7 @@
 	- **Opt-in by config:** a MobLibrary entry with a `footsteps` module (`MobTypes.Footsteps`) is watched; nothing else is
 	- **Timing:** each frame it reads the mob's playing gait tracks (`gaits`, keyed like `animations`) and shakes when a clip's phase passes one of its `at` shares, so steps follow the playback speed
 	- **Gaits:** each has its own shape; when two strike together, the one with the heavier blend weight wins
+	- **Sound:** a gait's optional `sound` (SoundLibrary path) plays from each mob on every step it strikes
 	- **Strength:** the shape is scaled by closeness, full at the mob and nothing at `range`; several mobs stepping on one frame give one shake, the strongest
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -185,18 +186,18 @@ local function struck(stride: Stride, gait: MobTypes.Gait, minWeight: number): b
 	return false
 end
 
-local function stepOf(watch: Watch): string?
-	local heaviest, shape = -1, nil
+local function stepOf(watch: Watch): MobTypes.Gait?
+	local heaviest, stepped = -1, nil
 
 	for key, stride in watch.Strides do
 		local gait = watch.Profile.Gaits[key]
 
 		if gait and struck(stride, gait.Settings, watch.Profile.Settings.min_weight) and stride.Track.WeightCurrent > heaviest then
-			heaviest, shape = stride.Track.WeightCurrent, gait.Settings.shake
+			heaviest, stepped = stride.Track.WeightCurrent, gait.Settings
 		end
 	end
 
-	return shape
+	return stepped
 end
 
 local function step()
@@ -217,10 +218,12 @@ local function step()
 		local stepped = stepOf(watch)
 		if not stepped then continue end
 
+		Jloader.GlobalFunctions.SoundService:TryPlay(stepped.sound, { Parent = watch.Root })
+
 		local scale = 1 - (watch.Root.Position - own.Position).Magnitude / watch.Profile.Settings.range
 
 		if scale > strongest then
-			strongest, shape = scale, stepped
+			strongest, shape = scale, stepped.shake
 		end
 	end
 
