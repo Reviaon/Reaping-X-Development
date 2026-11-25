@@ -18,6 +18,9 @@ return {
 		starts = { --@ Seconds into a clip it starts from
 			fire = 5 / 60, --@ The string's snap; earlier frames only pull further after the arrow has already left
 		},
+		speeds = { --@ Clip playback per phase before the tier's `draw` multiplier
+			draw = 1 / 3, --@ The 0.5 s draw stretched to 1.5 s, where `Weapons.Bow.Charge`'s creak peaks as the string reaches full; tiers pitch the sound up with the draw
+		},
 		nock = {
 			part = "Arrow",
 			idle = "ArrowIdle",
@@ -42,6 +45,28 @@ return {
 		},
 
 		obstacle_effect = "ProjectileHitObstacle",
+
+		sounds = { --@ SoundLibrary paths, played from the archer (or where the arrow lands)
+			draw = "Weapons.Bow.Charge",
+			reload = "Weapons.Bow.Load",
+			quick = "Weapons.Bow.QuickFire", --@ Loosed straight out of the draw
+			charged = "Weapons.Bow.ChargedShot", --@ Loosed from a held, full draw
+			impact = {
+				path = "Weapons.Bow.Impact", --@ The struck surface's kind is added to this
+				fallback = "Rock", --@ Kind for any material not listed
+				materials = {
+					[Enum.Material.Wood] = "Wood",
+					[Enum.Material.WoodPlanks] = "Wood",
+					[Enum.Material.Sand] = "Sand",
+					[Enum.Material.Grass] = "Sand",
+					[Enum.Material.LeafyGrass] = "Sand",
+					[Enum.Material.Ground] = "Sand",
+					[Enum.Material.Mud] = "Sand",
+					[Enum.Material.Snow] = "Sand",
+					[Enum.Material.Salt] = "Sand",
+				},
+			},
+		},
 		aim_fov = -8,
 		aim_line = "Subtle",
 		release_shake = "BowRelease",
