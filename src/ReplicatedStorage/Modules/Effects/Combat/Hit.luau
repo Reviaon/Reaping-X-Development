@@ -11,6 +11,7 @@ local Jloader = require("@game/ReplicatedStorage/JLoader")
 local AnimatorService = Jloader.GlobalFunctions.AnimatorService
 local EffectService = Jloader.GlobalFunctions.EffectService
 local CombatConfig = require("@game/ReplicatedStorage/Modules/Client/Controllers/Character/CombatHandler/Config")
+local CombatSounds = require("./CombatSounds")
 
 local Settings = {
 	DefaultEffect = "BluntHit", --@ Used when the swing names no effect
@@ -278,11 +279,12 @@ function Hit.Emit(Info)
 	local highlight = Hit.Highlight(victim)
 	local effect = if still then nil else Hit.SpawnParticles(victim, Info.Effect, rawget(Info, "Point"), rawget(Info, "Normal"))
 	local track = if still then nil else Hit.PlayReaction(Info, victim)
+	local sound = if still then nil else CombatSounds.Hit(victim, Info.Attacker, rawget(Info, "WeaponId"), rawget(Info, "Point"), rawget(Info, "ComboIndex"))
 
 	Hit.Freeze(track, CombatConfig:ResolveHitStop(rawget(Info, "WeaponId"), rawget(Info, "ComboIndex")))
 
 	if rawget(Info, "Predicted") then
-		predictions[victim] = { Highlight = highlight, Effect = effect, Track = track }
+		predictions[victim] = { Highlight = highlight, Effect = effect, Track = track, Sound = sound }
 	end
 end
 
@@ -306,6 +308,10 @@ function Hit.Retract(Info)
 
 	if prediction.Track and prediction.Track.IsPlaying then
 		prediction.Track:Stop(Settings.ReactionFade)
+	end
+
+	if prediction.Sound and prediction.Sound.Parent then
+		Jloader.GlobalFunctions.SoundService:Stop(prediction.Sound)
 	end
 end
 
