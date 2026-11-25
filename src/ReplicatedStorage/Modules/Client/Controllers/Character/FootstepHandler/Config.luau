@@ -26,6 +26,16 @@ return {
 	RayUp = 1, --@ Studs above a foot the floor probe starts
 	RayDepth = 6, --@ Studs the floor probe reaches down
 
+	Sounds = { --@ A step sound from the planted leg, picked by the ground's kind and the speed
+		Kinds = { --@ Kind -> SoundLibrary path the gait name is added to; a kind left out is silent
+			Grass = "Footsteps.Grass",
+			Sand = "Footsteps.Sand",
+			Ground = "Footsteps.Stone",
+		},
+		RunSpeed = 22, --@ Studs/s across the floor a step counts as running (`.Run`), under it walking (`.Walk`)
+		Mute = { "Running" }, --@ Roblox's default character sounds on the root, silenced on watched bodies so steps aren't doubled
+	},
+
 	PrintPool = 8, --@ Copies of each kind's part, used in turn, so a recolour never repaints prints still fading
 
 	Pebbles = { --@ Tiny blocks kicked up behind a sprinting character's planted foot
