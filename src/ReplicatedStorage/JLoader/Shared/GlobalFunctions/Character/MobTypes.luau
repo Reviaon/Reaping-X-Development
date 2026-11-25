@@ -29,6 +29,7 @@ export type Sleep = {
 export type Gait = {
 	at: { number },
 	shake: string,
+	sound: string?,
 }
 
 export type Footsteps = {
