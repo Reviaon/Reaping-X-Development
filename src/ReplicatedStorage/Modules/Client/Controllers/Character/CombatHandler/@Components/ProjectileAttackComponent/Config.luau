@@ -39,6 +39,8 @@ return {
 	FallbackOriginHeight = 1.5,
 	MinShotDistance = 1,
 	MaxCatchUp = 0.3,
+	SoundFreshness = 0.5, --@ Seconds old another archer's phase change may be and still play its sound
+	SoundCancelFade = 0.08, --@ Fade on a draw or reload sound cut short by a cancel, or the draw sound by the string's release
 
 	Facing = {
 		Step = "ProjectileFacing",
