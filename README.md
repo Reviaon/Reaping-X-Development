@@ -1561,6 +1561,54 @@ own screen.
 - **Pebbles** (`Pebbles`): at `Pebbles.Speed` studs/s or more (sprint runs at 30; sprint status is client-only, so speed stands in for it), each plant flicks 2–3 tiny blocks cut from `DashGroundDebree.Ground`, in the floor's material and colour, back and up behind the runner. They arc under light gravity, spin, and shrink away within half a second. Pooled with `PartCache`.
 - **A new ground** is a new part under `Footstep` plus lines in `Config.Kinds` and `Config.Materials`.
 
+### Sounds
+
+Every sound effect lives in `Libraries/SoundLibrary` and plays through `GlobalFunctions.SoundService` (`Effects/SoundService/`). Gameplay plays them from the places below, on every client, so nothing extra is networked.
+
+- **The library** is folders of modules, found by path: folders, module name and keys joined by dots.
+  - `Weapons/Dagger.luau`'s `Hit` is `Weapons.Dagger.Hit`; the bow's `Impact.Rock` is `Weapons.Bow.Impact.Rock`.
+  - Categories: `Footsteps` (by surface), `Weapons` (keyed like `WeaponsLibrary`, so the fists are `Melee`), `Abilities` (`Push`, `Grab` = the chokehold, `Tackle` = the dive), `Mobs` (keyed like `MobLibrary`).
+- **Adding a sound for something already wired** is data only. For example, `Hit` in `Weapons/Sword.luau` plays at once, and so does `Hit` in `Mobs/Wolf.luau`. A new clip cue is a line in `AnimationVisualsHandler/Config.Sounds`.
+  - An entry is `{ Ids = { … } }` plus optional `Volume`, `PlaybackSpeed`, `Looped`, `StartAt`, `Trim`, `RollOffMaxDistance`, `Cycle` (`SoundTypes.Entry`).
+  - **`Trim = { [assetId] = seconds }`** starts one variant that far in, for an upload with dead air before its sound (Dagger whiff 2's swoosh lands ~0.4 s in, so it starts at 0.36). `StartAt` does the same for every variant.
+  - **Picking a variant:** by default each play picks one id at random and never repeats the last one.
+    - `Cycle = true` plays them in listed order instead (1, 2, 3, 1, …), for sets made as a sequence, like footsteps.
+    - Each model keeps its own place in the cycle: the model the sound is parented into, or `Owner` in the play options.
+    - `Number` in the play options plays the variant with that number (weapon sounds pass the combo index). Ids count 1, 2, 3… unless the entry lists their own `Numbers` (e.g. `{ 1, 2, 4 }` for "Scythe whiff 1, 2, 4"). A number with no sound of its own wraps round the list.
+- **Adding sounds** is data only: an id in a list, a key in a module, or a new module or folder. The service finds it by name.
+- **The utility** (`SoundService:<Method>`):
+  - `Play(path, options?)` returns the `Sound`. Options: `Parent` (plays from that part), `Position` (from a point in the world), neither (2D), `Variant`, `Volume`, `PlaybackSpeed`, `Looped`, `StartAt`, `FadeIn`.
+  - `Get(path)` (the entry), `Paths(prefix?)` (browse the library), `Ids(path)`.
+  - `Find(prefix?, scope?)` returns the sounds this machine is playing under a path prefix, optionally only those inside `scope` (a character).
+  - `Stop`, `Pause`, `Resume`, `IsPlaying`, and `Tune(target, { Volume, PlaybackSpeed }, fade?)` take a `Sound`, a list from `Find`, or a path prefix. `Stop` takes an optional fade.
+  - `StopAll(scope?, fade?)`; `TuneGroup(category, volume, fade?)`.
+  - `TryPlay(path?, options?)` is `Play` that stays silent when the path isn't in the library. Convention lookups use it, so a weapon with no `Hit` list yet just plays nothing. `Has(path)` checks.
+- **Where each sound is played:**
+  - **Footsteps:** `FootstepHandler/Sounds` plays `Config.Sounds.Kinds[kind]` + `.Walk` / `.Run` from the planted leg (`Run` at `RunSpeed` 22 and up). The `Ground` kind uses the Stone sounds. It mutes Roblox's default `Running` sound (`Config.Sounds.Mute`) on the bodies it watches, so steps aren't doubled.
+  - **Mob steps:** a `footsteps` gait's optional `sound` plays from the mob on every strike (`StepShakeHandler`). The wolf's walk and run both use `Mobs.Wolf.Walk` until run steps are uploaded.
+  - **Weapon swings and hits** go through `Effects/Combat/CombatSounds`.
+    - `VisualsCore.Attack` plays `Weapons.<WeaponId>.Whiff` from the attacker on the swing VFX frame, every swing.
+    - `Hit.Emit` plays `Weapons.<WeaponId>.Hit` at the contact point, or the victim.
+    - Both pick by the attack's combo index (`Number`), so attack 3 plays whiff 3 and hit 3, and a combo reset starts the sounds again at 1.
+    - Whiffs sit at volume 0.4 under the 0.5 default, so a landed hit stays the louder of the two. A mob attacker plays `Mobs.<Name>.Hit` instead, and `HitOverrides` sends `Push` to `Abilities.Push.Hit`.
+    - Still (scene) strikes play nothing here; their clips carry their own. A predicted hit the server retracts stops its sound.
+  - **Bow:** `projectile.sounds` in `WeaponsLibrary.Bow`.
+    - `draw` on Drawing, `reload` on Reloading. Firing plays `charged` when it leaves Holding, `quick` when it fires straight out of the draw.
+    - The draw is timed to its sound. `projectile.speeds.draw` (1/3) stretches the 0.5 s `BowAim` to 1.5 s, where the Charge creak peaks as the string reaches full.
+    - A tier's `draw` multiplier speeds the clip and plays the draw and reload sounds at the same `PlaybackSpeed`, so they stay together.
+    - **Cut short with the action:** a cancel (RMB, stun, unequip) fades out the draw and reload sounds (`SoundCancelFade`, 0.08 s). Loosing the string ends the draw creak too. Shot sounds always ring out.
+      - Other archers: going Idle from Drawing/Holding, or from Reloading before its clip ends, counts as a cancel (`Observe`).
+    - Arrows landing on the world play `impact.path` + the kind from `impact.materials` (`fallback` Rock).
+    - The archer plays these from `ProjectileAttackComponent/Cycle`, others from `Observe` (phase changes under `SoundFreshness` old) and `Shot`.
+  - **Clip-cued sounds** (push whiffs, tackle miss, face punch and slam, the chokehold): `AnimationVisualsHandler/Config.Sounds`, keyed by clip like `Visuals`.
+    - `At` (seconds, or a list) or `Marker` cue a `Sound`; `Anchor = "Partner"` plays it from the scene partner.
+    - `Hold = true` plays it from the clip's start until the clip stops (the choking loop).
+- **Clean-up:** a one-shot destroys itself (and any world-position holder) when it ends. A looped one plays until stopped.
+- **Mixing:** each top-level category plays through a `SoundGroup` of that name in `SoundService`, client-side only (`Config.Groups` volumes). A group already placed there is used instead of making one.
+- **Preloading:** `PreloadHandler` adds `SoundService:PreloadList()` to its batch, so every library id loads with the rest of `Storage`.
+- **Server or client:** it runs on either. A server-played sound replicates to everyone, while a client-played one is heard only by that client. `Find` only sees what its own machine started.
+- **Trying one:** `sound Weapons.Dagger.Hit` in the console plays it on you; `sound stop` silences them.
+
 ---
 
 ## The console
