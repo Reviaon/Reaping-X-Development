@@ -68,6 +68,10 @@ function PreloadHandler:Load()
 	local Storage = ReplicatedStorage:WaitForChild("Storage")
 	local Assets, Skipped = self:Collect(Storage)
 
+	for _, Sound in Jloader.GlobalFunctions.SoundService:PreloadList() do
+		table.insert(Assets, Sound)
+	end
+
 	self.Report.Total = #Assets
 	self.Report.Skipped = Skipped
 
