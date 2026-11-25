@@ -4,6 +4,7 @@ local Config = require("./Config")
 local Weapon = require("./Weapon")
 local Aim = require("./Aim")
 local Nock = require("./Nock")
+local Sounds = require("./Sounds")
 
 local Shot = {}
 
@@ -34,6 +35,8 @@ local function surfaceColor(result: RaycastResult): Color3?
 end
 
 local function spawnObstacle(projectile, result: RaycastResult)
+	Sounds.Impact(projectile, result)
+
 	local name = projectile.obstacle_effect
 	local module = typeof(name) == "string" and hits()
 
